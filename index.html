@@ -36,7 +36,6 @@
 
         .container { 
             width: 100%; 
-            /* 게시판 탭 추가로 가로폭을 넓게 조정 (1100px) */
             max-width: 1100px; 
             background: var(--card-bg); 
             padding: 28px; 
@@ -424,7 +423,7 @@
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1>올인원 영작-단어장 시스템<small>소설 학습 4슬롯 관리 & 원키 단어장 복습 트레이너</small></h1>
+        <h1>올인원 영작-단어장 시스템<small>소설 학습 6슬롯 관리 & 원키 단어장 복습 트레이너</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
             
@@ -457,7 +456,6 @@
         <button class="tab-btn" onclick="switchMainTab('vocaTab')">단어장</button>
         <button class="tab-btn" onclick="switchMainTab('quizTab')">라운드퀴즈</button>
         <button class="tab-btn" onclick="switchMainTab('novelQuizTab')">영작퀴즈</button>
-        <!-- 추가된 게시판 탭 버튼 -->
         <button class="tab-btn" onclick="switchMainTab('boardTab')">게시판</button>
     </div>
 
@@ -468,10 +466,11 @@
         <!-- 파일 업로드 인풋 -->
         <input type="file" id="globalFileInput" accept=".xlsx, .xls, .csv, .txt, .srt" style="display:none;" onchange="importFileForSlot(event)">
 
-        <!-- 4개 슬롯 영역 -->
+        <!-- 6개 슬롯 영역 -->
         <div class="multi-slot-container">
+            <!-- 1. 일반 슬롯 (슬롯 1 ~ 3) -->
             <script>
-                for(let i=0; i<2; i++) {
+                for(let i=0; i<3; i++) {
                     document.write(`
                         <div id="slotRow_${i}" class="slot-row" onclick="switchSlot(${i})">
                             <span class="slot-tag">슬롯 ${i+1}</span>
@@ -491,34 +490,42 @@
                 }
             </script>
             
-            <div id="slotRow_2" class="slot-row" onclick="switchSlot(2)">
-                <span class="slot-tag" style="background:#111827; color:#fff;">슬롯 3</span>
-                <div id="slotTitle_2" class="slot-title-area">비어 있음 (3열 전용: 불러오기 및 붙여넣기 등록 가능)</div>
-                <div class="slot-actions" onclick="event.stopPropagation()">
-                    <button class="btn-excel" onclick="triggerImport(2)">불러오기</button>
-                    <button class="btn-excel" onclick="openPasteModalSlot3()">붙여넣기</button>
-                    <button class="btn-download" onclick="exportResultExcelForSlot(2)">다운로드</button>
-                    <div id="slotNav_2" class="slot-nav" style="display: none;">
-                        <button class="btn-nav" onclick="moveIndexForSlot(2, -1)">&lt;</button>
-                        <input type="text" id="slotIndexInput_2" value="00001" onchange="jumpToIndexForSlot(2, this.value)">
-                        <span id="slotTotalSpan_2" style="font-family: monospace;">/ 00000</span>
-                        <button class="btn-nav" onclick="moveIndexForSlot(2, 1)">&gt;</button>
-                    </div>
-                </div>
-            </div>
+            <!-- 2. 3열 전용 슬롯 (슬롯 4 ~ 5) -->
+            <script>
+                for(let i=3; i<5; i++) {
+                    document.write(`
+                        <div id="slotRow_${i}" class="slot-row" onclick="switchSlot(${i})">
+                            <span class="slot-tag" style="background:#111827; color:#fff;">슬롯 ${i+1}</span>
+                            <div id="slotTitle_${i}" class="slot-title-area">비어 있음 (3열 전용: 불러오기 및 붙여넣기 등록 가능)</div>
+                            <div class="slot-actions" onclick="event.stopPropagation()">
+                                <button class="btn-excel" onclick="triggerImport(${i})">불러오기</button>
+                                <button class="btn-excel" onclick="openPasteModalSlot3(${i})">붙여넣기</button>
+                                <button class="btn-download" onclick="exportResultExcelForSlot(${i})">다운로드</button>
+                                <div id="slotNav_${i}" class="slot-nav" style="display: none;">
+                                    <button class="btn-nav" onclick="moveIndexForSlot(${i}, -1)">&lt;</button>
+                                    <input type="text" id="slotIndexInput_${i}" value="00001" onchange="jumpToIndexForSlot(${i}, this.value)">
+                                    <span id="slotTotalSpan_${i}" style="font-family: monospace;">/ 00000</span>
+                                    <button class="btn-nav" onclick="moveIndexForSlot(${i}, 1)">&gt;</button>
+                                </div>
+                            </div>
+                        </div>
+                    `);
+                }
+            </script>
 
-            <div id="slotRow_3" class="slot-row" onclick="switchSlot(3)">
-                <span class="slot-tag">슬롯 4</span>
-                <div id="slotTitle_3" class="slot-title-area">비어 있음 (붙여넣기 버튼으로 텍스트 파싱 가능)</div>
+            <!-- 3. 파싱 전용 슬롯 (슬롯 6) -->
+            <div id="slotRow_5" class="slot-row" onclick="switchSlot(5)">
+                <span class="slot-tag">슬롯 6</span>
+                <div id="slotTitle_5" class="slot-title-area">비어 있음 (붙여넣기 버튼으로 텍스트 파싱 가능)</div>
                 <div class="slot-actions" onclick="event.stopPropagation()">
-                    <button class="btn-excel" onclick="triggerImport(3)">불러오기</button>
+                    <button class="btn-excel" onclick="triggerImport(5)">불러오기</button>
                     <button class="btn-excel" onclick="openPasteModalNovel()">붙여넣기</button>
-                    <button class="btn-download" onclick="exportResultExcelForSlot(3)">다운로드</button>
-                    <div id="slotNav_3" class="slot-nav" style="display: none;">
-                        <button class="btn-nav" onclick="moveIndexForSlot(3, -1)">&lt;</button>
-                        <input type="text" id="slotIndexInput_3" value="00001" onchange="jumpToIndexForSlot(3, this.value)">
-                        <span id="slotTotalSpan_3" style="font-family: monospace;">/ 00000</span>
-                        <button class="btn-nav" onclick="moveIndexForSlot(3, 1)">&gt;</button>
+                    <button class="btn-download" onclick="exportResultExcelForSlot(5)">다운로드</button>
+                    <div id="slotNav_5" class="slot-nav" style="display: none;">
+                        <button class="btn-nav" onclick="moveIndexForSlot(5, -1)">&lt;</button>
+                        <input type="text" id="slotIndexInput_5" value="00001" onchange="jumpToIndexForSlot(5, this.value)">
+                        <span id="slotTotalSpan_5" style="font-family: monospace;">/ 00000</span>
+                        <button class="btn-nav" onclick="moveIndexForSlot(5, 1)">&gt;</button>
                     </div>
                 </div>
             </div>
@@ -535,14 +542,14 @@
                     <option value="Russian">러시아어</option>
                 </select>
                 
-                <!-- 슬롯 1, 2, 4 용 버튼 그룹 -->
+                <!-- 슬롯 1~3, 6 용 버튼 그룹 -->
                 <div id="normalSlotControlGroup" style="display:inline-flex; gap:4px; margin-right:auto; align-items:center;">
                     <button class="btn-ai" style="padding: 5px 10px; font-size: 11px;" onclick="chunkSplitCurrentSentence()">한국어 청크 분리하기</button>
                     <button class="btn-ai" style="padding: 5px 10px; font-size: 11px; background: #4b5563; color: #ffffff;" onclick="copyDeepStudyPromptPractice()">AI도움</button>
                     <button class="btn-excel" style="padding: 5px 10px; font-size: 11px;" onclick="toggleAiHelpGuideline('practice')">추가요청</button>
                 </div>
                 
-                <!-- 슬롯 3 전용 정돈된 컨트롤 버튼 그룹 -->
+                <!-- 3열 전용(슬롯 4~5) 정돈된 컨트롤 버튼 그룹 -->
                 <div id="slot3ControlGroup" style="display:none; margin-right: auto; gap: 4px; align-items: center;">
                     <button class="btn-ai" style="padding: 5px 10px; font-size: 11px; background: #4b5563; color: #ffffff; height: 26px;" onclick="copyDeepStudyPromptPractice()">AI도움</button>
                     <button class="btn-excel" style="padding: 5px 10px; font-size: 11px; height: 26px;" onclick="toggleAiHelpGuideline('practice')">추가요청</button>
@@ -550,7 +557,7 @@
                     <!-- 별표 관련 버튼 (노란색 톤으로 가시성 구분) -->
                     <button id="btnStarToggleSlot3" class="btn-star-group" style="padding: 5px 10px; font-size: 11px; font-weight: 900; border-radius: 4px; height: 26px; cursor: pointer; transition: 0.2s;" onclick="toggleStarSlot3()">☆</button>
                     
-                    <input type="text" id="slot3RangeInput" placeholder="예: 3-330" style="width: 70px; font-size: 11px; padding: 4px 6px; border: 1px solid var(--border-color); border-radius: 4px; text-align: center; height: 26px; box-sizing: border-box;" onkeydown="if(event.key==='Enter') moveIndexForSlot(2, 1, true);">
+                    <input type="text" id="slot3RangeInput" placeholder="예: 3-330" style="width: 70px; font-size: 11px; padding: 4px 6px; border: 1px solid var(--border-color); border-radius: 4px; text-align: center; height: 26px; box-sizing: border-box;" onkeydown="if(event.key==='Enter') moveIndexForSlot(activeSlotIndex, 1, true);">
                     
                     <!-- 무작위 버튼 분리 -->
                     <button class="btn-star-group" style="padding: 5px 10px; font-size: 11px; font-weight: 700; border-radius: 4px; height: 26px; cursor: pointer; transition: 0.2s;" onclick="doRandomSelectSlot3(true)">★표 무작위</button>
@@ -916,11 +923,11 @@
     </div>
 </div>
 
-<!-- 슬롯 3 (3열 전용) 텍스트 붙여넣기 모달 -->
+<!-- 3열 전용 슬롯(4, 5) 텍스트 붙여넣기 모달 -->
 <div id="pasteModalSlot3" class="modal-overlay">
     <div class="modal-card">
         <div style="display: flex; justify-content: space-between; align-items: center;">
-            <div style="font-weight: 700; font-size: 14px; color: #111827;">텍스트 붙여넣기 (슬롯 3 전용)</div>
+            <div style="font-weight: 700; font-size: 14px; color: #111827;">텍스트 붙여넣기 (3열 전용 슬롯)</div>
         </div>
         <textarea id="modalPasteAreaSlot3" placeholder="일련번호(생략가능)[탭]한국어[탭]영어 형식으로 텍스트를 붙여넣으세요..."></textarea>
         <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
@@ -933,11 +940,11 @@
     </div>
 </div>
 
-<!-- 소설 슬롯 4 텍스트 붙여넣기 모달 -->
+<!-- 소설 슬롯 6 텍스트 붙여넣기 모달 -->
 <div id="pasteModalNovel" class="modal-overlay">
     <div class="modal-card">
         <div style="display: flex; justify-content: space-between; align-items: center;">
-            <div style="font-weight: 700; font-size: 14px; color: #111827;">텍스트 직접 붙여넣기 (슬롯 4 전용)</div>
+            <div style="font-weight: 700; font-size: 14px; color: #111827;">텍스트 직접 붙여넣기 (파싱 전용 슬롯)</div>
             <button id="btnAiFormat" class="btn-ai" style="padding: 4px 8px; font-size: 11px; border-radius: 4px;" onclick="formatPastedTextNovel()">AI 맞춤법/타임코드 정리</button>
         </div>
         <textarea id="modalPasteAreaNovel" placeholder="여기에 소설, SRT 자막, 유튜브 스크립트 등을 붙여넣으세요..."></textarea>
@@ -1118,15 +1125,44 @@
     /* ========================================== */
     /* [공통/영작] 상태 및 초기화 관리             */
     /* ========================================== */
-    let slotsData = JSON.parse(localStorage.getItem('myNovelPracticeMultiSlots')) || [
-        { fileName: '', data: [], currentIndex: 0 },
-        { fileName: '', data: [], currentIndex: 0 },
-        { fileName: '', data: [], currentIndex: 0 },
-        { fileName: '', data: [], currentIndex: 0, rawText: '' }
+    // 기존 슬롯 4개에서 -> 6개로 안전하게 구조 마이그레이션(업데이트)
+    let rawSlotsData = JSON.parse(localStorage.getItem('myNovelPracticeMultiSlots')) || [];
+    let slotsData = [];
+    const defaultSlots = [
+        { fileName: '', data: [], currentIndex: 0 }, // 0: 일반 (기존1)
+        { fileName: '', data: [], currentIndex: 0 }, // 1: 일반 (기존2)
+        { fileName: '', data: [], currentIndex: 0 }, // 2: 일반 (신규추가)
+        { fileName: '', data: [], currentIndex: 0 }, // 3: 3열 전용 (기존3)
+        { fileName: '', data: [], currentIndex: 0 }, // 4: 3열 전용 (신규추가)
+        { fileName: '', data: [], currentIndex: 0, rawText: '' } // 5: 파싱 전용 (기존4)
     ];
+
+    if (rawSlotsData.length === 4) {
+        slotsData[0] = rawSlotsData[0] || defaultSlots[0];
+        slotsData[1] = rawSlotsData[1] || defaultSlots[1];
+        slotsData[2] = defaultSlots[2]; // 신규 일반 
+        slotsData[3] = rawSlotsData[2] || defaultSlots[3]; // 기존 3열 전용 이동
+        slotsData[4] = defaultSlots[4]; // 신규 3열 전용
+        slotsData[5] = rawSlotsData[3] || defaultSlots[5]; // 기존 파싱 전용 이동
+        localStorage.setItem('myNovelPracticeMultiSlots', JSON.stringify(slotsData));
+    } else {
+        slotsData = rawSlotsData;
+        for (let i = 0; i < 6; i++) {
+            if (!slotsData[i]) slotsData[i] = defaultSlots[i];
+        }
+    }
+
+    // 3열(번역, 특수) 기능을 적용할 슬롯 인덱스 범위 확인 함수
+    function isSlot3Type(idx) {
+        return idx >= 3 && idx <= 4;
+    }
+
     let activeSlotIndex = parseInt(localStorage.getItem('myNovelActiveSlotIndex')) || 0;
+    if(activeSlotIndex >= 6) activeSlotIndex = 0; // 혹시 모를 에러 방지
+
     let targetImportSlot = 0;
     let slot3HintIndex = 0; 
+    let activePasteSlot3 = 3; // 3열 모달용 타겟 추적
 
     let words = JSON.parse(localStorage.getItem('myScoreVocaWords')) || [];
     let hideAll = false;
@@ -1442,13 +1478,13 @@
                     const lines = rawText.split('\n');
                     let rawRows = lines.map(line => line.split('\t'));
 
-                    if (targetImportSlot === 2) parsedList = detectColumnsAndParse(rawRows);
+                    if (isSlot3Type(targetImportSlot)) parsedList = detectColumnsAndParse(rawRows);
                     else parsedList = parseTextToSentencesByRule(rawText, false, isSrtFile);
 
                     if (parsedList.length === 0) alert('유효한 문장을 찾지 못했습니다.');
                     else {
                         let customFileName = '';
-                        if (targetImportSlot === 2 && parsedList[0] && parsedList[0].text) {
+                        if (isSlot3Type(targetImportSlot) && parsedList[0] && parsedList[0].text) {
                             let firstText = parsedList[0].text;
                             if (firstText.length > 20) firstText = firstText.substring(0, 20) + '...';
                             customFileName = `[한-영] ${firstText}`;
@@ -1475,13 +1511,13 @@
                     const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 });
                     
                     let parsedList = [];
-                    if (targetImportSlot === 2) parsedList = detectColumnsAndParse(rows);
+                    if (isSlot3Type(targetImportSlot)) parsedList = detectColumnsAndParse(rows);
                     else parsedList = processRowsByRule(rows);
 
                     if (parsedList.length === 0) alert('유효한 데이터가 없습니다.');
                     else {
                         let customFileName = '';
-                        if (targetImportSlot === 2 && parsedList[0] && parsedList[0].text) {
+                        if (isSlot3Type(targetImportSlot) && parsedList[0] && parsedList[0].text) {
                             let firstText = parsedList[0].text;
                             if (firstText.length > 20) firstText = firstText.substring(0, 20) + '...';
                             customFileName = `[한-영] ${firstText}`;
@@ -1511,7 +1547,7 @@
         const exportData = slot.data.map(item => {
             let row = [];
             row.push(item.id); row.push(item.isImportant ? "★" : ""); row.push(item.text || '');
-            if (slotIdx === 2) row.push(item.english || '');
+            if (isSlot3Type(slotIdx)) row.push(item.english || '');
             row.push(item.userAnswer || ''); row.push(item.feedback || '');
             return row;
         });
@@ -1557,7 +1593,7 @@
 
     function handleEnglishTextChange() {
         const slot = slotsData[activeSlotIndex];
-        if (slot && slot.data[slot.currentIndex] && activeSlotIndex !== 2) {
+        if (slot && slot.data[slot.currentIndex] && !isSlot3Type(activeSlotIndex)) {
             slot.data[slot.currentIndex].userAnswer = document.getElementById('englishInputNovel').value;
             saveAllSlotsToStorage();
         }
@@ -1567,7 +1603,7 @@
         const currentSlot = slotsData[activeSlotIndex];
         if (currentSlot?.data?.[currentSlot.currentIndex]) {
             currentSlot.data[currentSlot.currentIndex].text = document.getElementById('koreanInput').value;
-            if (activeSlotIndex !== 2) {
+            if (!isSlot3Type(activeSlotIndex)) {
                 currentSlot.data[currentSlot.currentIndex].userAnswer = document.getElementById('englishInputNovel').value;
             }
             saveAllSlotsToStorage();
@@ -1577,11 +1613,13 @@
     function saveAllSlotsToStorage() { localStorage.setItem('myNovelPracticeMultiSlots', JSON.stringify(slotsData)); }
 
     function renderAllSlotsUI() {
-        for(let i=0; i<4; i++) {
+        for(let i=0; i<6; i++) {
             const row = document.getElementById(`slotRow_${i}`);
             const title = document.getElementById(`slotTitle_${i}`);
             const nav = document.getElementById(`slotNav_${i}`);
             const slot = slotsData[i];
+
+            if(!row) continue; // 방어 로직
 
             row.classList.toggle('active', i === activeSlotIndex);
             if(slot && slot.data.length > 0) {
@@ -1590,8 +1628,8 @@
                 document.getElementById(`slotIndexInput_${i}`).value = String(slot.currentIndex + 1).padStart(5, '0');
                 document.getElementById(`slotTotalSpan_${i}`).innerText = `/ ${String(slot.data.length).padStart(5, '0')}`;
             } else {
-                if (i === 3) title.innerText = '비어 있음 (붙여넣기 버튼으로 텍스트 파싱 가능)';
-                else if (i === 2) title.innerText = '비어 있음 (3열 전용: 불러오기 및 붙여넣기 등록 가능)';
+                if (i === 5) title.innerText = '비어 있음 (붙여넣기 버튼으로 텍스트 파싱 가능)';
+                else if (isSlot3Type(i)) title.innerText = '비어 있음 (3열 전용: 불러오기 및 붙여넣기 등록 가능)';
                 else title.innerText = '비어 있음 (클릭하여 이동 또는 파일 추가)';
                 nav.style.display = 'none';
             }
@@ -1623,7 +1661,7 @@
         const slot3Group = document.getElementById('slot3ControlGroup');
         const engInput = document.getElementById('englishInputNovel');
         
-        if (activeSlotIndex === 2) {
+        if (isSlot3Type(activeSlotIndex)) {
             if (normalGroup) normalGroup.style.display = 'none';
             slot3Group.style.display = 'inline-flex';
             engInput.placeholder = "여기에 번역할 문장을 작성하세요... (Enter: AI도움 요청 복사, PageDown/Up: 이동, Home: ★/☆ 토글, →: 힌트)";
@@ -1645,7 +1683,7 @@
     }
 
     function toggleStarSlot3() {
-        const slot = slotsData[2];
+        const slot = slotsData[activeSlotIndex];
         if (!slot || !slot.data || slot.data.length === 0) return;
         const cIdx = slot.currentIndex;
         slot.data[cIdx].isImportant = !slot.data[cIdx].isImportant;
@@ -1655,8 +1693,8 @@
 
     function doRandomSelectSlot3(onlyStarred) {
         saveCurrentNovelInput();
-        const slot = slotsData[2];
-        if (!slot || !slot.data || slot.data.length === 0) return alert('슬롯 3에 데이터가 없습니다.');
+        const slot = slotsData[activeSlotIndex];
+        if (!slot || !slot.data || slot.data.length === 0) return alert('현재 슬롯에 데이터가 없습니다.');
         const rangeInput = document.getElementById('slot3RangeInput')?.value.trim();
         let candidates = [];
         let startId = 1;
@@ -1683,7 +1721,7 @@
     }
 
     function showSlot3Hint() {
-        const slot = slotsData[2];
+        const slot = slotsData[activeSlotIndex];
         if (!slot || !slot.data || slot.data.length === 0) return;
         const item = slot.data[slot.currentIndex];
         if (!item.english) return;
@@ -1708,7 +1746,7 @@
         saveCurrentNovelInput();
         const slot = slotsData[slotIdx];
 
-        if (slotIdx === 2) {
+        if (isSlot3Type(slotIdx)) {
             const rangeInput = document.getElementById('slot3RangeInput')?.value.trim();
             if (rangeInput) {
                 const match = rangeInput.match(/^(\d+)\s*-\s*(\d+)$/);
@@ -1780,7 +1818,7 @@
                 return;
             }
         }
-        if (activeSlotIndex === 2) {
+        if (isSlot3Type(activeSlotIndex)) {
             if (event.key === 'Home') { event.preventDefault(); toggleStarSlot3(); } 
             else if (event.key === 'ArrowRight' && inputEl.selectionStart === inputEl.value.length) {
                 event.preventDefault(); showSlot3Hint();
@@ -1957,8 +1995,9 @@ Rules:
         }
     }
 
-    function openPasteModalSlot3() { 
-        const currentSlot3 = slotsData[2];
+    function openPasteModalSlot3(idx) { 
+        activePasteSlot3 = idx;
+        const currentSlot3 = slotsData[idx];
         document.getElementById('modalPasteAreaSlot3').value = currentSlot3 ? (currentSlot3.rawText || '') : '';
         document.getElementById('pasteModalSlot3').style.display = 'flex'; 
     }
@@ -1976,9 +2015,9 @@ Rules:
         if (firstText.length > 20) firstText = firstText.substring(0, 20) + '...';
         let customFileName = `[한-영] ${firstText}`;
 
-        slotsData[2] = { fileName: customFileName, data: parsedList, currentIndex: 0, rawText: rawText };
-        saveAllSlotsToStorage(); closePasteModalSlot3(); switchSlot(2, false);
-        alert(`[슬롯 3] 텍스트 (${parsedList.length}개 문장) 등록 완료! (언어 자동 감지 적용)`);
+        slotsData[activePasteSlot3] = { fileName: customFileName, data: parsedList, currentIndex: 0, rawText: rawText };
+        saveAllSlotsToStorage(); closePasteModalSlot3(); switchSlot(activePasteSlot3, false);
+        alert(`[슬롯 ${activePasteSlot3 + 1}] 텍스트 (${parsedList.length}개 문장) 등록 완료! (언어 자동 감지 적용)`);
     }
 
     async function generateAndRegisterSlot3() {
@@ -2009,9 +2048,9 @@ Rules:
                         if (parsedList.length === 0) return alert('유효한 문장을 찾지 못했습니다.');
                         let firstText = parsedList[0].text;
                         if (firstText.length > 20) firstText = firstText.substring(0, 20) + '...';
-                        slotsData[2] = { fileName: `[한-영] ${firstText}`, data: parsedList, currentIndex: 0, rawText: rawText };
-                        saveAllSlotsToStorage(); closePasteModalSlot3(); switchSlot(2, false);
-                        alert(`[슬롯 3] 20문장 일상 대화문 생성 및 등록 완료!`);
+                        slotsData[activePasteSlot3] = { fileName: `[한-영] ${firstText}`, data: parsedList, currentIndex: 0, rawText: rawText };
+                        saveAllSlotsToStorage(); closePasteModalSlot3(); switchSlot(activePasteSlot3, false);
+                        alert(`[슬롯 ${activePasteSlot3 + 1}] 20문장 일상 대화문 생성 및 등록 완료!`);
                     } else throw new Error("JSON 내부 dialogue 배열 형식이 올바르지 않습니다.");
                 } else throw new Error("JSON 형태의 응답을 찾을 수 없습니다.");
             } catch(e) { alert(`대화문 파싱 중 오류가 발생했습니다.\n\n[AI 원본 응답]\n${generatedText}`); }
@@ -2019,8 +2058,8 @@ Rules:
     }
 
     function openPasteModalNovel() { 
-        const currentSlot4 = slotsData[3];
-        document.getElementById('modalPasteAreaNovel').value = currentSlot4 ? (currentSlot4.rawText || '') : '';
+        const currentSlotParse = slotsData[5];
+        document.getElementById('modalPasteAreaNovel').value = currentSlotParse ? (currentSlotParse.rawText || '') : '';
         document.getElementById('pasteModalNovel').style.display = 'flex'; 
     }
     function closePasteModalNovel() { document.getElementById('pasteModalNovel').style.display = 'none'; }
@@ -2029,9 +2068,9 @@ Rules:
         if (!rawText.trim()) return alert('텍스트를 입력해 주세요.');
         const parsedList = parseTextToSentencesByRule(rawText, true);
         if (parsedList.length === 0) return alert('유효한 문장을 찾지 못했습니다.');
-        slotsData[3] = { fileName: '직접 붙여넣은 텍스트', data: parsedList, currentIndex: 0, rawText: rawText };
-        saveAllSlotsToStorage(); closePasteModalNovel(); switchSlot(3, false);
-        alert(`[슬롯 4] 붙여넣은 텍스트 (${parsedList.length}개 문장) 등록 완료!`);
+        slotsData[5] = { fileName: '직접 붙여넣은 텍스트', data: parsedList, currentIndex: 0, rawText: rawText };
+        saveAllSlotsToStorage(); closePasteModalNovel(); switchSlot(5, false);
+        alert(`[슬롯 6] 붙여넣은 텍스트 (${parsedList.length}개 문장) 등록 완료!`);
     }
 
     async function formatPastedTextNovel() {
@@ -2066,9 +2105,9 @@ Rules:
                         document.getElementById('modalPasteAreaNovel').value = rawText;
                         let parsedList = parsed.dialogue.map((text, idx) => ({ id: idx + 1, text: text.trim(), userAnswer: '', feedback: '' }));
                         if (parsedList.length === 0) return alert('유효한 문장을 찾지 못했습니다.');
-                        slotsData[3] = { fileName: 'AI 생성 대화문', data: parsedList, currentIndex: 0, rawText: rawText };
-                        saveAllSlotsToStorage(); closePasteModalNovel(); switchSlot(3, false);
-                        alert(`[슬롯 4] 유머러스한 일상 대화문 (${parsedList.length}개 문장) 생성 및 등록 완료!`);
+                        slotsData[5] = { fileName: 'AI 생성 대화문', data: parsedList, currentIndex: 0, rawText: rawText };
+                        saveAllSlotsToStorage(); closePasteModalNovel(); switchSlot(5, false);
+                        alert(`[슬롯 6] 유머러스한 일상 대화문 (${parsedList.length}개 문장) 생성 및 등록 완료!`);
                     } else throw new Error("JSON 내부 dialogue 배열 형식이 올바르지 않습니다.");
                 } else throw new Error("JSON 형태의 응답을 찾을 수 없습니다.");
             } catch(e) { alert(`대화문 파싱 중 오류가 발생했습니다.\n\n[AI 원본 응답]\n${generatedText}`); }
@@ -2341,16 +2380,26 @@ Rules:
     }
 
     // --- 영작 퀴즈 기능 ---
+    // 영작 퀴즈 대상 슬롯 데이터 (3열 전용 슬롯 모두 취합)
+    function getCombinedSlot3Data() {
+        let combined = [];
+        for(let i=3; i<=4; i++) {
+            if(slotsData[i] && slotsData[i].data) combined.push(...slotsData[i].data);
+        }
+        return combined;
+    }
+
     function resetNovelQuizToSetup() {
         document.getElementById('novelQuizSetupArea').style.display = 'flex'; document.getElementById('novelQuizPlayArea').style.display = 'none'; document.getElementById('novelQuizResultArea').style.display = 'none';
         const filterSelect = document.getElementById('novelQuizFilter'); const startBtn = document.getElementById('btnStartNovelRound');
-        const slot3Data = slotsData[2] ? slotsData[2].data : [];
-        if (!slot3Data || slot3Data.length === 0) { filterSelect.innerHTML = `<option value="">'슬롯3'에 데이터를 입력하세요</option>`; filterSelect.disabled = true; startBtn.disabled = true; } 
+        const slot3Data = getCombinedSlot3Data();
+        
+        if (!slot3Data || slot3Data.length === 0) { filterSelect.innerHTML = `<option value="">'3열 전용 슬롯'에 데이터를 입력하세요</option>`; filterSelect.disabled = true; startBtn.disabled = true; } 
         else { filterSelect.disabled = false; startBtn.disabled = false; filterSelect.innerHTML = `<option value="ALL">전체 문장</option><option value="MINUS">마이너스 문장만</option><option value="ZERO">0점 문장만</option><option value="LOW">1-2점 문장만</option><option value="MID">3-4점 문장만</option><option value="MAX">만점 문장만</option>`; }
     }
     function startNovelRound() {
-        const slot3Data = slotsData[2] ? slotsData[2].data : [];
-        if (!slot3Data || slot3Data.length === 0) return alert("'슬롯3'에 데이터를 입력하세요!");
+        const slot3Data = getCombinedSlot3Data();
+        if (!slot3Data || slot3Data.length === 0) return alert("'3열 전용 슬롯'에 데이터를 입력하세요!");
         const groupFilter = document.getElementById('novelQuizFilter').value; const subCondition = document.getElementById('novelQuizSubCondition').value; const requestedCount = parseInt(document.getElementById('novelQuizCountInput').value) || 10;
         let targetItems = slot3Data.filter(item => groupFilter === 'ALL' || getGroup(item) === groupFilter);
         if (targetItems.length === 0) return alert("선택한 그룹에 해당하는 문장이 없습니다!");
@@ -2378,16 +2427,25 @@ Rules:
     function prevNovelQuizQuestion() { if (currentNovelRoundIndex > 0) { currentNovelRoundIndex--; renderNovelQuizQuestion(); } }
     function nextNovelQuizQuestion() { currentNovelRoundIndex++; if (currentNovelRoundIndex < novelRoundTotalCount) renderNovelQuizQuestion(); else showNovelRoundResult(); }
     function speakSmartNovelQuiz() { if (novelRoundQueue && novelRoundQueue[currentNovelRoundIndex]) speakAutoDetect('', novelRoundQueue[currentNovelRoundIndex].english); }
+    
     function handleNovelQuizResult(isCorrect) {
-        const targetItem = (slotsData[2]?.data || []).find(item => item.id === novelRoundQueue[currentNovelRoundIndex].id);
-        if (targetItem) {
-            targetItem.lastQueriedAt = Date.now(); targetItem.lastResult = isCorrect;
-            if (isCorrect) { targetItem.score = Math.min(5, (targetItem.score || 0) + 1); novelRoundCorrectCount++; } 
-            else targetItem.score = (targetItem.score || 0) - 1;
+        const targetQuizItem = novelRoundQueue[currentNovelRoundIndex];
+        
+        for(let i=3; i<=4; i++) {
+            const targetItem = (slotsData[i]?.data || []).find(item => item.id === targetQuizItem.id);
+            if (targetItem) {
+                targetItem.lastQueriedAt = Date.now(); 
+                targetItem.lastResult = isCorrect;
+                if (isCorrect) { targetItem.score = Math.min(5, (targetItem.score || 0) + 1); novelRoundCorrectCount++; } 
+                else targetItem.score = (targetItem.score || 0) - 1;
+                break;
+            }
         }
+        
         saveAllSlotsToStorage();
         currentNovelRoundIndex++; if (currentNovelRoundIndex < novelRoundTotalCount) renderNovelQuizQuestion(); else showNovelRoundResult();
     }
+
     function showNovelRoundResult() {
         document.getElementById('novelQuizPlayArea').style.display = 'none'; document.getElementById('novelQuizResultArea').style.display = 'block';
         document.getElementById('novelResultScore').innerText = `${Math.round((novelRoundCorrectCount / novelRoundTotalCount) * 100)}%`;
@@ -2609,14 +2667,29 @@ Rules:
     function createBoardObject(name, rawData) {
         const validData = rawData.filter(row => row.length > 0 && row.some(cell => String(cell).trim() !== ''));
         if (validData.length === 0) return null;
-        const langs = detectLanguageColumns(validData);
         
+        // 언어 감지 로직
+        let krCol = 0; let maxKr = -1;
+        let enCol = 1; let maxEn = -1;
+        let sample = validData.slice(0, 15);
+        for(let c=0; c<sample[0].length; c++) {
+            let krScore = 0, enScore = 0;
+            sample.forEach(r => {
+                let t = String(r[c]||'').replace(/[\s\d\p{P}\p{S}]/gu, '');
+                if((/[\uAC00-\uD7AF]/g).test(t)) krScore++;
+                if((/[a-zA-Z]/g).test(t)) enScore++;
+            });
+            if(krScore > maxKr) { maxKr = krScore; krCol = c; }
+            if(enScore > maxEn) { maxEn = enScore; enCol = c; }
+        }
+        if (krCol === enCol) { enCol = krCol === 0 ? 1 : 0; }
+
         const items = validData.map((row, index) => ({
-            cells: row, views: 0, author: extractBoardRandomAuthor(String(row[langs.en] || row[langs.kr] || '')),
+            cells: row, views: 0, author: extractBoardRandomAuthor(String(row[enCol] || row[krCol] || '')),
             starred: false, serial: index + 1, lastViewedAt: 0 
         }));
 
-        return { id: 'board_' + Date.now() + '_' + Math.floor(Math.random()*1000), name: name, items: items, krColIdx: langs.kr, enColIdx: langs.en };
+        return { id: 'board_' + Date.now() + '_' + Math.floor(Math.random()*1000), name: name, items: items, krColIdx: krCol, enColIdx: enCol };
     }
 
     async function addBoardAndSave(boardObj) {
