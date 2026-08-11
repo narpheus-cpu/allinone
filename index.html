@@ -2554,26 +2554,48 @@ Rules:
         mtProcessParsedData(jsonData);
     }
 
+    // 데이터 처리 및 저장 (일련번호 제외, 언어 자동 감지 강화)
     function mtProcessParsedData(data) {
-        let korIdx = 0, engIdx = 1;
+        let korIdx = -1, engIdx = -1;
+        let maxKorScore = -1, maxEngScore = -1;
 
-        for (let row of data) {
-            let val1 = String(row[0] || '').trim();
-            let val2 = String(row[1] || '').trim();
-            if (val1 && val2) {
-                if (/[a-zA-Z]/.test(val1) && /[ㄱ-ㅎㅏ-ㅣ가-힣]/.test(val2)) {
-                    korIdx = 1;
-                    engIdx = 0;
-                }
-                break;
+        // 첫 15개 유효 행을 분석하여 전체 열 개수 파악
+        let validRows = data.filter(row => row && row.length > 0).slice(0, 15);
+        let maxCols = 0;
+        validRows.forEach(row => { if (row.length > maxCols) maxCols = row.length; });
+
+        // 각 열의 한국어, 영어 텍스트 비중을 계산하여 대상 열 감지 (순수 숫자/일련번호 열 배제)
+        for (let c = 0; c < maxCols; c++) {
+            let korScore = 0, engScore = 0;
+            for (let row of validRows) {
+                let cellVal = String(row[c] || '').trim();
+                
+                // 순수 숫자(일련번호)는 언어 점수 계산에서 완전히 제외
+                if (!cellVal || /^\d+$/.test(cellVal)) continue;
+
+                let korMatches = cellVal.match(/[ㄱ-ㅎㅏ-ㅣ가-힣]/g);
+                let engMatches = cellVal.match(/[a-zA-Z]/g);
+                
+                if (korMatches) korScore += korMatches.length;
+                if (engMatches) engScore += engMatches.length;
             }
+
+            if (korScore > maxKorScore && korScore > 0) { maxKorScore = korScore; korIdx = c; }
+            if (engScore > maxEngScore && engScore > 0) { maxEngScore = engScore; engIdx = c; }
         }
+
+        // 만약 언어를 찾지 못했거나 동일한 열이 선택되었다면 예외 처리(기본값 적용)
+        if (korIdx === -1) korIdx = 0;
+        if (engIdx === -1) engIdx = 1;
+        if (korIdx === engIdx) engIdx = (korIdx === 0) ? 1 : 0;
 
         let wordsArr = [];
         for (let row of data) {
             let korVal = String(row[korIdx] || '').trim();
             let engVal = String(row[engIdx] || '').trim();
-            if (korVal && engVal) {
+            
+            // 값이 모두 존재하고, 단순 일련번호가 아닐 때만 최종 리스트에 추가
+            if (korVal && engVal && !/^\d+$/.test(korVal) && !/^\d+$/.test(engVal)) {
                 wordsArr.push({ kor: korVal, eng: engVal, starred: false });
             }
         }
