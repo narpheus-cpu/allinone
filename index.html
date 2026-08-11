@@ -23,13 +23,15 @@
             --novel-font-size: 15px;
             --voca-font-size: 15px;
             
-            /* 타이핑 to 언마스크 레이아웃 및 폰트 사이즈 변수 */
-            --mt-kor-size: 26px;
-            --mt-paren-size: 16px;
-            --mt-eng-box-size: 22px;
-            --mt-input-size: 20px;
-            --mt-eng-box-width: 1.64em;
-            --mt-eng-box-gap: 6px;
+/* 마스킹타이핑 폰트 사이즈 변수 */
+        --mt-kor-size: 26px;
+        --mt-paren-size: 16px;
+        --mt-eng-box-size: 22px;
+        --mt-input-size: 20px;
+        
+        /* 기본값: 너비 1.64em -> 1.2em, 간격 6px -> 2px로 축소 */
+        --mt-eng-box-width: 1.2em; 
+        --mt-eng-box-gap: 2px;
         }
 
         body { 
@@ -352,13 +354,22 @@
         .mt-word-wrapper { display: flex; gap: var(--mt-eng-box-gap); }
         
         /* 폰트사이즈(em) 및 너비/간격 변수 기반 디자인 */
-        .mt-char-box { 
+.mt-char-box { 
             font-size: var(--mt-eng-box-size); 
-            width: var(--mt-eng-box-width); height: 2.1em; font-weight: bold; 
-            display: flex; align-items: center; justify-content: center; 
-            border: 2px solid transparent; 
-            border-radius: 6px; user-select: none; 
-            background-color: transparent; box-sizing: border-box;
+            width: var(--mt-eng-box-width); 
+            height: 2.1em; 
+            font-weight: bold; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            border: 2px solid #000; 
+            border-radius: 6px; 
+            user-select: none; 
+            background-color: #ffffff; 
+            box-sizing: border-box;
+            
+            /* 추가된 부분: 글자 간격을 미세하게 당김 */
+            letter-spacing: -2px;
         }
         .mt-char-box.masked { 
             background-color: #ffffff; 
