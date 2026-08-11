@@ -22,6 +22,12 @@
             --accent-green: #16a34a;
             --novel-font-size: 15px;
             --voca-font-size: 15px;
+            
+            /* 마스킹타이핑 폰트 사이즈 변수 */
+            --mt-kor-size: 26px;
+            --mt-paren-size: 16px;
+            --mt-eng-box-size: 22px;
+            --mt-input-size: 20px;
         }
 
         body { 
@@ -336,17 +342,20 @@
         
         .mt-top-bar { display: flex; justify-content: space-between; margin-bottom: 20px; align-items: center; }
         .mt-progress-text { color: #666; font-size: 14px; font-weight: bold; }
-        #mtKorText { font-size: 26px; font-weight: bold; color: #333; margin-bottom: 30px; line-height: 1.4; text-align: center; }
+        
+        #mtKorText { font-size: var(--mt-kor-size); font-weight: bold; color: #333; margin-bottom: 30px; line-height: 1.4; text-align: center; }
+        .mt-paren-text { font-size: var(--mt-paren-size); color: #555; }
         
         .mt-mask-container { display: flex; gap: 6px; justify-content: center; margin-bottom: 30px; flex-wrap: wrap; }
         .mt-word-wrapper { display: flex; gap: 6px; }
         
-        /* 마스킹 박스를 완전 검은색에서 '검은 외곽선의 하얀 카드'로 변경 */
+        /* 폰트사이즈(em) 기반으로 유동적으로 크기가 변하는 카드 디자인 */
         .mt-char-box { 
-            width: 36px; height: 46px; font-size: 22px; font-weight: bold; 
+            font-size: var(--mt-eng-box-size); 
+            width: 1.64em; height: 2.1em; font-weight: bold; 
             display: flex; align-items: center; justify-content: center; 
             border: 2px solid #000; border-radius: 6px; user-select: none; 
-            background-color: #ffffff; 
+            background-color: #ffffff; box-sizing: border-box;
         }
         .mt-char-box.masked { 
             background-color: #ffffff; 
@@ -354,17 +363,33 @@
             cursor: pointer; 
         }
         .mt-char-box.revealed { background-color: #fffacd; color: #000; }
-        .mt-char-box.unmasked-punct { border: none; background-color: transparent; width: auto; min-width: 18px; }
-        .mt-char-box.space { border: none; background-color: transparent; width: 18px; }
+        .mt-char-box.unmasked-punct { border: none; background-color: transparent; width: auto; min-width: 0.82em; }
+        .mt-char-box.space { border: none; background-color: transparent; width: 0.82em; }
         
         .mt-input-area { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 20px; }
         #mtStarBtn { font-size: 32px; cursor: pointer; color: #f1c40f; user-select: none; transition: transform 0.1s; }
         #mtStarBtn:active { transform: scale(0.9); }
-        #mtEngInput { padding: 12px; font-size: 20px; width: 70%; max-width: 500px; text-align: center; border: 2px solid var(--border-color); border-radius: 6px; outline: none; font-family: inherit; }
+        #mtEngInput { font-size: var(--mt-input-size); padding: 12px; width: 70%; max-width: 500px; text-align: center; border: 2px solid var(--border-color); border-radius: 6px; outline: none; font-family: inherit; }
         #mtEngInput:focus { border-color: #111827; }
 
         .mt-nav-buttons { display: flex; justify-content: center; gap: 15px; margin-bottom: 10px; }
 
+        /* 마스킹타이핑 폰트 컨트롤러 바 */
+        .mt-font-ctrl-bar {
+            display: flex; justify-content: center; align-items: center; gap: 15px; flex-wrap: wrap;
+            margin-top: 30px; padding-top: 15px; border-top: 1px dashed var(--border-color);
+        }
+        .mt-font-ctrl-item {
+            display: flex; align-items: center; gap: 5px; font-size: 12px; color: #4b5563; font-weight: 600;
+            background: #f9fafb; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border-color);
+        }
+        .mt-font-ctrl-item button {
+            padding: 2px 6px; font-size: 12px; background: #e5e7eb; color: #374151; border-radius: 4px; border: none; cursor: pointer;
+        }
+        .mt-font-ctrl-item button:hover { background: #d1d5db; }
+        .mt-font-ctrl-item input {
+            width: 32px; text-align: center; border: none; background: transparent; font-size: 12px; font-weight: 700; outline: none; color: #111827;
+        }
 
         /* ========================================== */
         /* 게시판 뷰(Board Tab) 전용 스타일 캡슐화       */
@@ -489,7 +514,7 @@
         <button class="btn-excel" onclick="resetCustomFont()" style="padding: 7px 14px;">기본 복구</button>
     </div>
 
-    <!-- 메인 탭 메뉴 (영작퀴즈 탭 제거 및 마스킹타이핑 탭 추가) -->
+    <!-- 메인 탭 메뉴 -->
     <div class="tabs">
         <button class="tab-btn active" onclick="switchMainTab('novelTab')">영작하기</button>
         <button class="tab-btn" onclick="switchMainTab('vocaTab')">단어장</button>
@@ -507,7 +532,6 @@
 
         <!-- 6개 슬롯 영역 -->
         <div class="multi-slot-container">
-            <!-- 1. 일반 슬롯 (슬롯 1 ~ 3) -->
             <script>
                 for(let i=0; i<3; i++) {
                     document.write(`
@@ -528,8 +552,6 @@
                     `);
                 }
             </script>
-            
-            <!-- 2. 3열 전용 슬롯 (슬롯 4 ~ 5) -->
             <script>
                 for(let i=3; i<5; i++) {
                     document.write(`
@@ -551,8 +573,6 @@
                     `);
                 }
             </script>
-
-            <!-- 3. 파싱 전용 슬롯 (슬롯 6) -->
             <div id="slotRow_5" class="slot-row" onclick="switchSlot(5)">
                 <span class="slot-tag">슬롯 6</span>
                 <div id="slotTitle_5" class="slot-title-area">비어 있음 (붙여넣기 버튼으로 텍스트 파싱 가능)</div>
@@ -581,24 +601,19 @@
                     <option value="Russian">러시아어</option>
                 </select>
                 
-                <!-- 슬롯 1~3, 6 용 버튼 그룹 -->
                 <div id="normalSlotControlGroup" style="display:inline-flex; gap:4px; margin-right:auto; align-items:center;">
                     <button class="btn-ai" style="padding: 5px 10px; font-size: 11px;" onclick="chunkSplitCurrentSentence()">한국어 청크 분리하기</button>
                     <button class="btn-ai" style="padding: 5px 10px; font-size: 11px; background: #4b5563; color: #ffffff;" onclick="copyDeepStudyPromptPractice()">AI도움</button>
                     <button class="btn-excel" style="padding: 5px 10px; font-size: 11px;" onclick="toggleAiHelpGuideline('practice')">추가요청</button>
                 </div>
                 
-                <!-- 3열 전용(슬롯 4~5) 정돈된 컨트롤 버튼 그룹 -->
                 <div id="slot3ControlGroup" style="display:none; margin-right: auto; gap: 4px; align-items: center;">
                     <button class="btn-ai" style="padding: 5px 10px; font-size: 11px; background: #4b5563; color: #ffffff; height: 26px;" onclick="copyDeepStudyPromptPractice()">AI도움</button>
                     <button class="btn-excel" style="padding: 5px 10px; font-size: 11px; height: 26px;" onclick="toggleAiHelpGuideline('practice')">추가요청</button>
                     
-                    <!-- 별표 관련 버튼 (노란색 톤으로 가시성 구분) -->
                     <button id="btnStarToggleSlot3" class="btn-star-group" style="padding: 5px 10px; font-size: 11px; font-weight: 900; border-radius: 4px; height: 26px; cursor: pointer; transition: 0.2s;" onclick="toggleStarSlot3()">☆</button>
-                    
                     <input type="text" id="slot3RangeInput" placeholder="예: 3-330" style="width: 70px; font-size: 11px; padding: 4px 6px; border: 1px solid var(--border-color); border-radius: 4px; text-align: center; height: 26px; box-sizing: border-box;" onkeydown="if(event.key==='Enter') moveIndexForSlot(activeSlotIndex, 1, true);">
                     
-                    <!-- 무작위 버튼 분리 -->
                     <button class="btn-star-group" style="padding: 5px 10px; font-size: 11px; font-weight: 700; border-radius: 4px; height: 26px; cursor: pointer; transition: 0.2s;" onclick="doRandomSelectSlot3(true)">★표 무작위</button>
                     <button class="btn-excel" style="padding: 5px 10px; font-size: 11px; height: 26px; font-weight: 700;" onclick="doRandomSelectSlot3(false)">전체 무작위</button>
                 </div>
@@ -609,7 +624,6 @@
                 <button onclick="adjustNovelFont(1)">+</button>
             </div>
 
-            <!-- AI도움 추가요청 입력칸 -->
             <div id="aiHelpGuidelineArea_practice" style="display: none; margin-bottom: 12px; margin-top: 6px;">
                 <input type="text" id="aiHelpInput_practice" placeholder="AI 도움 시 반영할 추가 요청사항을 입력하세요 (예: 단어 뜻도 자세히 알려줘)" style="width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 12px; box-sizing: border-box; outline: none;" oninput="saveGuidelineInput('practice')">
             </div>
@@ -867,9 +881,37 @@
                 <button class="btn-excel" style="padding: 10px 24px; font-size: 13px;" onclick="mtNextWord()">다음 카드</button>
             </div>
             
+            <!-- 폰트 조절 컨트롤러 영역 -->
+            <div class="mt-font-ctrl-bar">
+                <div class="mt-font-ctrl-item">
+                    <span>한국어</span>
+                    <button onclick="mtAdjustFontSize('kor', -1)">-</button>
+                    <input type="number" id="mtKorSizeInput" readonly>
+                    <button onclick="mtAdjustFontSize('kor', 1)">+</button>
+                </div>
+                <div class="mt-font-ctrl-item">
+                    <span>괄호속한국어</span>
+                    <button onclick="mtAdjustFontSize('paren', -1)">-</button>
+                    <input type="number" id="mtParenSizeInput" readonly>
+                    <button onclick="mtAdjustFontSize('paren', 1)">+</button>
+                </div>
+                <div class="mt-font-ctrl-item">
+                    <span>영어박스</span>
+                    <button onclick="mtAdjustFontSize('engBox', -1)">-</button>
+                    <input type="number" id="mtEngBoxSizeInput" readonly>
+                    <button onclick="mtAdjustFontSize('engBox', 1)">+</button>
+                </div>
+                <div class="mt-font-ctrl-item">
+                    <span>입력칸</span>
+                    <button onclick="mtAdjustFontSize('input', -1)">-</button>
+                    <input type="number" id="mtInputSizeInput" readonly>
+                    <button onclick="mtAdjustFontSize('input', 1)">+</button>
+                </div>
+            </div>
+
             <div style="margin-top: 25px; padding-top: 15px; border-top: 1px dashed var(--border-color); font-size: 12px; color: #6b7280; text-align: center; line-height: 1.6;">
                 * 대소문자 구분 없음. 가려진 네모를 클릭하면 힌트를 볼 수 있습니다.<br>
-                * 알파벳을 모두 채운 상태에서 기호(마침표 등) 생략 후 [Enter]를 눌러도 넘어갑니다.
+                * [PageUp/PageDown] 이전/다음 카드 이동. [Enter] 정답 시 다음 이동.
             </div>
         </div>
     </div>
@@ -1109,7 +1151,6 @@
 
             if (document.getElementById('novelTab').classList.contains('active')) saveCurrentNovelInput();
 
-            // 마스킹타이핑 10개 슬롯 데이터 취합
             const mtBackupData = {};
             for (let i = 1; i <= 10; i++) {
                 const val = localStorage.getItem('word_slot_' + i);
@@ -1122,7 +1163,8 @@
                 novelFontSize: novelFontSize,
                 vocaFontSize: vocaFontSize,
                 boardDataList: boardDataList,
-                mtBackupData: mtBackupData, // 마스킹타이핑 데이터 추가
+                mtBackupData: mtBackupData, 
+                mtFontSettings: { kor: mtKorSize, paren: mtParenSize, engBox: mtEngBoxSize, input: mtInputSize },
                 lastSaved: new Date().toISOString()
             };
 
@@ -1152,22 +1194,24 @@
             if (parsed.slotsData) slotsData = parsed.slotsData;
             if (parsed.words) words = parsed.words;
             
-            // 게시판 복원
             if (parsed.boardDataList) {
                 boardDataList = parsed.boardDataList;
                 await saveToDatabase();
                 renderBoardList();
             }
 
-            // 마스킹타이핑 복원
             if (parsed.mtBackupData) {
                 for(let i = 1; i <= 10; i++) {
-                    if(parsed.mtBackupData[i]) {
-                        localStorage.setItem('word_slot_' + i, parsed.mtBackupData[i]);
-                    } else {
-                        localStorage.removeItem('word_slot_' + i);
-                    }
+                    if(parsed.mtBackupData[i]) localStorage.setItem('word_slot_' + i, parsed.mtBackupData[i]);
+                    else localStorage.removeItem('word_slot_' + i);
                 }
+            }
+            if (parsed.mtFontSettings) {
+                mtKorSize = parsed.mtFontSettings.kor; mtParenSize = parsed.mtFontSettings.paren;
+                mtEngBoxSize = parsed.mtFontSettings.engBox; mtInputSize = parsed.mtFontSettings.input;
+                localStorage.setItem('mtKorSize', mtKorSize); localStorage.setItem('mtParenSize', mtParenSize);
+                localStorage.setItem('mtEngBoxSize', mtEngBoxSize); localStorage.setItem('mtInputSize', mtInputSize);
+                mtApplyFontSettings();
             }
             
             saveAllSlotsToStorage();
@@ -1175,7 +1219,7 @@
             renderAllSlotsUI();
             switchSlot(activeSlotIndex, false);
             
-            if (typeof mtInitSlots === 'function') mtInitSlots(); // 마스킹타이핑 슬롯 재렌더링
+            if (typeof mtInitSlots === 'function') mtInitSlots(); 
             
             const reminder = document.getElementById('saveReminder');
             if (reminder) reminder.style.display = 'none';
@@ -2409,7 +2453,7 @@ Rules:
         if (!roundQueue[currentRoundIndex]) return alert('저장할 항목이 없습니다.');
         const currentInQueue = roundQueue[currentRoundIndex];
         const newEng = document.getElementById('quizLiveEngInput').value.trim(); const newMean = document.getElementById('quizLiveMeanInput').value.trim(); const newHint = document.getElementById('quizLiveHintInput').value.trim();
-        if (!newEng || !newMean) return alert('단어(항목1)와 뜻(항목2)은 비워둘 수 없습니다.');
+        if (!newEng || !newMean) return alert('단어(항목1)와 뜻(항목2)은 비워둘 수 검습니다.');
         currentInQueue.english = newEng; currentInQueue.meaning = newMean; currentInQueue.hint = newHint;
         const targetWord = words.find(w => w.id === currentInQueue.id);
         if (targetWord) { targetWord.english = newEng; targetWord.meaning = newMean; targetWord.hint = newHint; }
@@ -2481,6 +2525,42 @@ Rules:
     let mtCurrentStudyWords = []; 
     let mtCurrentIndex = 0;
     let mtRevealedSet = new Set(); 
+
+    // 마스킹타이핑 폰트 사이즈 변수 관리
+    let mtKorSize = parseInt(localStorage.getItem('mtKorSize')) || 26;
+    let mtParenSize = parseInt(localStorage.getItem('mtParenSize')) || 16;
+    let mtEngBoxSize = parseInt(localStorage.getItem('mtEngBoxSize')) || 22;
+    let mtInputSize = parseInt(localStorage.getItem('mtInputSize')) || 20;
+
+    function mtApplyFontSettings() {
+        const root = document.documentElement;
+        root.style.setProperty('--mt-kor-size', mtKorSize + 'px');
+        root.style.setProperty('--mt-paren-size', mtParenSize + 'px');
+        root.style.setProperty('--mt-eng-box-size', mtEngBoxSize + 'px');
+        root.style.setProperty('--mt-input-size', mtInputSize + 'px');
+
+        if(document.getElementById('mtKorSizeInput')) document.getElementById('mtKorSizeInput').value = mtKorSize;
+        if(document.getElementById('mtParenSizeInput')) document.getElementById('mtParenSizeInput').value = mtParenSize;
+        if(document.getElementById('mtEngBoxSizeInput')) document.getElementById('mtEngBoxSizeInput').value = mtEngBoxSize;
+        if(document.getElementById('mtInputSizeInput')) document.getElementById('mtInputSizeInput').value = mtInputSize;
+    }
+
+    function mtAdjustFontSize(type, delta) {
+        if(type === 'kor') {
+            mtKorSize = Math.max(10, Math.min(50, mtKorSize + delta));
+            localStorage.setItem('mtKorSize', mtKorSize);
+        } else if(type === 'paren') {
+            mtParenSize = Math.max(10, Math.min(50, mtParenSize + delta));
+            localStorage.setItem('mtParenSize', mtParenSize);
+        } else if(type === 'engBox') {
+            mtEngBoxSize = Math.max(10, Math.min(50, mtEngBoxSize + delta));
+            localStorage.setItem('mtEngBoxSize', mtEngBoxSize);
+        } else if(type === 'input') {
+            mtInputSize = Math.max(10, Math.min(50, mtInputSize + delta));
+            localStorage.setItem('mtInputSize', mtInputSize);
+        }
+        mtApplyFontSettings();
+    }
 
     function mtInitSlots() {
         const grid = document.getElementById('mtSlotsGrid');
@@ -2719,8 +2799,8 @@ Rules:
         let currentWord = mtCurrentStudyWords[index];
         
         let safeKor = mtEscapeHTML(currentWord.kor);
-        // 괄호 부분 글꼴 크기 60% 축소
-        let formattedKor = safeKor.replace(/\s*(\([^)]+\))/g, '<br><span style="font-size: 60%;">$1</span>');
+        // 괄호 부분은 클래스로 적용 (css에서 var(--mt-paren-size) 적용됨)
+        let formattedKor = safeKor.replace(/\s*(\([^)]+\))/g, '<br><span class="mt-paren-text">$1</span>');
         
         document.getElementById('mtKorText').innerHTML = formattedKor;
         document.getElementById('mtEngInput').value = '';
@@ -3305,6 +3385,7 @@ Rules:
         renderBoardList();
         
         // 마스킹 타이핑 초기화 (슬롯 불러오기 연동)
+        mtApplyFontSettings();
         if (typeof mtInitSlots === 'function') mtInitSlots();
     })();
 
