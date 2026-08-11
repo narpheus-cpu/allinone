@@ -2521,7 +2521,7 @@ Rules:
         }
     }
 
-    // 마스킹 타이핑 파일 업로드 처리
+// 마스킹 타이핑 파일 업로드 처리 (인코딩 자동 감지 및 한글 깨짐 방지 적용)
     document.getElementById('mtFileUpload').addEventListener('change', function(e) {
         let file = e.target.files[0];
         if (!file) return;
@@ -2532,9 +2532,39 @@ Rules:
 
         if (ext === 'txt') {
             reader.onload = function(e) {
-                mtParseTextData(e.target.result);
+                try {
+                    const buffer = e.target.result;
+                    const uint8 = new Uint8Array(buffer);
+                    let rawText = '';
+                    
+                    // 1. BOM(Byte Order Mark) 체크를 통한 인코딩 정확도 확인
+                    if (uint8.length >= 2 && uint8[0] === 0xFF && uint8[1] === 0xFE) {
+                        // UTF-16 LE 인코딩
+                        rawText = new TextDecoder('utf-16le').decode(uint8);
+                    } else if (uint8.length >= 3 && uint8[0] === 0xEF && uint8[1] === 0xBB && uint8[2] === 0xBF) {
+                        // UTF-8 BOM 인코딩
+                        rawText = new TextDecoder('utf-8').decode(uint8);
+                    } else {
+                        // 2. BOM이 없는 일반 텍스트: UTF-8로 우선 시도
+                        try { 
+                            // fatal: true 옵션으로 UTF-8이 아닐 경우 강제로 에러를 발생시킴
+                            rawText = new TextDecoder('utf-8', { fatal: true }).decode(uint8); 
+                        } catch (err) { 
+                            // 3. UTF-8 디코딩 실패 시 윈도우 기본 인코딩인 EUC-KR(ANSI)로 풀백
+                            rawText = new TextDecoder('euc-kr').decode(uint8); 
+                        }
+                    }
+                    
+                    // 4. 맥(Mac) OS 등에서 자음/모음이 분리되는 현상(NFD)을 합쳐줌(NFC)
+                    rawText = rawText.normalize('NFC');
+                    
+                    mtParseTextData(rawText);
+                } catch (err) {
+                    alert('텍스트 파일 파싱 중 오류가 발생했습니다.');
+                }
             };
-            reader.readAsText(file);
+            // 텍스트 인코딩을 직접 제어하기 위해 텍스트가 아닌 ArrayBuffer(바이트 데이터)로 읽음
+            reader.readAsArrayBuffer(file);
         } else {
             reader.onload = function(e) {
                 let data = new Uint8Array(e.target.result);
