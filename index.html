@@ -23,7 +23,7 @@
             --novel-font-size: 15px;
             --voca-font-size: 15px;
             
-            /* 마스킹타이핑 폰트 사이즈 변수 */
+            /* 타이핑 to 언마스크 폰트 사이즈 변수 */
             --mt-kor-size: 26px;
             --mt-paren-size: 16px;
             --mt-eng-box-size: 22px;
@@ -330,7 +330,7 @@
         }
 
         /* ========================================== */
-        /* 마스킹 타이핑(Masking Typing) 뷰 전용 스타일 */
+        /* 타이핑 to 언마스크 뷰 전용 스타일 */
         /* ========================================== */
         .mt-slots-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px; }
         .mt-slot { border: 2px dashed #ccc; border-radius: 8px; padding: 20px; cursor: pointer; transition: all 0.2s; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 80px; background: white;}
@@ -354,15 +354,21 @@
             font-size: var(--mt-eng-box-size); 
             width: 1.64em; height: 2.1em; font-weight: bold; 
             display: flex; align-items: center; justify-content: center; 
-            border: 2px solid #000; border-radius: 6px; user-select: none; 
-            background-color: #ffffff; box-sizing: border-box;
+            border: 2px solid transparent; /* 글자가 채워진(기본) 상태일 땐 윤곽선, 배경 모두 투명 */
+            border-radius: 6px; user-select: none; 
+            background-color: transparent; box-sizing: border-box;
         }
         .mt-char-box.masked { 
-            background-color: #ffffff; 
+            background-color: #ffffff; /* 마스킹 상태일 땐 하얀 배경 */
+            border-color: #000;        /* 마스킹 상태일 때만 검은 윤곽선 */
             color: transparent; 
             cursor: pointer; 
         }
-        .mt-char-box.revealed { background-color: #fffacd; color: #000; }
+        .mt-char-box.revealed { 
+            background-color: #fffacd; /* 힌트를 본 카드는 연노랑 배경 유지 */
+            border-color: transparent; /* 윤곽선 투명 */
+            color: #000; 
+        }
         .mt-char-box.unmasked-punct { border: none; background-color: transparent; width: auto; min-width: 0.82em; }
         .mt-char-box.space { border: none; background-color: transparent; width: 0.82em; }
         
@@ -374,7 +380,7 @@
 
         .mt-nav-buttons { display: flex; justify-content: center; gap: 15px; margin-bottom: 10px; }
 
-        /* 마스킹타이핑 폰트 컨트롤러 바 */
+        /* 타이핑 to 언마스크 폰트 컨트롤러 바 */
         .mt-font-ctrl-bar {
             display: flex; justify-content: center; align-items: center; gap: 15px; flex-wrap: wrap;
             margin-top: 30px; padding-top: 15px; border-top: 1px dashed var(--border-color);
@@ -514,7 +520,7 @@
         <button class="btn-excel" onclick="resetCustomFont()" style="padding: 7px 14px;">기본 복구</button>
     </div>
 
-<!-- 메인 탭 메뉴 -->
+    <!-- 메인 탭 메뉴 -->
     <div class="tabs">
         <button class="tab-btn active" onclick="switchMainTab('novelTab')">영작하기</button>
         <button class="tab-btn" onclick="switchMainTab('vocaTab')">단어장</button>
@@ -746,7 +752,7 @@
                         <option value="ALL">전체 단어</option>
                         <option value="MINUS">마이너스 단어만</option>
                         <option value="ZERO">0점 단어만</option>
-                        <option value="LOW">1-2 단어만</option>
+                        <option value="LOW">1-2점 단어만</option>
                         <option value="MID">3-4 단어만</option>
                         <option value="MAX">만점 단어만</option>
                     </select>
@@ -816,12 +822,12 @@
     </div>
 
     <!-- ========================================== -->
-    <!-- 4. 마스킹 타이핑 탭 -->
+    <!-- 4. 타이핑 to 언마스크 탭 -->
     <!-- ========================================== -->
-<div id="maskingTypingTab" class="tab-content">
+    <div id="maskingTypingTab" class="tab-content">
         <!-- 메인 화면 -->
         <div id="mt-main-menu" style="background: white; padding: 30px; border-radius: 12px; border: 1px solid var(--border-color); text-align: center;">
-            <h2 style="font-size: 18px; font-weight: 700; margin-top: 0; color: #111827;">타이핑 to 언마스크 영작 연습</h2>
+            <h2 style="font-size: 18px; font-weight: 700; margin-top: 0; color: #111827;">타이핑 to 언마스크 영작 연습 (슬롯 1~10)</h2>
             <p style="color:#666; font-size:13px; margin-bottom: 20px;">빈 슬롯을 클릭하여 엑셀(.xlsx) 또는 텍스트(.txt) 파일을 업로드하세요.</p>
             <div class="mt-slots-grid" id="mtSlotsGrid"></div>
             <input type="file" id="mtFileUpload" style="display:none;" accept=".xlsx, .xls, .txt" />
@@ -870,7 +876,7 @@
             </div>
         </div>
 
-        <!-- 마스킹 타이핑 다중 열 선택 모달 -->
+        <!-- 다중 열 선택 모달 -->
         <div id="mtColumnSelectModal" class="modal-overlay">
             <div class="modal-card" style="width: 350px;">
                 <div style="font-weight: 700; font-size: 15px; color: #111827; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 15px;">열 선택 (다중 한국어 감지)</div>
@@ -1211,7 +1217,7 @@
             const reminder = document.getElementById('saveReminder');
             if (reminder) reminder.style.display = 'none';
 
-            alert("내 PC 파일에 전체 데이터(게시판, 마스킹타이핑 포함)가 성공적으로 덮어쓰기 저장되었습니다!");
+            alert("내 PC 파일에 전체 데이터(게시판, 타이핑to언마스크 포함)가 성공적으로 덮어쓰기 저장되었습니다!");
         } catch (err) {
             if (err.name !== 'AbortError') { alert("저장 중 오류가 발생했습니다: " + err.message); }
         }
@@ -1260,7 +1266,7 @@
             const reminder = document.getElementById('saveReminder');
             if (reminder) reminder.style.display = 'none';
             
-            alert("전체 데이터(게시판, 마스킹타이핑 포함)를 성공적으로 불러왔습니다! 이제 '덮어쓰기 저장'을 누르면 이 파일에 즉시 기록됩니다.");
+            alert("전체 데이터(게시판, 타이핑to언마스크 포함)를 성공적으로 불러왔습니다! 이제 '덮어쓰기 저장'을 누르면 이 파일에 즉시 기록됩니다.");
         } catch (err) {
             if (err.name !== 'AbortError') { alert("불러오기 중 오류가 발생했습니다: " + err.message); }
         }
@@ -2553,7 +2559,7 @@ Rules:
 
 
     /* ========================================== */
-    /* [새 기능] 4. 마스킹 타이핑 기능 관리        */
+    /* [새 기능] 4. 타이핑 to 언마스크 기능 관리     */
     /* ========================================== */
     let mtCurrentUploadedFileName = ""; 
     let mtActiveSlotIndex = null;
@@ -2599,7 +2605,7 @@ Rules:
         mtApplyFontSettings();
     }
 
-function mtInitSlots() {
+    function mtInitSlots() {
         const grid = document.getElementById('mtSlotsGrid');
         if(!grid) return;
         grid.innerHTML = '';
@@ -2613,7 +2619,6 @@ function mtInitSlots() {
                     ? { name: "슬롯 " + i, words: parsedData } 
                     : parsedData;
 
-                // ★ 표시된 카드 수 계산
                 let starredCount = slotData.words ? slotData.words.filter(w => w.starred).length : 0;
 
                 div.className = 'mt-slot has-data';
@@ -3550,7 +3555,7 @@ function mtInitSlots() {
         await loadFromDatabase();
         renderBoardList();
         
-        // 마스킹 타이핑 초기화 (슬롯 불러오기 연동)
+        // 타이핑 to 언마스크 초기화 (슬롯 불러오기 연동)
         mtApplyFontSettings();
         if (typeof mtInitSlots === 'function') mtInitSlots();
     })();
