@@ -44,7 +44,7 @@
             border: 1px solid var(--border-color); 
         }
 
-        /* 상단 헤더 (제목 + 백업 버튼) 레이아웃 */
+        /* 상단 헤더 */
         .header-container {
             display: flex;
             justify-content: space-between;
@@ -300,12 +300,9 @@
             opacity: 1;
         }
 
-        #quizPlayArea button, #novelQuizPlayArea button {
+        #quizPlayArea button {
             font-size: 16px !important; 
             padding: 10px 18px !important;
-        }
-        #novelQuizPlayArea .quiz-word {
-            font-size: 30px !important; 
         }
 
         .quiz-edit-card { background: #f9fafb; border: 1px solid var(--border-color); border-radius: 10px; padding: 14px; max-width: 420px; margin: 16px auto; text-align: left; display: none; }
@@ -317,7 +314,6 @@
         .modal-card { background: #ffffff; width: 90%; max-width: 520px; border-radius: 14px; padding: 20px; border: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 12px; }
         .modal-card textarea { width: 100%; height: 160px; border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; font-size: 13px; box-sizing: border-box; resize: vertical; outline: none; }
 
-        /* 별표 관련 버튼 시각적 분리 CSS */
         .btn-star-group {
             background: #ffffff !important; 
             color: #d97706 !important; 
@@ -326,6 +322,39 @@
         .btn-star-group:hover {
             background: #fffbeb !important;
         }
+
+        /* ========================================== */
+        /* 마스킹 타이핑(Masking Typing) 뷰 전용 스타일 */
+        /* ========================================== */
+        .mt-slots-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px; }
+        .mt-slot { border: 2px dashed #ccc; border-radius: 8px; padding: 20px; cursor: pointer; transition: all 0.2s; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 80px; background: white;}
+        .mt-slot:hover { border-color: #4A90E2; background-color: #f0f7ff; }
+        .mt-slot.has-data { border: 2px solid #4A90E2; background-color: #eaf3fc; }
+        .mt-slot-title { font-weight: bold; margin-bottom: 5px; word-break: break-all; font-size: 14px; color: #111827;}
+        .mt-slot-desc { font-size: 12px; color: #666; margin-bottom: 10px; }
+        .mt-btn-delete { background: var(--accent-red); color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: 600; }
+        
+        .mt-top-bar { display: flex; justify-content: space-between; margin-bottom: 20px; align-items: center; }
+        .mt-progress-text { color: #666; font-size: 14px; font-weight: bold; }
+        #mtKorText { font-size: 26px; font-weight: bold; color: #333; margin-bottom: 30px; line-height: 1.4; text-align: center; }
+        
+        .mt-mask-container { display: flex; gap: 6px; justify-content: center; margin-bottom: 30px; flex-wrap: wrap; }
+        .mt-word-wrapper { display: flex; gap: 6px; }
+        
+        .mt-char-box { width: 36px; height: 46px; font-size: 22px; font-weight: bold; display: flex; align-items: center; justify-content: center; border: 2px solid #000; border-radius: 6px; user-select: none; }
+        .mt-char-box.masked { background-color: #000; color: transparent; cursor: pointer; }
+        .mt-char-box.revealed { background-color: #fffacd; color: #000; }
+        .mt-char-box.unmasked-punct { border: none; background-color: transparent; width: auto; min-width: 18px; }
+        .mt-char-box.space { border: none; background-color: transparent; width: 18px; }
+        
+        .mt-input-area { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 20px; }
+        #mtStarBtn { font-size: 32px; cursor: pointer; color: #f1c40f; user-select: none; transition: transform 0.1s; }
+        #mtStarBtn:active { transform: scale(0.9); }
+        #mtEngInput { padding: 12px; font-size: 20px; width: 70%; max-width: 500px; text-align: center; border: 2px solid var(--border-color); border-radius: 6px; outline: none; font-family: inherit; }
+        #mtEngInput:focus { border-color: #111827; }
+
+        .mt-nav-buttons { display: flex; justify-content: center; gap: 15px; margin-bottom: 10px; }
+
 
         /* ========================================== */
         /* 게시판 뷰(Board Tab) 전용 스타일 캡슐화       */
@@ -450,12 +479,12 @@
         <button class="btn-excel" onclick="resetCustomFont()" style="padding: 7px 14px;">기본 복구</button>
     </div>
 
-    <!-- 메인 탭 메뉴 -->
+    <!-- 메인 탭 메뉴 (영작퀴즈 탭 제거 및 마스킹타이핑 탭 추가) -->
     <div class="tabs">
         <button class="tab-btn active" onclick="switchMainTab('novelTab')">영작하기</button>
         <button class="tab-btn" onclick="switchMainTab('vocaTab')">단어장</button>
         <button class="tab-btn" onclick="switchMainTab('quizTab')">라운드퀴즈</button>
-        <button class="tab-btn" onclick="switchMainTab('novelQuizTab')">영작퀴즈</button>
+        <button class="tab-btn" onclick="switchMainTab('maskingTypingTab')">마스킹타이핑</button>
         <button class="tab-btn" onclick="switchMainTab('boardTab')">게시판</button>
     </div>
 
@@ -763,67 +792,74 @@
     </div>
 
     <!-- ========================================== -->
-    <!-- 4. 영작 퀴즈 탭 -->
+    <!-- 4. 마스킹 타이핑 탭 (새로 결합됨) -->
     <!-- ========================================== -->
-    <div id="novelQuizTab" class="tab-content">
-        <div class="quiz-card">
-            <div id="novelQuizSetupArea" class="quiz-setup">
-                <div class="quiz-setup-item">
-                    <label for="novelQuizFilter">대상 그룹:</label>
-                    <select id="novelQuizFilter" style="width: 220px;"></select>
+    <div id="maskingTypingTab" class="tab-content">
+        <!-- 메인 화면 -->
+        <div id="mt-main-menu" style="background: white; padding: 30px; border-radius: 12px; border: 1px solid var(--border-color); text-align: center;">
+            <h2 style="font-size: 18px; font-weight: 700; margin-top: 0; color: #111827;">마스킹 타이핑 단어장 (슬롯 1~10)</h2>
+            <p style="color:#666; font-size:13px; margin-bottom: 20px;">빈 슬롯을 클릭하여 엑셀(.xlsx) 또는 텍스트(.txt) 파일을 업로드하세요.</p>
+            <div class="mt-slots-grid" id="mtSlotsGrid"></div>
+            <input type="file" id="mtFileUpload" style="display:none;" accept=".xlsx, .xls, .txt" />
+        </div>
+
+        <!-- 옵션 설정 모달 -->
+        <div id="mtOptionsModal" class="modal-overlay">
+            <div class="modal-card" style="width: 320px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
+                    <div style="font-weight: 700; font-size: 15px; color: #111827;" id="mtModalSlotTitle">출제 옵션</div>
                 </div>
-                <div class="quiz-setup-item">
-                    <label for="novelQuizSubCondition">출제 세분화 조건:</label>
-                    <select id="novelQuizSubCondition" style="width: 220px;">
-                        <option value="RANDOM">무작위 (기본)</option>
-                        <option value="OLDEST_QUERIED">오래 안 푼 문장 우선</option>
-                        <option value="RECENT_WRONG">최근 틀린 문장 (직전 오답)</option>
-                        <option value="RECENT_24H">최근 24시간 이내 학습 문장</option>
+                
+                <div style="margin-top: 10px;">
+                    <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 6px; color: #374151;">출제 범위 (예: 1-300 또는 433-)</label>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <input type="number" id="mtRangeStart" placeholder="1" style="width: 80px; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); outline: none;" min="1">
+                        <span>~</span>
+                        <input type="number" id="mtRangeEnd" placeholder="끝까지" style="width: 80px; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); outline: none;" min="1">
+                    </div>
+                </div>
+
+                <div style="margin-top: 15px;">
+                    <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 6px; color: #374151;">카드 출제 방식</label>
+                    <select id="mtStudyMode" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); outline: none; font-size: 13px;">
+                        <option value="sequential">일련번호순</option>
+                        <option value="reverse">역순</option>
+                        <option value="random">무작위</option>
+                        <option value="starred">★표시카드만</option>
                     </select>
                 </div>
-                <div class="quiz-setup-item">
-                    <label for="novelQuizCountInput">출제 문장 수:</label>
-                    <input type="number" id="novelQuizCountInput" value="10" min="1" max="100" style="width: 80px; text-align: center;">
-                </div>
-                <button id="btnStartNovelRound" class="btn-primary" style="width: 100%; margin-top: 10px; padding: 12px; font-size: 15px;" onclick="startNovelRound()">라운드 시작</button>
-            </div>
 
-            <div id="novelQuizPlayArea" style="display: none;">
-                <div id="novelProgressBadge" class="badge badge-mid" style="margin-bottom:12px;">1 / 10</div>
-                <div id="novelQuizWord" class="quiz-word" style="font-size:30px; line-height:1.5;">Korean Sentence</div>
-                
-                <div id="novelQuizMeaning" class="quiz-meaning" style="margin-top: 14px;"></div>
-                <div id="novelQuizStats" style="font-size:13px; font-weight:600; color:#4b5563; margin-bottom:14px; margin-top:8px;"></div>
-
-                <div style="display:flex; justify-content:center; gap:8px; margin-bottom:15px; flex-wrap: wrap;">
-                    <button class="btn-primary" onclick="speakSmartNovelQuiz()">원어 발음</button>
-                </div>
-
-                <div style="display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 14px; flex-wrap: wrap;">
-                    <button id="btnPrevNovelQuiz" class="btn-excel" style="font-size:12px; padding:10px 16px;" onclick="prevNovelQuizQuestion()">이전 단어</button>
-                    <button class="btn-danger" style="padding:10px 20px; font-size:13px;" onclick="handleNovelQuizResult(false)">틀림 (-1점)</button>
-                    <button class="btn-primary" style="background:var(--accent-green); padding:10px 20px; font-size:13px;" onclick="handleNovelQuizResult(true)">맞춤 (+1점)</button>
-                    <button id="btnNextNovelQuiz" class="btn-excel" style="font-size:12px; padding:10px 16px;" onclick="nextNovelQuizQuestion()">다음 단어</button>
-                </div>
-
-                <!-- AI도움 클릭 시 질문 프롬프트 클립보드 복사 -->
-                <div style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 16px;">
-                    <div style="display: flex; gap: 8px; justify-content: center;">
-                        <button class="btn-ai" style="padding: 10px 20px; font-size: 14px; background: #4b5563; color: #ffffff;" onclick="copyDeepStudyPrompt()">AI도움</button>
-                        <button class="btn-excel" style="padding: 10px 20px; font-size: 14px;" onclick="toggleAiHelpGuideline('quiz')">추가요청</button>
-                    </div>
-                    <!-- AI도움 추가요청 입력칸 -->
-                    <div id="aiHelpGuidelineArea_quiz" style="display: none; margin-top: 10px;">
-                        <input type="text" id="aiHelpInput_quiz" placeholder="AI 도움 시 반영할 추가 요청사항을 입력하세요 (예: 단어 뜻도 자세히 알려줘)" style="width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 13px; box-sizing: border-box; outline: none;" oninput="saveGuidelineInput('quiz')">
-                    </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px; gap: 10px;">
+                    <button class="btn-excel" style="flex: 1; padding: 10px;" onclick="mtCloseModal()">취소</button>
+                    <button class="btn-primary" style="flex: 1; padding: 10px;" onclick="mtApplyOptionsAndStart()">시작하기</button>
                 </div>
             </div>
+        </div>
 
-            <div id="novelQuizResultArea" style="display: none;">
-                <h2>라운드 종료!</h2>
-                <div id="novelResultScore" style="font-size:36px; font-weight:800; margin:16px 0;">80%</div>
-                <div id="novelResultDetails" style="font-size:15px; color:#4b5563; margin-bottom:24px;"></div>
-                <button class="btn-primary" style="width: 100%; padding: 12px; font-size: 15px;" onclick="resetNovelQuizToSetup()">새 라운드 설정하기</button>
+        <!-- 플래시카드 (학습 화면) -->
+        <div id="mt-flashcard" style="display:none; background: white; padding: 30px; border-radius: 12px; border: 1px solid var(--border-color);">
+            <div class="mt-top-bar">
+                <button class="btn-excel" onclick="mtGoMainMenu()">← 슬롯 목록으로</button>
+                <div class="mt-progress-text" id="mtProgressText">0 / 0</div>
+            </div>
+            
+            <div id="mtKorText">한국어 단어</div>
+            
+            <div id="mtMaskContainer" class="mt-mask-container"></div>
+            
+            <div class="mt-input-area">
+                <div id="mtStarBtn" onclick="mtToggleStar()">☆</div>
+                <input type="text" id="mtEngInput" autocomplete="off" placeholder="영어를 타이핑하세요" />
+            </div>
+
+            <div class="mt-nav-buttons">
+                <button class="btn-excel" style="padding: 10px 24px; font-size: 13px;" onclick="mtPrevWord()">이전 단어</button>
+                <button class="btn-excel" style="padding: 10px 24px; font-size: 13px;" onclick="mtNextWord()">다음 단어</button>
+            </div>
+            
+            <div style="margin-top: 25px; padding-top: 15px; border-top: 1px dashed var(--border-color); font-size: 12px; color: #6b7280; text-align: center; line-height: 1.6;">
+                * 대소문자 구분 없음. 가려진 네모를 클릭하면 힌트를 볼 수 있습니다.<br>
+                * 알파벳을 모두 채운 상태에서 기호(마침표 등) 생략 후 [Enter]를 눌러도 넘어갑니다.
             </div>
         </div>
     </div>
@@ -1063,12 +1099,20 @@
 
             if (document.getElementById('novelTab').classList.contains('active')) saveCurrentNovelInput();
 
+            // 마스킹타이핑 10개 슬롯 데이터 취합
+            const mtBackupData = {};
+            for (let i = 1; i <= 10; i++) {
+                const val = localStorage.getItem('word_slot_' + i);
+                if (val) mtBackupData[i] = val;
+            }
+
             const dataToSave = {
                 slotsData: slotsData,
                 words: words,
                 novelFontSize: novelFontSize,
                 vocaFontSize: vocaFontSize,
                 boardDataList: boardDataList,
+                mtBackupData: mtBackupData, // 마스킹타이핑 데이터 추가
                 lastSaved: new Date().toISOString()
             };
 
@@ -1079,7 +1123,7 @@
             const reminder = document.getElementById('saveReminder');
             if (reminder) reminder.style.display = 'none';
 
-            alert("내 PC 파일에 전체 데이터(게시판 포함)가 성공적으로 덮어쓰기 저장되었습니다!");
+            alert("내 PC 파일에 전체 데이터(게시판, 마스킹타이핑 포함)가 성공적으로 덮어쓰기 저장되었습니다!");
         } catch (err) {
             if (err.name !== 'AbortError') { alert("저장 중 오류가 발생했습니다: " + err.message); }
         }
@@ -1097,10 +1141,23 @@
 
             if (parsed.slotsData) slotsData = parsed.slotsData;
             if (parsed.words) words = parsed.words;
+            
+            // 게시판 복원
             if (parsed.boardDataList) {
                 boardDataList = parsed.boardDataList;
                 await saveToDatabase();
                 renderBoardList();
+            }
+
+            // 마스킹타이핑 복원
+            if (parsed.mtBackupData) {
+                for(let i = 1; i <= 10; i++) {
+                    if(parsed.mtBackupData[i]) {
+                        localStorage.setItem('word_slot_' + i, parsed.mtBackupData[i]);
+                    } else {
+                        localStorage.removeItem('word_slot_' + i);
+                    }
+                }
             }
             
             saveAllSlotsToStorage();
@@ -1108,10 +1165,12 @@
             renderAllSlotsUI();
             switchSlot(activeSlotIndex, false);
             
+            if (typeof mtInitSlots === 'function') mtInitSlots(); // 마스킹타이핑 슬롯 재렌더링
+            
             const reminder = document.getElementById('saveReminder');
             if (reminder) reminder.style.display = 'none';
             
-            alert("전체 데이터(게시판 포함)를 성공적으로 불러왔습니다! 이제 '덮어쓰기 저장'을 누르면 이 파일에 즉시 기록됩니다.");
+            alert("전체 데이터(게시판, 마스킹타이핑 포함)를 성공적으로 불러왔습니다! 이제 '덮어쓰기 저장'을 누르면 이 파일에 즉시 기록됩니다.");
         } catch (err) {
             if (err.name !== 'AbortError') { alert("불러오기 중 오류가 발생했습니다: " + err.message); }
         }
@@ -1125,25 +1184,24 @@
     /* ========================================== */
     /* [공통/영작] 상태 및 초기화 관리             */
     /* ========================================== */
-    // 기존 슬롯 4개에서 -> 6개로 안전하게 구조 마이그레이션(업데이트)
     let rawSlotsData = JSON.parse(localStorage.getItem('myNovelPracticeMultiSlots')) || [];
     let slotsData = [];
     const defaultSlots = [
-        { fileName: '', data: [], currentIndex: 0 }, // 0: 일반 (기존1)
-        { fileName: '', data: [], currentIndex: 0 }, // 1: 일반 (기존2)
-        { fileName: '', data: [], currentIndex: 0 }, // 2: 일반 (신규추가)
-        { fileName: '', data: [], currentIndex: 0 }, // 3: 3열 전용 (기존3)
-        { fileName: '', data: [], currentIndex: 0 }, // 4: 3열 전용 (신규추가)
-        { fileName: '', data: [], currentIndex: 0, rawText: '' } // 5: 파싱 전용 (기존4)
+        { fileName: '', data: [], currentIndex: 0 }, 
+        { fileName: '', data: [], currentIndex: 0 }, 
+        { fileName: '', data: [], currentIndex: 0 }, 
+        { fileName: '', data: [], currentIndex: 0 }, 
+        { fileName: '', data: [], currentIndex: 0 }, 
+        { fileName: '', data: [], currentIndex: 0, rawText: '' } 
     ];
 
     if (rawSlotsData.length === 4) {
         slotsData[0] = rawSlotsData[0] || defaultSlots[0];
         slotsData[1] = rawSlotsData[1] || defaultSlots[1];
-        slotsData[2] = defaultSlots[2]; // 신규 일반 
-        slotsData[3] = rawSlotsData[2] || defaultSlots[3]; // 기존 3열 전용 이동
-        slotsData[4] = defaultSlots[4]; // 신규 3열 전용
-        slotsData[5] = rawSlotsData[3] || defaultSlots[5]; // 기존 파싱 전용 이동
+        slotsData[2] = defaultSlots[2]; 
+        slotsData[3] = rawSlotsData[2] || defaultSlots[3]; 
+        slotsData[4] = defaultSlots[4]; 
+        slotsData[5] = rawSlotsData[3] || defaultSlots[5]; 
         localStorage.setItem('myNovelPracticeMultiSlots', JSON.stringify(slotsData));
     } else {
         slotsData = rawSlotsData;
@@ -1152,17 +1210,14 @@
         }
     }
 
-    // 3열(번역, 특수) 기능을 적용할 슬롯 인덱스 범위 확인 함수
-    function isSlot3Type(idx) {
-        return idx >= 3 && idx <= 4;
-    }
+    function isSlot3Type(idx) { return idx >= 3 && idx <= 4; }
 
     let activeSlotIndex = parseInt(localStorage.getItem('myNovelActiveSlotIndex')) || 0;
-    if(activeSlotIndex >= 6) activeSlotIndex = 0; // 혹시 모를 에러 방지
+    if(activeSlotIndex >= 6) activeSlotIndex = 0;
 
     let targetImportSlot = 0;
     let slot3HintIndex = 0; 
-    let activePasteSlot3 = 3; // 3열 모달용 타겟 추적
+    let activePasteSlot3 = 3; 
 
     let words = JSON.parse(localStorage.getItem('myScoreVocaWords')) || [];
     let hideAll = false;
@@ -1173,11 +1228,6 @@
     let novelFontSize = parseInt(localStorage.getItem('myNovelFontSize')) || 15;
     let vocaFontSize = parseInt(localStorage.getItem('myVocaFontSize')) || 15;
     let activeGuideline = ""; 
-
-    let novelRoundQueue = [];
-    let currentNovelRoundIndex = 0;
-    let novelRoundCorrectCount = 0;
-    let novelRoundTotalCount = 0;
 
     function applyFontSettings() {
         document.documentElement.style.setProperty('--novel-font-size', novelFontSize + 'px');
@@ -1229,7 +1279,9 @@
         document.getElementById(tabId).classList.add('active');
         event.target.classList.add('active');
         if(tabId === 'quizTab') resetToSetup();
-        if(tabId === 'novelQuizTab') resetNovelQuizToSetup();
+        if(tabId === 'maskingTypingTab') {
+            if(typeof mtInitSlots === 'function') mtInitSlots();
+        }
     }
 
     function toggleGuidelineInput() {
@@ -1619,7 +1671,7 @@
             const nav = document.getElementById(`slotNav_${i}`);
             const slot = slotsData[i];
 
-            if(!row) continue; // 방어 로직
+            if(!row) continue;
 
             row.classList.toggle('active', i === activeSlotIndex);
             if(slot && slot.data.length > 0) {
@@ -2379,102 +2431,6 @@ Rules:
         document.getElementById('resultDetails').innerText = `총 ${roundTotalCount}문제 중 ${roundCorrectCount}문제를 맞춰 점수가 반영되었습니다!`;
     }
 
-    // --- 영작 퀴즈 기능 ---
-    // 영작 퀴즈 대상 슬롯 데이터 (3열 전용 슬롯 모두 취합)
-    function getCombinedSlot3Data() {
-        let combined = [];
-        for(let i=3; i<=4; i++) {
-            if(slotsData[i] && slotsData[i].data) combined.push(...slotsData[i].data);
-        }
-        return combined;
-    }
-
-    function resetNovelQuizToSetup() {
-        document.getElementById('novelQuizSetupArea').style.display = 'flex'; document.getElementById('novelQuizPlayArea').style.display = 'none'; document.getElementById('novelQuizResultArea').style.display = 'none';
-        const filterSelect = document.getElementById('novelQuizFilter'); const startBtn = document.getElementById('btnStartNovelRound');
-        const slot3Data = getCombinedSlot3Data();
-        
-        if (!slot3Data || slot3Data.length === 0) { filterSelect.innerHTML = `<option value="">'3열 전용 슬롯'에 데이터를 입력하세요</option>`; filterSelect.disabled = true; startBtn.disabled = true; } 
-        else { filterSelect.disabled = false; startBtn.disabled = false; filterSelect.innerHTML = `<option value="ALL">전체 문장</option><option value="MINUS">마이너스 문장만</option><option value="ZERO">0점 문장만</option><option value="LOW">1-2점 문장만</option><option value="MID">3-4점 문장만</option><option value="MAX">만점 문장만</option>`; }
-    }
-    function startNovelRound() {
-        const slot3Data = getCombinedSlot3Data();
-        if (!slot3Data || slot3Data.length === 0) return alert("'3열 전용 슬롯'에 데이터를 입력하세요!");
-        const groupFilter = document.getElementById('novelQuizFilter').value; const subCondition = document.getElementById('novelQuizSubCondition').value; const requestedCount = parseInt(document.getElementById('novelQuizCountInput').value) || 10;
-        let targetItems = slot3Data.filter(item => groupFilter === 'ALL' || getGroup(item) === groupFilter);
-        if (targetItems.length === 0) return alert("선택한 그룹에 해당하는 문장이 없습니다!");
-        
-        const now = Date.now();
-        switch (subCondition) {
-            case 'OLDEST_QUERIED': targetItems.sort((a, b) => (a.lastQueriedAt || 0) - (b.lastQueriedAt || 0)); break;
-            case 'RECENT_WRONG': const wrongItems = targetItems.filter(w => w.lastResult === false); if (wrongItems.length > 0) targetItems = wrongItems; else alert("최근에 틀린 문장이 없어 무작위 출제합니다."); targetItems.sort(() => Math.random() - 0.5); break;
-            case 'RECENT_24H': const recentItems = targetItems.filter(w => w.lastQueriedAt && (now - w.lastQueriedAt <= 86400000)); if (recentItems.length > 0) targetItems = recentItems; else alert("최근 24시간 내 학습 문장이 없어 무작위 출제합니다."); targetItems.sort(() => Math.random() - 0.5); break;
-            case 'RANDOM': default: targetItems.sort(() => Math.random() - 0.5); break;
-        }
-
-        novelRoundQueue = targetItems.slice(0, Math.min(requestedCount, targetItems.length));
-        currentNovelRoundIndex = 0; novelRoundCorrectCount = 0; novelRoundTotalCount = novelRoundQueue.length;
-        document.getElementById('novelQuizSetupArea').style.display = 'none'; document.getElementById('novelQuizPlayArea').style.display = 'block'; document.getElementById('novelQuizResultArea').style.display = 'none';
-        renderNovelQuizQuestion();
-    }
-    function renderNovelQuizQuestion() {
-        const current = novelRoundQueue[currentNovelRoundIndex];
-        document.getElementById('novelProgressBadge').innerText = `진행률: ${currentNovelRoundIndex + 1} / ${novelRoundTotalCount}`;
-        document.getElementById('novelQuizWord').innerText = current.text || ''; 
-        renderMaskedText(document.getElementById('novelQuizMeaning'), current.english || "");
-        document.getElementById('novelQuizStats').innerText = `현재 점수: ${current.score || 0}점`;
-    }
-    function prevNovelQuizQuestion() { if (currentNovelRoundIndex > 0) { currentNovelRoundIndex--; renderNovelQuizQuestion(); } }
-    function nextNovelQuizQuestion() { currentNovelRoundIndex++; if (currentNovelRoundIndex < novelRoundTotalCount) renderNovelQuizQuestion(); else showNovelRoundResult(); }
-    function speakSmartNovelQuiz() { if (novelRoundQueue && novelRoundQueue[currentNovelRoundIndex]) speakAutoDetect('', novelRoundQueue[currentNovelRoundIndex].english); }
-    
-    function handleNovelQuizResult(isCorrect) {
-        const targetQuizItem = novelRoundQueue[currentNovelRoundIndex];
-        
-        for(let i=3; i<=4; i++) {
-            const targetItem = (slotsData[i]?.data || []).find(item => item.id === targetQuizItem.id);
-            if (targetItem) {
-                targetItem.lastQueriedAt = Date.now(); 
-                targetItem.lastResult = isCorrect;
-                if (isCorrect) { targetItem.score = Math.min(5, (targetItem.score || 0) + 1); novelRoundCorrectCount++; } 
-                else targetItem.score = (targetItem.score || 0) - 1;
-                break;
-            }
-        }
-        
-        saveAllSlotsToStorage();
-        currentNovelRoundIndex++; if (currentNovelRoundIndex < novelRoundTotalCount) renderNovelQuizQuestion(); else showNovelRoundResult();
-    }
-
-    function showNovelRoundResult() {
-        document.getElementById('novelQuizPlayArea').style.display = 'none'; document.getElementById('novelQuizResultArea').style.display = 'block';
-        document.getElementById('novelResultScore').innerText = `${Math.round((novelRoundCorrectCount / novelRoundTotalCount) * 100)}%`;
-        document.getElementById('novelResultDetails').innerText = `총 ${novelRoundTotalCount}문제 중 ${novelRoundCorrectCount}문제를 맞춰 점수가 반영되었습니다!`;
-    }
-
-    function copyDeepStudyPrompt() {
-        if (!novelRoundQueue || !novelRoundQueue[currentNovelRoundIndex]) return;
-        const current = novelRoundQueue[currentNovelRoundIndex];
-        const kor = current.text ? current.text.trim() : ''; const eng = current.english ? current.english.trim() : '';
-        const extra = document.getElementById('aiHelpInput_quiz') ? document.getElementById('aiHelpInput_quiz').value.trim() : '';
-        const extraText = extra ? `\n\n[추가 요청사항]\n${extra}` : '';
-
-        const promptText = `'${kor}'에 대한 영어 번역인 '${eng}'이(가) 올바른 지 채점해줘
-[출력 형식]
-★ 종합점수: 100점 만점
-★ 종합피드백: (왜 그렇게 평가했는지, 논리적이고 기술적인 분석을 짧고 굵게 적어라.)
-★ 교정답안: (가장 깔끔하고 최적화된 결과물 제시.)
-★ 원어민식 답변: (원어민들은 실생활에서 실제로 이렇게 말해요 라고 할 수 있는 문장 제시)
-★ 핵심영작포인트: (실수를 주의해야 할 문법/뉘앙스적 포인트 1~2줄 요약.)
-
-[채점 가이드]
-- 해당 답안이 해당 한국어에 대한 올바른 구어체 영작으로 볼 수 있는지만 판단할 것
-- 문장부호, 대소문자 사용법은 깡그리 무시하고 아예 언급자체를 절대하지 말 것.${extraText}`;
-
-        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(promptText).then(() => alert(`질문 프롬프트가 클립보드에 복사되었습니다!\n다른 곳에 붙여넣어 바로 사용할 수 있습니다:\n\n${promptText}`)).catch(() => fallbackCopyPrompt(promptText));
-        else fallbackCopyPrompt(promptText);
-    }
-
     function copyDeepStudyPromptPractice() {
         saveCurrentNovelInput(); 
         const kor = document.getElementById('koreanInput').value.trim(); const eng = document.getElementById('englishInputNovel').value.trim();
@@ -2505,6 +2461,342 @@ Rules:
         document.body.removeChild(textArea);
     }
 
+
+    /* ========================================== */
+    /* [새 기능] 4. 마스킹 타이핑 기능 관리        */
+    /* ========================================== */
+    let mtCurrentUploadedFileName = ""; 
+    let mtActiveSlotIndex = null;
+    let mtOriginalSlotData = null; 
+    let mtCurrentStudyWords = []; 
+    let mtCurrentIndex = 0;
+    let mtRevealedSet = new Set(); 
+
+    function mtInitSlots() {
+        const grid = document.getElementById('mtSlotsGrid');
+        if(!grid) return;
+        grid.innerHTML = '';
+        for (let i = 1; i <= 10; i++) {
+            let rawData = localStorage.getItem('word_slot_' + i);
+            let div = document.createElement('div');
+            
+            if (rawData) {
+                let parsedData = JSON.parse(rawData);
+                let slotData = Array.isArray(parsedData) 
+                    ? { name: "슬롯 " + i, words: parsedData } 
+                    : parsedData;
+
+                div.className = 'mt-slot has-data';
+                div.innerHTML = `
+                    <div class="mt-slot-title">${slotData.name}</div>
+                    <div class="mt-slot-desc">단어 수: ${slotData.words.length}개</div>
+                    <div>
+                        <button class="mt-btn-delete" onclick="mtDeleteSlot(event, ${i})">삭제</button>
+                    </div>
+                `;
+                div.onclick = () => mtOpenOptionsModal(i, slotData);
+            } else {
+                div.className = 'mt-slot';
+                div.innerHTML = `
+                    <div class="mt-slot-title">슬롯 ${i}</div>
+                    <div class="mt-slot-desc">[비어 있음]</div>
+                    <div style="font-size: 11px; font-weight: 600; color: #4A90E2;">클릭하여 파일 추가</div>
+                `;
+                div.onclick = () => mtTriggerUpload(i);
+            }
+            grid.appendChild(div);
+        }
+    }
+
+    function mtTriggerUpload(slotIndex) {
+        mtActiveSlotIndex = slotIndex;
+        document.getElementById('mtFileUpload').click();
+    }
+
+    function mtDeleteSlot(event, slotIndex) {
+        event.stopPropagation(); 
+        if(confirm(`슬롯 ${slotIndex}의 데이터를 삭제하시겠습니까?`)) {
+            localStorage.removeItem('word_slot_' + slotIndex);
+            mtInitSlots();
+        }
+    }
+
+    // 마스킹 타이핑 파일 업로드 처리
+    document.getElementById('mtFileUpload').addEventListener('change', function(e) {
+        let file = e.target.files[0];
+        if (!file) return;
+
+        mtCurrentUploadedFileName = file.name.replace(/\.[^/.]+$/, ""); 
+        let ext = file.name.split('.').pop().toLowerCase();
+        let reader = new FileReader();
+
+        if (ext === 'txt') {
+            reader.onload = function(e) {
+                mtParseTextData(e.target.result);
+            };
+            reader.readAsText(file);
+        } else {
+            reader.onload = function(e) {
+                let data = new Uint8Array(e.target.result);
+                let workbook = XLSX.read(data, {type: 'array'});
+                let firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                let jsonData = XLSX.utils.sheet_to_json(firstSheet, {header: 1});
+                mtProcessParsedData(jsonData);
+            };
+            reader.readAsArrayBuffer(file);
+        }
+        e.target.value = ''; 
+    });
+
+    function mtParseTextData(text) {
+        let lines = text.split(/\r?\n/);
+        let jsonData = lines.map(line => line.includes('\t') ? line.split('\t') : line.split(','));
+        mtProcessParsedData(jsonData);
+    }
+
+    function mtProcessParsedData(data) {
+        let korIdx = 0, engIdx = 1;
+
+        for (let row of data) {
+            let val1 = String(row[0] || '').trim();
+            let val2 = String(row[1] || '').trim();
+            if (val1 && val2) {
+                if (/[a-zA-Z]/.test(val1) && /[ㄱ-ㅎㅏ-ㅣ가-힣]/.test(val2)) {
+                    korIdx = 1;
+                    engIdx = 0;
+                }
+                break;
+            }
+        }
+
+        let wordsArr = [];
+        for (let row of data) {
+            let korVal = String(row[korIdx] || '').trim();
+            let engVal = String(row[engIdx] || '').trim();
+            if (korVal && engVal) {
+                wordsArr.push({ kor: korVal, eng: engVal, starred: false });
+            }
+        }
+
+        if (wordsArr.length > 0) {
+            let slotName = mtCurrentUploadedFileName || (wordsArr[0].kor.substring(0, 10) + "...");
+            let slotData = { name: slotName, words: wordsArr };
+            
+            localStorage.setItem('word_slot_' + mtActiveSlotIndex, JSON.stringify(slotData));
+            mtInitSlots();
+        } else {
+            alert("유효한 단어 데이터를 찾을 수 없습니다.");
+        }
+    }
+
+    function mtOpenOptionsModal(slotIndex, slotData) {
+        mtActiveSlotIndex = slotIndex;
+        mtOriginalSlotData = slotData;
+        
+        document.getElementById('mtModalSlotTitle').innerText = slotData.name;
+        document.getElementById('mtRangeStart').value = 1;
+        document.getElementById('mtRangeEnd').value = '';
+        document.getElementById('mtRangeEnd').placeholder = slotData.words.length;
+        
+        document.getElementById('mtOptionsModal').style.display = 'flex';
+    }
+
+    function mtCloseModal() {
+        document.getElementById('mtOptionsModal').style.display = 'none';
+    }
+
+    function mtApplyOptionsAndStart() {
+        let totalLen = mtOriginalSlotData.words.length;
+        
+        let startVal = parseInt(document.getElementById('mtRangeStart').value) || 1;
+        let endVal = parseInt(document.getElementById('mtRangeEnd').value) || totalLen;
+        
+        if (startVal < 1) startVal = 1;
+        if (endVal > totalLen) endVal = totalLen;
+        if (startVal > endVal) {
+            alert("시작 번호가 끝 번호보다 클 수 없습니다.");
+            return;
+        }
+
+        let selected = mtOriginalSlotData.words.map((w, idx) => ({ ...w, originalIndex: idx }))
+                                             .slice(startVal - 1, endVal);
+        
+        let mode = document.getElementById('mtStudyMode').value;
+        
+        if (mode === 'starred') {
+            selected = selected.filter(w => w.starred);
+            if (selected.length === 0) {
+                alert("선택한 범위 내에 ★ 표시된 카드가 없습니다.");
+                return;
+            }
+        } else if (mode === 'reverse') {
+            selected.reverse();
+        } else if (mode === 'random') {
+            for (let i = selected.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [selected[i], selected[j]] = [selected[j], selected[i]];
+            }
+        }
+
+        mtCurrentStudyWords = selected;
+        mtCurrentIndex = 0;
+        
+        mtCloseModal();
+        document.getElementById('mt-main-menu').style.display = 'none';
+        document.getElementById('mt-flashcard').style.display = 'block';
+        mtLoadWord(mtCurrentIndex);
+    }
+
+    function mtGoMainMenu() {
+        document.getElementById('mt-flashcard').style.display = 'none';
+        document.getElementById('mt-main-menu').style.display = 'block';
+        mtInitSlots();
+    }
+
+    function mtEscapeHTML(str) {
+        return str.replace(/[&<>'"]/g, 
+            tag => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                "'": '&#39;',
+                '"': '&quot;'
+            }[tag] || tag)
+        );
+    }
+
+    function mtLoadWord(index) {
+        mtRevealedSet.clear(); 
+        let currentWord = mtCurrentStudyWords[index];
+        let safeKor = mtEscapeHTML(currentWord.kor);
+        let formattedKor = safeKor.replace(/\s*(\([^)]+\))/g, '<br><span style="font-size: 80%;">$1</span>');
+        
+        document.getElementById('mtKorText').innerHTML = formattedKor;
+        document.getElementById('mtEngInput').value = '';
+        document.getElementById('mtEngInput').focus();
+        
+        document.getElementById('mtStarBtn').innerText = currentWord.starred ? '★' : '☆';
+        document.getElementById('mtProgressText').innerText = `${index + 1} / ${mtCurrentStudyWords.length}`;
+        
+        mtRenderMask('');
+    }
+
+    function mtPrevWord() {
+        if (mtCurrentIndex > 0) {
+            mtCurrentIndex--;
+            mtLoadWord(mtCurrentIndex);
+        } else {
+            alert("첫 번째 단어입니다.");
+        }
+    }
+
+    function mtNextWord() {
+        if (mtCurrentIndex < mtCurrentStudyWords.length - 1) {
+            mtCurrentIndex++;
+            mtLoadWord(mtCurrentIndex);
+        } else {
+            alert("설정된 범위의 학습을 완료했습니다!");
+            mtGoMainMenu();
+        }
+    }
+
+    function mtToggleStar() {
+        let currentWord = mtCurrentStudyWords[mtCurrentIndex];
+        currentWord.starred = !currentWord.starred;
+        
+        document.getElementById('mtStarBtn').innerText = currentWord.starred ? '★' : '☆';
+        
+        mtOriginalSlotData.words[currentWord.originalIndex].starred = currentWord.starred;
+        localStorage.setItem('word_slot_' + mtActiveSlotIndex, JSON.stringify(mtOriginalSlotData));
+    }
+
+    function mtRenderMask(typedStr) {
+        let targetStr = mtCurrentStudyWords[mtCurrentIndex].eng;
+        let container = document.getElementById('mtMaskContainer');
+        container.innerHTML = ''; 
+
+        let wordDiv = document.createElement('div');
+        wordDiv.className = 'mt-word-wrapper';
+
+        for (let i = 0; i < targetStr.length; i++) {
+            let char = targetStr[i];
+
+            if (char === ' ') {
+                if (wordDiv.childNodes.length > 0) {
+                    container.appendChild(wordDiv);
+                    wordDiv = document.createElement('div');
+                    wordDiv.className = 'mt-word-wrapper';
+                }
+                let span = document.createElement('span');
+                span.className = 'mt-char-box space';
+                container.appendChild(span);
+            } else {
+                let span = document.createElement('span');
+                let isAlphaNum = /[a-zA-Z0-9]/.test(char);
+
+                if (!isAlphaNum) {
+                    span.className = 'mt-char-box unmasked-punct';
+                    span.textContent = char;
+                } else {
+                    if (i < typedStr.length) {
+                        span.className = 'mt-char-box';
+                        span.textContent = char; 
+                    } else if (mtRevealedSet.has(i)) {
+                        span.className = 'mt-char-box revealed';
+                        span.textContent = char; 
+                    } else {
+                        span.className = 'mt-char-box masked';
+                        span.onclick = function() {
+                            mtRevealedSet.add(i); 
+                            mtRenderMask(document.getElementById('mtEngInput').value); 
+                            document.getElementById('mtEngInput').focus();
+                        };
+                    }
+                }
+                wordDiv.appendChild(span);
+            }
+        }
+        if (wordDiv.childNodes.length > 0) {
+            container.appendChild(wordDiv);
+        }
+    }
+
+    // 입력 및 정답 처리 이벤트 설정
+    document.addEventListener("DOMContentLoaded", function() {
+        const mtInputEl = document.getElementById('mtEngInput');
+        if (mtInputEl) {
+            mtInputEl.addEventListener('input', function(e) {
+                let typed = this.value;
+                let target = mtCurrentStudyWords[mtCurrentIndex].eng;
+
+                let validLength = 0;
+                for (let i = 0; i < typed.length; i++) {
+                    if (typed[i].toLowerCase() === target[i].toLowerCase()) {
+                        validLength++;
+                    } else {
+                        break;
+                    }
+                }
+
+                this.value = typed.substring(0, validLength);
+                mtRenderMask(this.value);
+            });
+
+            mtInputEl.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    let target = mtCurrentStudyWords[mtCurrentIndex].eng;
+                    let typed = this.value;
+                    
+                    let remaining = target.substring(typed.length);
+                    let isMaskingLeft = /[a-zA-Z0-9]/.test(remaining);
+
+                    if (!isMaskingLeft) {
+                        mtNextWord();
+                    }
+                }
+            });
+        }
+    });
 
     /* ========================================== */
     /* [새 기능] 5. 게시판(IndexedDB) 기능 관리    */
@@ -2952,6 +3244,9 @@ Rules:
         loadBoardAiExtraText();
         await loadFromDatabase();
         renderBoardList();
+        
+        // 마스킹 타이핑 초기화 (슬롯 불러오기 연동)
+        if (typeof mtInitSlots === 'function') mtInitSlots();
     })();
 
 </script>
