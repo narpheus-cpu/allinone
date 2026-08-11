@@ -821,7 +821,7 @@
     <div id="maskingTypingTab" class="tab-content">
         <!-- 메인 화면 -->
         <div id="mt-main-menu" style="background: white; padding: 30px; border-radius: 12px; border: 1px solid var(--border-color); text-align: center;">
-            <h2 style="font-size: 18px; font-weight: 700; margin-top: 0; color: #111827;">마스킹 타이핑 단어장 (슬롯 1~10)</h2>
+            <h2 style="font-size: 18px; font-weight: 700; margin-top: 0; color: #111827;">마스킹 타이핑 영작 연습</h2>
             <p style="color:#666; font-size:13px; margin-bottom: 20px;">빈 슬롯을 클릭하여 엑셀(.xlsx) 또는 텍스트(.txt) 파일을 업로드하세요.</p>
             <div class="mt-slots-grid" id="mtSlotsGrid"></div>
             <input type="file" id="mtFileUpload" style="display:none;" accept=".xlsx, .xls, .txt" />
@@ -856,6 +856,32 @@
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px; gap: 10px;">
                     <button class="btn-excel" style="flex: 1; padding: 10px;" onclick="mtCloseModal()">취소</button>
                     <button class="btn-primary" style="flex: 1; padding: 10px;" onclick="mtApplyOptionsAndStart()">시작하기</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 마스킹 타이핑 다중 열 선택 모달 -->
+        <div id="mtColumnSelectModal" class="modal-overlay">
+            <div class="modal-card" style="width: 350px;">
+                <div style="font-weight: 700; font-size: 15px; color: #111827; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 15px;">열 선택 (다중 한국어 감지)</div>
+                <p style="font-size:12px; color:#666; margin-top:0;">한국어 열이 2개 이상 감지되었습니다. 각 항목에 사용할 열을 지정해 주세요.</p>
+                
+                <div style="margin-bottom:10px;">
+                    <label style="font-size:13px; font-weight:600; display:block; margin-bottom:4px;">주문장 (한국어)</label>
+                    <select id="mtColMainKor" style="width:100%; padding:6px; border-radius:4px; border:1px solid var(--border-color); outline:none; font-size:13px;"></select>
+                </div>
+                <div style="margin-bottom:10px;">
+                    <label style="font-size:13px; font-weight:600; display:block; margin-bottom:4px;">보조문장 (괄호 처리)</label>
+                    <select id="mtColSubKor" style="width:100%; padding:6px; border-radius:4px; border:1px solid var(--border-color); outline:none; font-size:13px;"></select>
+                </div>
+                <div style="margin-bottom:20px;">
+                    <label style="font-size:13px; font-weight:600; display:block; margin-bottom:4px;">영어문장 (마스킹 대상)</label>
+                    <select id="mtColEng" style="width:100%; padding:6px; border-radius:4px; border:1px solid var(--border-color); outline:none; font-size:13px;"></select>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; gap:10px;">
+                    <button class="btn-excel" style="flex:1; padding:8px;" onclick="document.getElementById('mtColumnSelectModal').style.display='none'">취소</button>
+                    <button class="btn-primary" style="flex:1; padding:8px;" onclick="mtConfirmColumnSelect()">적용</button>
                 </div>
             </div>
         </div>
@@ -2453,7 +2479,7 @@ Rules:
         if (!roundQueue[currentRoundIndex]) return alert('저장할 항목이 없습니다.');
         const currentInQueue = roundQueue[currentRoundIndex];
         const newEng = document.getElementById('quizLiveEngInput').value.trim(); const newMean = document.getElementById('quizLiveMeanInput').value.trim(); const newHint = document.getElementById('quizLiveHintInput').value.trim();
-        if (!newEng || !newMean) return alert('단어(항목1)와 뜻(항목2)은 비워둘 수 검습니다.');
+        if (!newEng || !newMean) return alert('단어(항목1)와 뜻(항목2)은 비워둘 수 없습니다.');
         currentInQueue.english = newEng; currentInQueue.meaning = newMean; currentInQueue.hint = newHint;
         const targetWord = words.find(w => w.id === currentInQueue.id);
         if (targetWord) { targetWord.english = newEng; targetWord.meaning = newMean; targetWord.hint = newHint; }
@@ -2525,6 +2551,7 @@ Rules:
     let mtCurrentStudyWords = []; 
     let mtCurrentIndex = 0;
     let mtRevealedSet = new Set(); 
+    let mtTempParsedData = null; // 다중 열 감지 시 원본 임시 저장용
 
     // 마스킹타이핑 폰트 사이즈 변수 관리
     let mtKorSize = parseInt(localStorage.getItem('mtKorSize')) || 26;
@@ -2611,7 +2638,7 @@ Rules:
         }
     }
 
-    // 마스킹 타이핑 파일 업로드 처리 (인코딩 자동 감지 및 한글 깨짐 방지 적용)
+    // 마스킹 타이핑 파일 업로드 처리
     document.getElementById('mtFileUpload').addEventListener('change', function(e) {
         let file = e.target.files[0];
         if (!file) return;
@@ -2665,20 +2692,19 @@ Rules:
         mtProcessParsedData(jsonData);
     }
 
-    // 데이터 처리 및 저장 (일련번호 제외, 언어 자동 감지 강화)
+    // 데이터 처리 및 저장 (다중 한국어 열 감지 추가)
     function mtProcessParsedData(data) {
-        let korIdx = -1, engIdx = -1;
-        let maxKorScore = -1, maxEngScore = -1;
-
         let validRows = data.filter(row => row && row.length > 0).slice(0, 15);
         let maxCols = 0;
         validRows.forEach(row => { if (row.length > maxCols) maxCols = row.length; });
+
+        let korCols = [];
+        let engCols = [];
 
         for (let c = 0; c < maxCols; c++) {
             let korScore = 0, engScore = 0;
             for (let row of validRows) {
                 let cellVal = String(row[c] || '').trim();
-                
                 if (!cellVal || /^\d+$/.test(cellVal)) continue;
 
                 let korMatches = cellVal.match(/[ㄱ-ㅎㅏ-ㅣ가-힣]/g);
@@ -2688,21 +2714,96 @@ Rules:
                 if (engMatches) engScore += engMatches.length;
             }
 
-            if (korScore > maxKorScore && korScore > 0) { maxKorScore = korScore; korIdx = c; }
-            if (engScore > maxEngScore && engScore > 0) { maxEngScore = engScore; engIdx = c; }
+            if (korScore > 0 || engScore > 0) {
+                if (korScore >= engScore) {
+                    korCols.push({ index: c, score: korScore });
+                } else {
+                    engCols.push({ index: c, score: engScore });
+                }
+            }
         }
 
-        if (korIdx === -1) korIdx = 0;
-        if (engIdx === -1) engIdx = 1;
-        if (korIdx === engIdx) engIdx = (korIdx === 0) ? 1 : 0;
+        korCols.sort((a, b) => b.score - a.score);
+        engCols.sort((a, b) => b.score - a.score);
 
+        if (engCols.length === 0) return alert("유효한 영어 데이터를 찾을 수 없습니다.");
+        if (korCols.length === 0) return alert("유효한 한국어 데이터를 찾을 수 없습니다.");
+
+        mtTempParsedData = data; 
+
+        // 한국어 열이 2개 이상이면 역할 지정 모달 띄우기
+        if (korCols.length >= 2) {
+            mtShowColumnSelectModal(korCols, engCols);
+        } else {
+            mtFinalizeDataProcessing(korCols[0].index, -1, engCols[0].index);
+        }
+    }
+
+    function mtShowColumnSelectModal(korCols, engCols) {
+        const mainSel = document.getElementById('mtColMainKor');
+        const subSel = document.getElementById('mtColSubKor');
+        const engSel = document.getElementById('mtColEng');
+        
+        mainSel.innerHTML = ''; 
+        subSel.innerHTML = '<option value="-1">선택 안 함</option>'; 
+        engSel.innerHTML = '';
+        
+        korCols.forEach((col, i) => {
+            let textSnippet = "";
+            for(let r=0; r<mtTempParsedData.length; r++) {
+                if(mtTempParsedData[r] && mtTempParsedData[r][col.index]) {
+                    textSnippet = String(mtTempParsedData[r][col.index]).substring(0, 15) + "...";
+                    break;
+                }
+            }
+            const label = `열 ${col.index + 1} (${textSnippet})`;
+            mainSel.innerHTML += `<option value="${col.index}" ${i===0 ? 'selected' : ''}>${label}</option>`;
+            subSel.innerHTML += `<option value="${col.index}" ${i===1 ? 'selected' : ''}>${label}</option>`;
+        });
+
+        engCols.forEach((col, i) => {
+            let textSnippet = "";
+            for(let r=0; r<mtTempParsedData.length; r++) {
+                if(mtTempParsedData[r] && mtTempParsedData[r][col.index]) {
+                    textSnippet = String(mtTempParsedData[r][col.index]).substring(0, 15) + "...";
+                    break;
+                }
+            }
+            const label = `열 ${col.index + 1} (${textSnippet})`;
+            engSel.innerHTML += `<option value="${col.index}" ${i===0 ? 'selected' : ''}>${label}</option>`;
+        });
+
+        document.getElementById('mtColumnSelectModal').style.display = 'flex';
+    }
+
+    function mtConfirmColumnSelect() {
+        const mainKorIdx = parseInt(document.getElementById('mtColMainKor').value);
+        const subKorIdx = parseInt(document.getElementById('mtColSubKor').value);
+        const engIdx = parseInt(document.getElementById('mtColEng').value);
+        
+        document.getElementById('mtColumnSelectModal').style.display = 'none';
+        mtFinalizeDataProcessing(mainKorIdx, subKorIdx, engIdx);
+    }
+
+    function mtFinalizeDataProcessing(mainKorIdx, subKorIdx, engIdx) {
         let wordsArr = [];
-        for (let row of data) {
-            let korVal = String(row[korIdx] || '').trim();
+        for (let row of mtTempParsedData) {
+            if(!row || row.length === 0) continue;
+            let mainKorVal = String(row[mainKorIdx] || '').trim();
+            let subKorVal = subKorIdx >= 0 ? String(row[subKorIdx] || '').trim() : '';
             let engVal = String(row[engIdx] || '').trim();
             
-            if (korVal && engVal && !/^\d+$/.test(korVal) && !/^\d+$/.test(engVal)) {
-                wordsArr.push({ kor: korVal, eng: engVal, starred: false });
+            if (mainKorVal && engVal && !/^\d+$/.test(mainKorVal) && !/^\d+$/.test(engVal)) {
+                let combinedKor = mainKorVal;
+                
+                // 보조문장이 존재하고, 메인문장과 완전히 같지 않은 경우에만 추가
+                if (subKorVal && subKorVal !== mainKorVal) {
+                    let subClean = subKorVal.replace(/^\(|\)$/g, '').trim();
+                    if(subClean) {
+                        combinedKor += ` (${subClean})`;
+                    }
+                }
+                wordsArr.push({ kor: combinedKor, eng: engVal, starred: false });
             }
         }
 
