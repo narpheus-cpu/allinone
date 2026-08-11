@@ -28,8 +28,8 @@
             --mt-paren-size: 16px;
             --mt-eng-box-size: 22px;
             --mt-input-size: 20px;
-            --mt-eng-box-width: 1.0em; /* 타이트한 너비 */
-            --mt-eng-box-gap: 2px;     /* 좁은 자간 */
+            --mt-eng-box-width: 0.8em; /* 기본 1:1.2 비율을 위한 너비 설정 */
+            --mt-eng-box-gap: 4px;     /* 마스킹 사각형 간의 간격 */
         }
 
         body { 
@@ -348,34 +348,58 @@
         #mtKorText { font-size: var(--mt-kor-size); font-weight: bold; color: #333; margin-bottom: 30px; line-height: 1.4; text-align: center; }
         .mt-paren-text { font-size: var(--mt-paren-size); color: #555; }
         
-        .mt-mask-container { display: flex; gap: var(--mt-eng-box-gap); justify-content: center; margin-bottom: 30px; flex-wrap: wrap; }
-        .mt-word-wrapper { display: flex; gap: var(--mt-eng-box-gap); }
+        .mt-mask-container { 
+            display: flex; 
+            justify-content: center; 
+            margin-bottom: 30px; 
+            flex-wrap: wrap; 
+            gap: 10px 0; /* 줄바꿈 시 상하 간격 */
+        }
         
-        /* 폰트사이즈(em) 및 너비/간격 변수 기반 디자인 */
-        .mt-char-box { 
-            font-size: var(--mt-eng-box-size); 
+        .mt-word-wrapper { 
+            display: inline-flex; 
+            align-items: center; 
+            white-space: nowrap; 
+        }
+        
+        /* 정상적으로 입력/공개된 텍스트 (자연스러운 자간 유지) */
+        .mt-revealed-text {
+            font-size: var(--mt-eng-box-size);
+            font-weight: bold;
+            color: #000;
+        }
+        .mt-revealed-text.hint {
+            background-color: #fffacd; /* 힌트로 열어본 글자는 배경색 유지 */
+            border-radius: 3px;
+            padding: 0 1px;
+        }
+        
+        /* 아직 입력되지 않은 마스킹 사각형 (1:1.2 비율 유지, 투명 박스 사라짐 효과) */
+        .mt-mask-box { 
+            display: inline-block;
             width: var(--mt-eng-box-width); 
-            height: 1.4em; /* 타이트한 높이 적용 */
-            font-weight: bold; 
-            display: flex; align-items: center; justify-content: center; 
-            border: 2px solid transparent; /* 기본 투명 (글자가 채워진 상태) */
-            border-radius: 4px; user-select: none; 
-            background-color: transparent; /* 기본 투명 */
-            box-sizing: border-box;
-        }
-        .mt-char-box.masked { 
-            background-color: #ffffff; /* 마스킹 상태일 때만 배경 흰색 */
-            border-color: #000;        /* 마스킹 상태일 때만 윤곽선 검은색 */
-            color: transparent; 
+            height: calc(var(--mt-eng-box-width) * 1.2); 
+            border: 2px solid #000; 
+            border-radius: 4px; 
+            background-color: #ffffff; 
             cursor: pointer; 
+            box-sizing: border-box;
+            margin: 0 calc(var(--mt-eng-box-gap) / 2); /* 설정된 간격의 절반씩 좌우 마진 */
+            vertical-align: middle;
         }
-        .mt-char-box.revealed { 
-            background-color: #fffacd; 
-            border-color: transparent; 
-            color: #000; 
+        
+        /* 마침표, 쉼표 등 기호 처리 */
+        .mt-unmasked-punct { 
+            font-size: var(--mt-eng-box-size);
+            font-weight: bold;
+            color: #000;
         }
-        .mt-char-box.unmasked-punct { border: none; background-color: transparent; width: auto; min-width: 0.82em; }
-        .mt-char-box.space { border: none; background-color: transparent; width: 0.82em; }
+        
+        /* 띄어쓰기 여백 */
+        .mt-space { 
+            display: inline-block; 
+            width: 0.5em; 
+        }
         
         .mt-input-area { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 20px; }
         #mtStarBtn { font-size: 32px; cursor: pointer; color: #f1c40f; user-select: none; transition: transform 0.1s; }
@@ -1274,8 +1298,8 @@
                 mtParenSize = parsed.mtFontSettings.paren;
                 mtEngBoxSize = parsed.mtFontSettings.engBox; 
                 mtInputSize = parsed.mtFontSettings.input;
-                mtEngBoxWidth = parsed.mtFontSettings.boxWidth !== undefined ? parsed.mtFontSettings.boxWidth : 1.0;
-                mtEngBoxGap = parsed.mtFontSettings.boxGap !== undefined ? parsed.mtFontSettings.boxGap : 2;
+                mtEngBoxWidth = parsed.mtFontSettings.boxWidth !== undefined ? parsed.mtFontSettings.boxWidth : 0.8;
+                mtEngBoxGap = parsed.mtFontSettings.boxGap !== undefined ? parsed.mtFontSettings.boxGap : 4;
                 
                 localStorage.setItem('mtKorSize', mtKorSize); 
                 localStorage.setItem('mtParenSize', mtParenSize);
@@ -2604,9 +2628,9 @@ Rules:
     let mtParenSize = parseInt(localStorage.getItem('mtParenSize')) || 16;
     let mtEngBoxSize = parseInt(localStorage.getItem('mtEngBoxSize')) || 22;
     let mtInputSize = parseInt(localStorage.getItem('mtInputSize')) || 20;
-    let mtEngBoxWidth = parseFloat(localStorage.getItem('mtEngBoxWidth')) || 1.0;
+    let mtEngBoxWidth = parseFloat(localStorage.getItem('mtEngBoxWidth')) || 0.8;
     let mtEngBoxGap = parseInt(localStorage.getItem('mtEngBoxGap'));
-    if(isNaN(mtEngBoxGap)) mtEngBoxGap = 2;
+    if(isNaN(mtEngBoxGap)) mtEngBoxGap = 4;
 
     function mtApplyFontSettings() {
         const root = document.documentElement;
@@ -2644,7 +2668,7 @@ Rules:
 
     function mtAdjustLayout(type, delta) {
         if(type === 'boxWidth') {
-            mtEngBoxWidth = Math.max(0.5, Math.min(4.0, mtEngBoxWidth + delta));
+            mtEngBoxWidth = Math.max(0.2, Math.min(4.0, mtEngBoxWidth + delta));
             localStorage.setItem('mtEngBoxWidth', mtEngBoxWidth.toFixed(2));
         } else if(type === 'boxGap') {
             mtEngBoxGap = Math.max(0, Math.min(30, mtEngBoxGap + delta));
@@ -2761,7 +2785,7 @@ Rules:
         }
     }
 
-    // 마스킹 타이핑 파일 업로드 처리 (인코딩 자동 감지 및 한글 깨짐 방지 적용)
+    // 마스킹 타이핑 파일 업로드 처리
     document.getElementById('mtFileUpload').addEventListener('change', function(e) {
         let file = e.target.files[0];
         if (!file) return;
@@ -3082,24 +3106,27 @@ Rules:
                     wordDiv.className = 'mt-word-wrapper';
                 }
                 let span = document.createElement('span');
-                span.className = 'mt-char-box space';
+                span.className = 'mt-space';
                 container.appendChild(span);
             } else {
                 let span = document.createElement('span');
                 let isAlphaNum = /[a-zA-Z0-9]/.test(char);
 
                 if (!isAlphaNum) {
-                    span.className = 'mt-char-box unmasked-punct';
+                    span.className = 'mt-unmasked-punct';
                     span.textContent = char;
                 } else {
                     if (i < typedStr.length) {
-                        span.className = 'mt-char-box';
+                        // 정상적으로 입력되어 공개된 텍스트
+                        span.className = 'mt-revealed-text';
                         span.textContent = char; 
                     } else if (mtRevealedSet.has(i)) {
-                        span.className = 'mt-char-box revealed';
+                        // 힌트를 봐서 공개된 텍스트
+                        span.className = 'mt-revealed-text hint';
                         span.textContent = char; 
                     } else {
-                        span.className = 'mt-char-box masked';
+                        // 입력되지 않은 상태 (박스)
+                        span.className = 'mt-mask-box';
                         span.onclick = function() {
                             mtRevealedSet.add(i); 
                             mtRenderMask(document.getElementById('mtEngInput').value); 
