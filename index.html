@@ -30,7 +30,7 @@
             --mt-input-size: 20px;
             --mt-eng-box-width: 0.8em; 
             --mt-eng-box-gap: 4px;     
-            --mt-space-width: 0.8em; /* 띄어쓰기 간격 추가 */
+            --mt-space-width: 0.8em; 
         }
 
         body { 
@@ -336,11 +336,11 @@
         /* 타이핑 to 언마스크 뷰 전용 스타일 */
         /* ========================================== */
         .mt-slots-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px; }
-        .mt-slot { border: 2px dashed #ccc; border-radius: 8px; padding: 20px; cursor: pointer; transition: all 0.2s; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 80px; background: white;}
+        .mt-slot { border: 2px dashed #ccc; border-radius: 8px; padding: 20px; cursor: pointer; transition: all 0.2s; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 80px; background: white; position: relative;}
         .mt-slot:hover { border-color: #4A90E2; background-color: #f0f7ff; }
         .mt-slot.has-data { border: 2px solid #4A90E2; background-color: #eaf3fc; }
-        .mt-slot-title { font-weight: bold; margin-bottom: 5px; word-break: break-all; font-size: 14px; color: #111827;}
-        .mt-slot-desc { font-size: 12px; color: #666; margin-bottom: 10px; }
+        .mt-slot-title { font-weight: bold; margin-bottom: 5px; word-break: break-all; font-size: 14px; color: #111827; text-align: center;}
+        .mt-slot-desc { font-size: 12px; color: #666; margin-bottom: 15px; text-align: center; }
         .mt-btn-delete { background: var(--accent-red); color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: 600; }
         
         .mt-top-bar { display: flex; justify-content: space-between; margin-bottom: 20px; align-items: center; }
@@ -363,7 +363,6 @@
             white-space: nowrap; 
         }
         
-        /* 정상적으로 입력/공개된 텍스트 (자연스러운 자간 유지) */
         .mt-revealed-text {
             font-size: var(--mt-eng-box-size);
             font-weight: bold;
@@ -375,7 +374,6 @@
             padding: 0 1px;
         }
         
-        /* 아직 입력되지 않은 마스킹 사각형 (1:1.2 비율 유지) */
         .mt-mask-box { 
             display: inline-block;
             width: var(--mt-eng-box-width); 
@@ -389,7 +387,6 @@
             vertical-align: middle;
         }
         
-        /* 마침표, 쉼표 등 기호 처리 */
         .mt-unmasked-punct { 
             font-size: var(--mt-eng-box-size);
             font-weight: bold;
@@ -397,7 +394,6 @@
             min-width: var(--mt-space-width);
         }
         
-        /* 띄어쓰기 여백 */
         .mt-space { 
             display: inline-block; 
             width: var(--mt-space-width); 
@@ -411,10 +407,10 @@
 
         .mt-nav-buttons { display: flex; justify-content: center; gap: 15px; margin-bottom: 10px; }
 
-        /* 타이핑 to 언마스크 폰트 컨트롤러 바 */
+        /* 폰트/레이아웃 조절 컨트롤러 바 */
         .mt-font-ctrl-bar {
             display: flex; justify-content: center; align-items: center; gap: 10px; flex-wrap: wrap;
-            margin-top: 30px; padding-top: 15px; border-top: 1px dashed var(--border-color);
+            margin-top: 15px; padding-top: 15px; border-top: 1px dashed var(--border-color);
         }
         .mt-font-ctrl-item {
             display: flex; align-items: center; gap: 4px; font-size: 11px; color: #4b5563; font-weight: 600;
@@ -858,7 +854,7 @@
     <div id="maskingTypingTab" class="tab-content">
         <!-- 메인 화면 -->
         <div id="mt-main-menu" style="background: white; padding: 30px; border-radius: 12px; border: 1px solid var(--border-color); text-align: center;">
-            <h2 style="font-size: 18px; font-weight: 700; margin-top: 0; color: #111827;">타이핑 to 언마스크 영작 연습 (슬롯 1~10)</h2>
+            <h2 style="font-size: 18px; font-weight: 700; margin-top: 0; color: #111827;">타이핑 to 언마스크 영작 연습</h2>
             <p style="color:#666; font-size:13px; margin-bottom: 20px;">빈 슬롯을 클릭하여 엑셀(.xlsx) 또는 텍스트(.txt) 파일을 업로드하세요.</p>
             <div class="mt-slots-grid" id="mtSlotsGrid"></div>
             <input type="file" id="mtFileUpload" style="display:none;" accept=".xlsx, .xls, .txt" />
@@ -954,8 +950,12 @@
                 <button class="btn-excel" style="padding: 10px 24px; font-size: 13px;" onclick="mtNextWord()">다음 카드</button>
             </div>
             
-            <!-- 폰트/레이아웃 조절 컨트롤러 영역 -->
-            <div class="mt-font-ctrl-bar">
+            <div style="text-align: right; margin-top: -10px; margin-bottom: 10px;">
+                <button class="btn-excel" onclick="mtToggleCtrlBar()">⚙️ 폰트/레이아웃 설정</button>
+            </div>
+
+            <!-- 폰트/레이아웃 조절 컨트롤러 영역 (기본 숨김) -->
+            <div class="mt-font-ctrl-bar" id="mtFontCtrlBar" style="display: none;">
                 <div class="mt-font-ctrl-item">
                     <span>한국어</span>
                     <button onclick="mtAdjustFontSize('kor', -1)">-</button>
@@ -1247,6 +1247,8 @@
                 const val = localStorage.getItem('word_slot_' + i);
                 if (val) mtBackupData[i] = val;
             }
+            const starSess = localStorage.getItem('word_slot_star_session');
+            if (starSess) mtBackupData['star_session'] = starSess;
 
             const dataToSave = {
                 slotsData: slotsData,
@@ -1300,6 +1302,9 @@
                 for(let i = 1; i <= 10; i++) {
                     if(parsed.mtBackupData[i]) localStorage.setItem('word_slot_' + i, parsed.mtBackupData[i]);
                     else localStorage.removeItem('word_slot_' + i);
+                }
+                if(parsed.mtBackupData['star_session']) {
+                    localStorage.setItem('word_slot_star_session', parsed.mtBackupData['star_session']);
                 }
             }
             if (parsed.mtFontSettings) {
@@ -2642,7 +2647,7 @@ Rules:
     let mtEngBoxWidth = parseFloat(localStorage.getItem('mtEngBoxWidth')) || 0.8;
     let mtEngBoxGap = parseInt(localStorage.getItem('mtEngBoxGap'));
     if(isNaN(mtEngBoxGap)) mtEngBoxGap = 4;
-    let mtSpaceWidth = parseFloat(localStorage.getItem('mtSpaceWidth')) || 0.8; // 띄어쓰기 너비
+    let mtSpaceWidth = parseFloat(localStorage.getItem('mtSpaceWidth')) || 0.8;
 
     function mtApplyFontSettings() {
         const root = document.documentElement;
@@ -2694,21 +2699,88 @@ Rules:
         mtApplyFontSettings();
     }
 
+    function mtToggleCtrlBar() {
+        let bar = document.getElementById('mtFontCtrlBar');
+        if (bar.style.display === 'none' || bar.style.display === '') {
+            bar.style.display = 'flex';
+        } else {
+            bar.style.display = 'none';
+        }
+    }
+
+    function mtExportSlot(e, slotIndex) {
+        e.stopPropagation();
+        let rawData = localStorage.getItem('word_slot_' + slotIndex);
+        if (!rawData) return;
+        let parsed = JSON.parse(rawData);
+        let words = Array.isArray(parsed) ? parsed : parsed.words;
+        if (!words || words.length === 0) return alert('저장할 데이터가 없습니다.');
+        
+        let exportData = words.map((w, i) => [i + 1, w.starred ? "★" : "", w.kor, w.eng]);
+        exportData.unshift(["NO", "중요", "한국어", "영어"]);
+        
+        let ws = XLSX.utils.aoa_to_sheet(exportData);
+        let wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "단어장");
+        
+        let safeName = (parsed.name || `slot_${slotIndex}`).replace(/[\\/:*?"<>|]/g, '');
+        XLSX.writeFile(wb, `[마스킹타이핑]_${safeName}.xlsx`);
+    }
+
+    function mtExportStarred(e) {
+        e.stopPropagation();
+        let allStarredWords = [];
+        for (let i = 1; i <= 10; i++) {
+            let rawData = localStorage.getItem('word_slot_' + i);
+            if (rawData) {
+                let parsed = JSON.parse(rawData);
+                let wordsArr = Array.isArray(parsed) ? parsed : parsed.words;
+                if(wordsArr) {
+                    wordsArr.forEach((w) => {
+                        if (w.starred) allStarredWords.push(w);
+                    });
+                }
+            }
+        }
+        if (allStarredWords.length === 0) return alert('저장할 ★표시 카드가 없습니다.');
+        
+        let exportData = allStarredWords.map((w, i) => [i + 1, "★", w.kor, w.eng]);
+        exportData.unshift(["NO", "중요", "한국어", "영어"]);
+        
+        let ws = XLSX.utils.aoa_to_sheet(exportData);
+        let wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "★단어장");
+        
+        XLSX.writeFile(wb, `[마스킹타이핑]_★모아보기.xlsx`);
+    }
+
     function mtInitSlots() {
         const grid = document.getElementById('mtSlotsGrid');
         if(!grid) return;
         grid.innerHTML = '';
+        
+        let allStarredWords = [];
+
         for (let i = 1; i <= 10; i++) {
             let rawData = localStorage.getItem('word_slot_' + i);
             let div = document.createElement('div');
             
             if (rawData) {
                 let parsedData = JSON.parse(rawData);
-                let slotData = Array.isArray(parsedData) 
-                    ? { name: "슬롯 " + i, words: parsedData } 
-                    : parsedData;
+                let slotData = Array.isArray(parsedData) ? { name: "슬롯 " + i, words: parsedData } : parsedData;
 
-                let starredCount = slotData.words ? slotData.words.filter(w => w.starred).length : 0;
+                let starredCount = 0;
+                if (slotData.words) {
+                    slotData.words.forEach((w, wIdx) => {
+                        if (w.starred) {
+                            starredCount++;
+                            allStarredWords.push({
+                                kor: w.kor, eng: w.eng, starred: true,
+                                sourceSlot: i, sourceIndex: wIdx
+                            });
+                        }
+                    });
+                }
 
                 div.className = 'mt-slot has-data';
                 div.innerHTML = `
@@ -2718,6 +2790,7 @@ Rules:
                         <span style="color: #d97706; font-weight: 600;">★표기카드수: ${starredCount}개</span>
                     </div>
                     <div>
+                        <button class="btn-download" style="padding: 5px 10px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-right: 5px;" onclick="mtExportSlot(event, ${i})">저장</button>
                         <button class="mt-btn-delete" onclick="mtDeleteSlot(event, ${i})">삭제</button>
                     </div>
                 `;
@@ -2733,6 +2806,31 @@ Rules:
             }
             grid.appendChild(div);
         }
+
+        // ★ 모아보기 슬롯 생성
+        let starDiv = document.createElement('div');
+        starDiv.className = 'mt-slot has-data';
+        starDiv.style.borderColor = '#d97706';
+        starDiv.style.backgroundColor = '#fffbeb';
+        starDiv.innerHTML = `
+            <div class="mt-slot-title" style="color: #d97706;">★ 모아보기 슬롯</div>
+            <div class="mt-slot-desc" style="line-height: 1.5;">
+                카드 수: ${allStarredWords.length}개<br>
+                <span style="color: #d97706; font-weight: 600;">(모든 슬롯의 ★ 자동 수집)</span>
+            </div>
+            <div>
+                <button class="btn-download" style="padding: 5px 10px; border-radius: 4px; font-size: 11px; font-weight: 600; background: #ffffff;" onclick="mtExportStarred(event)">저장</button>
+            </div>
+        `;
+        let starSlotData = { name: "★ 모아보기 슬롯", words: allStarredWords, isStarSlot: true };
+        starDiv.onclick = () => {
+            if (allStarredWords.length === 0) {
+                alert("★ 표시된 카드가 없습니다. 다른 슬롯에서 카드를 ★ 표시해 보세요.");
+            } else {
+                mtPromptAction('star', starSlotData);
+            }
+        };
+        grid.appendChild(starDiv);
     }
 
     function mtPromptAction(slotIndex, slotData) {
@@ -2740,6 +2838,13 @@ Rules:
         mtOriginalSlotData = slotData;
         
         document.getElementById('mtActionSlotTitle').innerText = slotData.name;
+        
+        if (slotIndex === 'star') {
+            let starSessRaw = localStorage.getItem('word_slot_star_session');
+            if (starSessRaw) {
+                slotData.lastSession = JSON.parse(starSessRaw);
+            }
+        }
         
         const btnContinue = document.getElementById('mtBtnContinue');
         if (slotData.lastSession && slotData.lastSession.studyWords && slotData.lastSession.studyWords.length > 0) {
@@ -2785,7 +2890,11 @@ Rules:
                 studyWords: mtCurrentStudyWords,
                 currentIndex: mtCurrentIndex
             };
-            localStorage.setItem('word_slot_' + mtActiveSlotIndex, JSON.stringify(mtOriginalSlotData));
+            if (mtActiveSlotIndex === 'star') {
+                localStorage.setItem('word_slot_star_session', JSON.stringify(mtOriginalSlotData.lastSession));
+            } else {
+                localStorage.setItem('word_slot_' + mtActiveSlotIndex, JSON.stringify(mtOriginalSlotData));
+            }
         }
     }
 
@@ -3100,7 +3209,27 @@ Rules:
         
         document.getElementById('mtStarBtn').innerText = currentWord.starred ? '★' : '☆';
         
-        mtOriginalSlotData.words[currentWord.originalIndex].starred = currentWord.starred;
+        if (mtActiveSlotIndex === 'star') {
+            // ★ 슬롯에서 해제한 경우, 원본 슬롯 데이터도 업데이트
+            let srcSlot = currentWord.sourceSlot;
+            let srcIdx = currentWord.sourceIndex;
+            let rawData = localStorage.getItem('word_slot_' + srcSlot);
+            if (rawData) {
+                let parsed = JSON.parse(rawData);
+                let wordsArr = Array.isArray(parsed) ? parsed : parsed.words;
+                wordsArr[srcIdx].starred = currentWord.starred;
+                
+                if (Array.isArray(parsed)) {
+                    localStorage.setItem('word_slot_' + srcSlot, JSON.stringify(wordsArr));
+                } else {
+                    parsed.words = wordsArr;
+                    localStorage.setItem('word_slot_' + srcSlot, JSON.stringify(parsed));
+                }
+            }
+        } else {
+            mtOriginalSlotData.words[currentWord.originalIndex].starred = currentWord.starred;
+            localStorage.setItem('word_slot_' + mtActiveSlotIndex, JSON.stringify(mtOriginalSlotData));
+        }
         mtSaveSessionState();
     }
 
