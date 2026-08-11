@@ -2723,7 +2723,7 @@ function mtLoadWord(index) {
         let currentWord = mtCurrentStudyWords[index];
         
         let safeKor = mtEscapeHTML(currentWord.kor);
-        let formattedKor = safeKor.replace(/\s*(\([^)]+\))/g, '<br><span style="font-size: 80%;">$1</span>');
+        let formattedKor = safeKor.replace(/\s*(\([^)]+\))/g, '<br><span style="font-size: 50%;">$1</span>');
         
         document.getElementById('mtKorText').innerHTML = formattedKor;
         document.getElementById('mtEngInput').value = '';
