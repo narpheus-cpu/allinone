@@ -28,8 +28,9 @@
             --mt-paren-size: 16px;
             --mt-eng-box-size: 22px;
             --mt-input-size: 20px;
-            --mt-eng-box-width: 0.8em; /* 기본 1:1.2 비율을 위한 너비 설정 */
-            --mt-eng-box-gap: 4px;     /* 마스킹 사각형 간의 간격 */
+            --mt-eng-box-width: 0.8em; 
+            --mt-eng-box-gap: 4px;     
+            --mt-space-width: 0.8em; /* 띄어쓰기 간격 추가 */
         }
 
         body { 
@@ -353,7 +354,7 @@
             justify-content: center; 
             margin-bottom: 30px; 
             flex-wrap: wrap; 
-            gap: 10px 0; /* 줄바꿈 시 상하 간격 */
+            gap: 10px 0; 
         }
         
         .mt-word-wrapper { 
@@ -369,12 +370,12 @@
             color: #000;
         }
         .mt-revealed-text.hint {
-            background-color: #fffacd; /* 힌트로 열어본 글자는 배경색 유지 */
+            background-color: #fffacd; 
             border-radius: 3px;
             padding: 0 1px;
         }
         
-        /* 아직 입력되지 않은 마스킹 사각형 (1:1.2 비율 유지, 투명 박스 사라짐 효과) */
+        /* 아직 입력되지 않은 마스킹 사각형 (1:1.2 비율 유지) */
         .mt-mask-box { 
             display: inline-block;
             width: var(--mt-eng-box-width); 
@@ -384,7 +385,7 @@
             background-color: #ffffff; 
             cursor: pointer; 
             box-sizing: border-box;
-            margin: 0 calc(var(--mt-eng-box-gap) / 2); /* 설정된 간격의 절반씩 좌우 마진 */
+            margin: 0 calc(var(--mt-eng-box-gap) / 2);
             vertical-align: middle;
         }
         
@@ -393,12 +394,13 @@
             font-size: var(--mt-eng-box-size);
             font-weight: bold;
             color: #000;
+            min-width: var(--mt-space-width);
         }
         
         /* 띄어쓰기 여백 */
         .mt-space { 
             display: inline-block; 
-            width: 0.5em; 
+            width: var(--mt-space-width); 
         }
         
         .mt-input-area { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 20px; }
@@ -990,6 +992,12 @@
                     <input type="number" id="mtBoxGapInput" readonly>
                     <button onclick="mtAdjustLayout('boxGap', 1)">+</button>
                 </div>
+                <div class="mt-font-ctrl-item">
+                    <span>띄어쓰기</span>
+                    <button onclick="mtAdjustLayout('spaceWidth', -0.1)">-</button>
+                    <input type="text" id="mtSpaceWidthInput" readonly style="width:36px;">
+                    <button onclick="mtAdjustLayout('spaceWidth', 0.1)">+</button>
+                </div>
             </div>
 
             <div style="margin-top: 25px; padding-top: 15px; border-top: 1px dashed var(--border-color); font-size: 12px; color: #6b7280; text-align: center; line-height: 1.6;">
@@ -1250,7 +1258,8 @@
                 mtFontSettings: { 
                     kor: mtKorSize, paren: mtParenSize, 
                     engBox: mtEngBoxSize, input: mtInputSize,
-                    boxWidth: mtEngBoxWidth, boxGap: mtEngBoxGap
+                    boxWidth: mtEngBoxWidth, boxGap: mtEngBoxGap,
+                    spaceWidth: mtSpaceWidth
                 },
                 lastSaved: new Date().toISOString()
             };
@@ -1300,6 +1309,7 @@
                 mtInputSize = parsed.mtFontSettings.input;
                 mtEngBoxWidth = parsed.mtFontSettings.boxWidth !== undefined ? parsed.mtFontSettings.boxWidth : 0.8;
                 mtEngBoxGap = parsed.mtFontSettings.boxGap !== undefined ? parsed.mtFontSettings.boxGap : 4;
+                mtSpaceWidth = parsed.mtFontSettings.spaceWidth !== undefined ? parsed.mtFontSettings.spaceWidth : 0.8;
                 
                 localStorage.setItem('mtKorSize', mtKorSize); 
                 localStorage.setItem('mtParenSize', mtParenSize);
@@ -1307,6 +1317,7 @@
                 localStorage.setItem('mtInputSize', mtInputSize);
                 localStorage.setItem('mtEngBoxWidth', mtEngBoxWidth); 
                 localStorage.setItem('mtEngBoxGap', mtEngBoxGap);
+                localStorage.setItem('mtSpaceWidth', mtSpaceWidth);
                 mtApplyFontSettings();
             }
             
@@ -2631,6 +2642,7 @@ Rules:
     let mtEngBoxWidth = parseFloat(localStorage.getItem('mtEngBoxWidth')) || 0.8;
     let mtEngBoxGap = parseInt(localStorage.getItem('mtEngBoxGap'));
     if(isNaN(mtEngBoxGap)) mtEngBoxGap = 4;
+    let mtSpaceWidth = parseFloat(localStorage.getItem('mtSpaceWidth')) || 0.8; // 띄어쓰기 너비
 
     function mtApplyFontSettings() {
         const root = document.documentElement;
@@ -2640,6 +2652,7 @@ Rules:
         root.style.setProperty('--mt-input-size', mtInputSize + 'px');
         root.style.setProperty('--mt-eng-box-width', mtEngBoxWidth + 'em');
         root.style.setProperty('--mt-eng-box-gap', mtEngBoxGap + 'px');
+        root.style.setProperty('--mt-space-width', mtSpaceWidth + 'em');
 
         if(document.getElementById('mtKorSizeInput')) document.getElementById('mtKorSizeInput').value = mtKorSize;
         if(document.getElementById('mtParenSizeInput')) document.getElementById('mtParenSizeInput').value = mtParenSize;
@@ -2647,6 +2660,7 @@ Rules:
         if(document.getElementById('mtInputSizeInput')) document.getElementById('mtInputSizeInput').value = mtInputSize;
         if(document.getElementById('mtBoxWidthInput')) document.getElementById('mtBoxWidthInput').value = mtEngBoxWidth.toFixed(2);
         if(document.getElementById('mtBoxGapInput')) document.getElementById('mtBoxGapInput').value = mtEngBoxGap;
+        if(document.getElementById('mtSpaceWidthInput')) document.getElementById('mtSpaceWidthInput').value = mtSpaceWidth.toFixed(2);
     }
 
     function mtAdjustFontSize(type, delta) {
@@ -2673,6 +2687,9 @@ Rules:
         } else if(type === 'boxGap') {
             mtEngBoxGap = Math.max(0, Math.min(30, mtEngBoxGap + delta));
             localStorage.setItem('mtEngBoxGap', mtEngBoxGap);
+        } else if(type === 'spaceWidth') {
+            mtSpaceWidth = Math.max(0.1, Math.min(4.0, mtSpaceWidth + delta));
+            localStorage.setItem('mtSpaceWidth', mtSpaceWidth.toFixed(2));
         }
         mtApplyFontSettings();
     }
@@ -2785,7 +2802,6 @@ Rules:
         }
     }
 
-    // 마스킹 타이핑 파일 업로드 처리
     document.getElementById('mtFileUpload').addEventListener('change', function(e) {
         let file = e.target.files[0];
         if (!file) return;
@@ -3117,15 +3133,12 @@ Rules:
                     span.textContent = char;
                 } else {
                     if (i < typedStr.length) {
-                        // 정상적으로 입력되어 공개된 텍스트
                         span.className = 'mt-revealed-text';
                         span.textContent = char; 
                     } else if (mtRevealedSet.has(i)) {
-                        // 힌트를 봐서 공개된 텍스트
                         span.className = 'mt-revealed-text hint';
                         span.textContent = char; 
                     } else {
-                        // 입력되지 않은 상태 (박스)
                         span.className = 'mt-mask-box';
                         span.onclick = function() {
                             mtRevealedSet.add(i); 
