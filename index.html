@@ -514,12 +514,12 @@
         <button class="btn-excel" onclick="resetCustomFont()" style="padding: 7px 14px;">기본 복구</button>
     </div>
 
-    <!-- 메인 탭 메뉴 -->
+<!-- 메인 탭 메뉴 -->
     <div class="tabs">
         <button class="tab-btn active" onclick="switchMainTab('novelTab')">영작하기</button>
         <button class="tab-btn" onclick="switchMainTab('vocaTab')">단어장</button>
         <button class="tab-btn" onclick="switchMainTab('quizTab')">라운드퀴즈</button>
-        <button class="tab-btn" onclick="switchMainTab('maskingTypingTab')">마스킹타이핑</button>
+        <button class="tab-btn" onclick="switchMainTab('maskingTypingTab')">타이핑 to 언마스크</button>
         <button class="tab-btn" onclick="switchMainTab('boardTab')">게시판</button>
     </div>
 
@@ -818,10 +818,10 @@
     <!-- ========================================== -->
     <!-- 4. 마스킹 타이핑 탭 -->
     <!-- ========================================== -->
-    <div id="maskingTypingTab" class="tab-content">
+<div id="maskingTypingTab" class="tab-content">
         <!-- 메인 화면 -->
         <div id="mt-main-menu" style="background: white; padding: 30px; border-radius: 12px; border: 1px solid var(--border-color); text-align: center;">
-            <h2 style="font-size: 18px; font-weight: 700; margin-top: 0; color: #111827;">마스킹 타이핑 영작 연습</h2>
+            <h2 style="font-size: 18px; font-weight: 700; margin-top: 0; color: #111827;">타이핑 to 언마스크 영작 연습</h2>
             <p style="color:#666; font-size:13px; margin-bottom: 20px;">빈 슬롯을 클릭하여 엑셀(.xlsx) 또는 텍스트(.txt) 파일을 업로드하세요.</p>
             <div class="mt-slots-grid" id="mtSlotsGrid"></div>
             <input type="file" id="mtFileUpload" style="display:none;" accept=".xlsx, .xls, .txt" />
