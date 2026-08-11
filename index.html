@@ -575,7 +575,7 @@
             </script>
             <div id="slotRow_5" class="slot-row" onclick="switchSlot(5)">
                 <span class="slot-tag">슬롯 6</span>
-                <div id="slotTitle_5" class="slot-title-area">비어 있음 (붙여넣기 버튼으로 텍스트 파싱 가능)</div>
+                <div id="slotTitle_5" class="slot-title-area">비어 있음 (붙여넣기 버튼으로 텍스트 파싱 전용)</div>
                 <div class="slot-actions" onclick="event.stopPropagation()">
                     <button class="btn-excel" onclick="triggerImport(5)">불러오기</button>
                     <button class="btn-excel" onclick="openPasteModalNovel()">붙여넣기</button>
@@ -746,7 +746,7 @@
                         <option value="ALL">전체 단어</option>
                         <option value="MINUS">마이너스 단어만</option>
                         <option value="ZERO">0점 단어만</option>
-                        <option value="LOW">1-2점 단어만</option>
+                        <option value="LOW">1-2 단어만</option>
                         <option value="MID">3-4 단어만</option>
                         <option value="MAX">만점 단어만</option>
                     </select>
@@ -825,6 +825,16 @@
             <p style="color:#666; font-size:13px; margin-bottom: 20px;">빈 슬롯을 클릭하여 엑셀(.xlsx) 또는 텍스트(.txt) 파일을 업로드하세요.</p>
             <div class="mt-slots-grid" id="mtSlotsGrid"></div>
             <input type="file" id="mtFileUpload" style="display:none;" accept=".xlsx, .xls, .txt" />
+        </div>
+
+        <!-- 슬롯 액션 선택 모달 (새로시작 / 이어서하기) -->
+        <div id="mtActionModal" class="modal-overlay">
+            <div class="modal-card" style="width: 300px; text-align: center; padding: 25px;">
+                <div style="font-weight: 700; font-size: 16px; color: #111827; margin-bottom: 20px;" id="mtActionSlotTitle">슬롯 선택</div>
+                <button class="btn-primary" style="width: 100%; padding: 12px; margin-bottom: 10px; font-size: 14px;" id="mtBtnContinue" onclick="mtContinueStudy()">이어서 하기</button>
+                <button class="btn-excel" style="width: 100%; padding: 12px; margin-bottom: 15px; font-size: 14px;" onclick="mtOpenOptionsFromAction()">새로 시작 (설정)</button>
+                <button class="btn-excel" style="width: 100%; padding: 12px; font-size: 14px; background: #f3f4f6; border: none;" onclick="document.getElementById('mtActionModal').style.display='none'">닫기</button>
+            </div>
         </div>
 
         <!-- 옵션 설정 모달 -->
@@ -2551,7 +2561,7 @@ Rules:
     let mtCurrentStudyWords = []; 
     let mtCurrentIndex = 0;
     let mtRevealedSet = new Set(); 
-    let mtTempParsedData = null; // 다중 열 감지 시 원본 임시 저장용
+    let mtTempParsedData = null; 
 
     // 마스킹타이핑 폰트 사이즈 변수 관리
     let mtKorSize = parseInt(localStorage.getItem('mtKorSize')) || 26;
@@ -2611,7 +2621,7 @@ Rules:
                         <button class="mt-btn-delete" onclick="mtDeleteSlot(event, ${i})">삭제</button>
                     </div>
                 `;
-                div.onclick = () => mtOpenOptionsModal(i, slotData);
+                div.onclick = () => mtPromptAction(i, slotData);
             } else {
                 div.className = 'mt-slot';
                 div.innerHTML = `
@@ -2622,6 +2632,60 @@ Rules:
                 div.onclick = () => mtTriggerUpload(i);
             }
             grid.appendChild(div);
+        }
+    }
+
+    function mtPromptAction(slotIndex, slotData) {
+        mtActiveSlotIndex = slotIndex;
+        mtOriginalSlotData = slotData;
+        
+        document.getElementById('mtActionSlotTitle').innerText = slotData.name;
+        
+        const btnContinue = document.getElementById('mtBtnContinue');
+        if (slotData.lastSession && slotData.lastSession.studyWords && slotData.lastSession.studyWords.length > 0) {
+            let progress = slotData.lastSession.currentIndex + 1;
+            let total = slotData.lastSession.studyWords.length;
+            if(progress > total) progress = total;
+            btnContinue.innerText = `이어서 하기 (${progress} / ${total})`;
+            btnContinue.disabled = false;
+            btnContinue.style.opacity = '1';
+        } else {
+            btnContinue.innerText = `이어서 하기 (기록 없음)`;
+            btnContinue.disabled = true;
+            btnContinue.style.opacity = '0.5';
+        }
+        
+        document.getElementById('mtActionModal').style.display = 'flex';
+    }
+
+    function mtOpenOptionsFromAction() {
+        document.getElementById('mtActionModal').style.display = 'none';
+        mtOpenOptionsModal(mtActiveSlotIndex, mtOriginalSlotData);
+    }
+
+    function mtContinueStudy() {
+        if (!mtOriginalSlotData || !mtOriginalSlotData.lastSession || !mtOriginalSlotData.lastSession.studyWords) {
+            alert("이어서 할 학습 데이터가 없습니다. 새로 시작을 눌러주세요.");
+            return;
+        }
+        mtCurrentStudyWords = mtOriginalSlotData.lastSession.studyWords;
+        mtCurrentIndex = mtOriginalSlotData.lastSession.currentIndex || 0;
+        
+        if (mtCurrentIndex >= mtCurrentStudyWords.length) mtCurrentIndex = 0;
+
+        document.getElementById('mtActionModal').style.display = 'none';
+        document.getElementById('mt-main-menu').style.display = 'none';
+        document.getElementById('mt-flashcard').style.display = 'block';
+        mtLoadWord(mtCurrentIndex);
+    }
+
+    function mtSaveSessionState() {
+        if(mtOriginalSlotData) {
+            mtOriginalSlotData.lastSession = {
+                studyWords: mtCurrentStudyWords,
+                currentIndex: mtCurrentIndex
+            };
+            localStorage.setItem('word_slot_' + mtActiveSlotIndex, JSON.stringify(mtOriginalSlotData));
         }
     }
 
@@ -2638,7 +2702,6 @@ Rules:
         }
     }
 
-    // 마스킹 타이핑 파일 업로드 처리
     document.getElementById('mtFileUpload').addEventListener('change', function(e) {
         let file = e.target.files[0];
         if (!file) return;
@@ -2692,7 +2755,6 @@ Rules:
         mtProcessParsedData(jsonData);
     }
 
-    // 데이터 처리 및 저장 (다중 한국어 열 감지 추가)
     function mtProcessParsedData(data) {
         let validRows = data.filter(row => row && row.length > 0).slice(0, 15);
         let maxCols = 0;
@@ -2731,7 +2793,6 @@ Rules:
 
         mtTempParsedData = data; 
 
-        // 한국어 열이 2개 이상이면 역할 지정 모달 띄우기
         if (korCols.length >= 2) {
             mtShowColumnSelectModal(korCols, engCols);
         } else {
@@ -2796,7 +2857,6 @@ Rules:
             if (mainKorVal && engVal && !/^\d+$/.test(mainKorVal) && !/^\d+$/.test(engVal)) {
                 let combinedKor = mainKorVal;
                 
-                // 보조문장이 존재하고, 메인문장과 완전히 같지 않은 경우에만 추가
                 if (subKorVal && subKorVal !== mainKorVal) {
                     let subClean = subKorVal.replace(/^\(|\)$/g, '').trim();
                     if(subClean) {
@@ -2809,7 +2869,7 @@ Rules:
 
         if (wordsArr.length > 0) {
             let slotName = mtCurrentUploadedFileName || (wordsArr[0].kor.substring(0, 10) + "...");
-            let slotData = { name: slotName, words: wordsArr };
+            let slotData = { name: slotName, words: wordsArr, lastSession: null };
             
             localStorage.setItem('word_slot_' + mtActiveSlotIndex, JSON.stringify(slotData));
             mtInitSlots();
@@ -2900,7 +2960,6 @@ Rules:
         let currentWord = mtCurrentStudyWords[index];
         
         let safeKor = mtEscapeHTML(currentWord.kor);
-        // 괄호 부분은 클래스로 적용 (css에서 var(--mt-paren-size) 적용됨)
         let formattedKor = safeKor.replace(/\s*(\([^)]+\))/g, '<br><span class="mt-paren-text">$1</span>');
         
         document.getElementById('mtKorText').innerHTML = formattedKor;
@@ -2913,6 +2972,7 @@ Rules:
         document.getElementById('mtProgressText').innerText = `[${realSerialNumber}] ${index + 1} / ${mtCurrentStudyWords.length}`;
         
         mtRenderMask('');
+        mtSaveSessionState();
     }
 
     function mtPrevWord() {
@@ -2941,7 +3001,7 @@ Rules:
         document.getElementById('mtStarBtn').innerText = currentWord.starred ? '★' : '☆';
         
         mtOriginalSlotData.words[currentWord.originalIndex].starred = currentWord.starred;
-        localStorage.setItem('word_slot_' + mtActiveSlotIndex, JSON.stringify(mtOriginalSlotData));
+        mtSaveSessionState();
     }
 
     function mtRenderMask(typedStr) {
@@ -3015,7 +3075,6 @@ Rules:
                 mtRenderMask(this.value);
             });
 
-            // 엔터키 및 PageUp/PageDown 키 감지
             mtInputEl.addEventListener('keydown', function(e) {
                 if (e.key === 'Enter') {
                     let target = mtCurrentStudyWords[mtCurrentIndex].eng;
