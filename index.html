@@ -853,8 +853,8 @@
             </div>
 
             <div class="mt-nav-buttons">
-                <button class="btn-excel" style="padding: 10px 24px; font-size: 13px;" onclick="mtPrevWord()">이전 카드</button>
-                <button class="btn-excel" style="padding: 10px 24px; font-size: 13px;" onclick="mtNextWord()">다음 카드</button>
+                <button class="btn-excel" style="padding: 10px 24px; font-size: 13px;" onclick="mtPrevWord()">이전 단어</button>
+                <button class="btn-excel" style="padding: 10px 24px; font-size: 13px;" onclick="mtNextWord()">다음 단어</button>
             </div>
             
             <div style="margin-top: 25px; padding-top: 15px; border-top: 1px dashed var(--border-color); font-size: 12px; color: #6b7280; text-align: center; line-height: 1.6;">
@@ -2665,9 +2665,11 @@ Rules:
         );
     }
 
-    function mtLoadWord(index) {
+function mtLoadWord(index) {
         mtRevealedSet.clear(); 
+        
         let currentWord = mtCurrentStudyWords[index];
+        
         let safeKor = mtEscapeHTML(currentWord.kor);
         let formattedKor = safeKor.replace(/\s*(\([^)]+\))/g, '<br><span style="font-size: 80%;">$1</span>');
         
@@ -2676,7 +2678,10 @@ Rules:
         document.getElementById('mtEngInput').focus();
         
         document.getElementById('mtStarBtn').innerText = currentWord.starred ? '★' : '☆';
-        document.getElementById('mtProgressText').innerText = `${index + 1} / ${mtCurrentStudyWords.length}`;
+        
+        // --- 변경된 부분: [실제일련번호] 출제범위상의 번호 / 출제범위상의 전체카드숫자 ---
+        let realSerialNumber = currentWord.originalIndex + 1;
+        document.getElementById('mtProgressText').innerText = `[${realSerialNumber}] ${index + 1} / ${mtCurrentStudyWords.length}`;
         
         mtRenderMask('');
     }
