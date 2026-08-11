@@ -23,11 +23,13 @@
             --novel-font-size: 15px;
             --voca-font-size: 15px;
             
-            /* 타이핑 to 언마스크 폰트 사이즈 변수 */
+            /* 타이핑 to 언마스크 레이아웃 및 폰트 사이즈 변수 */
             --mt-kor-size: 26px;
             --mt-paren-size: 16px;
             --mt-eng-box-size: 22px;
             --mt-input-size: 20px;
+            --mt-eng-box-width: 1.64em;
+            --mt-eng-box-gap: 6px;
         }
 
         body { 
@@ -346,27 +348,27 @@
         #mtKorText { font-size: var(--mt-kor-size); font-weight: bold; color: #333; margin-bottom: 30px; line-height: 1.4; text-align: center; }
         .mt-paren-text { font-size: var(--mt-paren-size); color: #555; }
         
-        .mt-mask-container { display: flex; gap: 6px; justify-content: center; margin-bottom: 30px; flex-wrap: wrap; }
-        .mt-word-wrapper { display: flex; gap: 6px; }
+        .mt-mask-container { display: flex; gap: var(--mt-eng-box-gap); justify-content: center; margin-bottom: 30px; flex-wrap: wrap; }
+        .mt-word-wrapper { display: flex; gap: var(--mt-eng-box-gap); }
         
-        /* 폰트사이즈(em) 기반으로 유동적으로 크기가 변하는 카드 디자인 */
+        /* 폰트사이즈(em) 및 너비/간격 변수 기반 디자인 */
         .mt-char-box { 
             font-size: var(--mt-eng-box-size); 
-            width: 1.64em; height: 2.1em; font-weight: bold; 
+            width: var(--mt-eng-box-width); height: 2.1em; font-weight: bold; 
             display: flex; align-items: center; justify-content: center; 
-            border: 2px solid transparent; /* 글자가 채워진(기본) 상태일 땐 윤곽선, 배경 모두 투명 */
+            border: 2px solid transparent; 
             border-radius: 6px; user-select: none; 
             background-color: transparent; box-sizing: border-box;
         }
         .mt-char-box.masked { 
-            background-color: #ffffff; /* 마스킹 상태일 땐 하얀 배경 */
-            border-color: #000;        /* 마스킹 상태일 때만 검은 윤곽선 */
+            background-color: #ffffff; 
+            border-color: #000;        
             color: transparent; 
             cursor: pointer; 
         }
         .mt-char-box.revealed { 
-            background-color: #fffacd; /* 힌트를 본 카드는 연노랑 배경 유지 */
-            border-color: transparent; /* 윤곽선 투명 */
+            background-color: #fffacd; 
+            border-color: transparent; 
             color: #000; 
         }
         .mt-char-box.unmasked-punct { border: none; background-color: transparent; width: auto; min-width: 0.82em; }
@@ -382,19 +384,19 @@
 
         /* 타이핑 to 언마스크 폰트 컨트롤러 바 */
         .mt-font-ctrl-bar {
-            display: flex; justify-content: center; align-items: center; gap: 15px; flex-wrap: wrap;
+            display: flex; justify-content: center; align-items: center; gap: 10px; flex-wrap: wrap;
             margin-top: 30px; padding-top: 15px; border-top: 1px dashed var(--border-color);
         }
         .mt-font-ctrl-item {
-            display: flex; align-items: center; gap: 5px; font-size: 12px; color: #4b5563; font-weight: 600;
-            background: #f9fafb; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border-color);
+            display: flex; align-items: center; gap: 4px; font-size: 11px; color: #4b5563; font-weight: 600;
+            background: #f9fafb; padding: 4px 8px; border-radius: 8px; border: 1px solid var(--border-color);
         }
         .mt-font-ctrl-item button {
-            padding: 2px 6px; font-size: 12px; background: #e5e7eb; color: #374151; border-radius: 4px; border: none; cursor: pointer;
+            padding: 2px 6px; font-size: 11px; background: #e5e7eb; color: #374151; border-radius: 4px; border: none; cursor: pointer;
         }
         .mt-font-ctrl-item button:hover { background: #d1d5db; }
         .mt-font-ctrl-item input {
-            width: 32px; text-align: center; border: none; background: transparent; font-size: 12px; font-weight: 700; outline: none; color: #111827;
+            width: 32px; text-align: center; border: none; background: transparent; font-size: 11px; font-weight: 700; outline: none; color: #111827;
         }
 
         /* ========================================== */
@@ -923,7 +925,7 @@
                 <button class="btn-excel" style="padding: 10px 24px; font-size: 13px;" onclick="mtNextWord()">다음 카드</button>
             </div>
             
-            <!-- 폰트 조절 컨트롤러 영역 -->
+            <!-- 폰트/레이아웃 조절 컨트롤러 영역 -->
             <div class="mt-font-ctrl-bar">
                 <div class="mt-font-ctrl-item">
                     <span>한국어</span>
@@ -932,13 +934,13 @@
                     <button onclick="mtAdjustFontSize('kor', 1)">+</button>
                 </div>
                 <div class="mt-font-ctrl-item">
-                    <span>괄호속한국어</span>
+                    <span>괄호문장</span>
                     <button onclick="mtAdjustFontSize('paren', -1)">-</button>
                     <input type="number" id="mtParenSizeInput" readonly>
                     <button onclick="mtAdjustFontSize('paren', 1)">+</button>
                 </div>
                 <div class="mt-font-ctrl-item">
-                    <span>영어박스</span>
+                    <span>영어글자</span>
                     <button onclick="mtAdjustFontSize('engBox', -1)">-</button>
                     <input type="number" id="mtEngBoxSizeInput" readonly>
                     <button onclick="mtAdjustFontSize('engBox', 1)">+</button>
@@ -948,6 +950,18 @@
                     <button onclick="mtAdjustFontSize('input', -1)">-</button>
                     <input type="number" id="mtInputSizeInput" readonly>
                     <button onclick="mtAdjustFontSize('input', 1)">+</button>
+                </div>
+                <div class="mt-font-ctrl-item">
+                    <span>박스너비</span>
+                    <button onclick="mtAdjustLayout('boxWidth', -0.1)">-</button>
+                    <input type="text" id="mtBoxWidthInput" readonly style="width:36px;">
+                    <button onclick="mtAdjustLayout('boxWidth', 0.1)">+</button>
+                </div>
+                <div class="mt-font-ctrl-item">
+                    <span>박스간격</span>
+                    <button onclick="mtAdjustLayout('boxGap', -1)">-</button>
+                    <input type="number" id="mtBoxGapInput" readonly>
+                    <button onclick="mtAdjustLayout('boxGap', 1)">+</button>
                 </div>
             </div>
 
@@ -1206,7 +1220,11 @@
                 vocaFontSize: vocaFontSize,
                 boardDataList: boardDataList,
                 mtBackupData: mtBackupData, 
-                mtFontSettings: { kor: mtKorSize, paren: mtParenSize, engBox: mtEngBoxSize, input: mtInputSize },
+                mtFontSettings: { 
+                    kor: mtKorSize, paren: mtParenSize, 
+                    engBox: mtEngBoxSize, input: mtInputSize,
+                    boxWidth: mtEngBoxWidth, boxGap: mtEngBoxGap
+                },
                 lastSaved: new Date().toISOString()
             };
 
@@ -1249,10 +1267,19 @@
                 }
             }
             if (parsed.mtFontSettings) {
-                mtKorSize = parsed.mtFontSettings.kor; mtParenSize = parsed.mtFontSettings.paren;
-                mtEngBoxSize = parsed.mtFontSettings.engBox; mtInputSize = parsed.mtFontSettings.input;
-                localStorage.setItem('mtKorSize', mtKorSize); localStorage.setItem('mtParenSize', mtParenSize);
-                localStorage.setItem('mtEngBoxSize', mtEngBoxSize); localStorage.setItem('mtInputSize', mtInputSize);
+                mtKorSize = parsed.mtFontSettings.kor; 
+                mtParenSize = parsed.mtFontSettings.paren;
+                mtEngBoxSize = parsed.mtFontSettings.engBox; 
+                mtInputSize = parsed.mtFontSettings.input;
+                mtEngBoxWidth = parsed.mtFontSettings.boxWidth !== undefined ? parsed.mtFontSettings.boxWidth : 1.64;
+                mtEngBoxGap = parsed.mtFontSettings.boxGap !== undefined ? parsed.mtFontSettings.boxGap : 6;
+                
+                localStorage.setItem('mtKorSize', mtKorSize); 
+                localStorage.setItem('mtParenSize', mtParenSize);
+                localStorage.setItem('mtEngBoxSize', mtEngBoxSize); 
+                localStorage.setItem('mtInputSize', mtInputSize);
+                localStorage.setItem('mtEngBoxWidth', mtEngBoxWidth); 
+                localStorage.setItem('mtEngBoxGap', mtEngBoxGap);
                 mtApplyFontSettings();
             }
             
@@ -2569,11 +2596,14 @@ Rules:
     let mtRevealedSet = new Set(); 
     let mtTempParsedData = null; 
 
-    // 마스킹타이핑 폰트 사이즈 변수 관리
+    // 타이핑 to 언마스크 폰트 사이즈 변수 관리
     let mtKorSize = parseInt(localStorage.getItem('mtKorSize')) || 26;
     let mtParenSize = parseInt(localStorage.getItem('mtParenSize')) || 16;
     let mtEngBoxSize = parseInt(localStorage.getItem('mtEngBoxSize')) || 22;
     let mtInputSize = parseInt(localStorage.getItem('mtInputSize')) || 20;
+    let mtEngBoxWidth = parseFloat(localStorage.getItem('mtEngBoxWidth')) || 1.64;
+    let mtEngBoxGap = parseInt(localStorage.getItem('mtEngBoxGap'));
+    if(isNaN(mtEngBoxGap)) mtEngBoxGap = 6;
 
     function mtApplyFontSettings() {
         const root = document.documentElement;
@@ -2581,11 +2611,15 @@ Rules:
         root.style.setProperty('--mt-paren-size', mtParenSize + 'px');
         root.style.setProperty('--mt-eng-box-size', mtEngBoxSize + 'px');
         root.style.setProperty('--mt-input-size', mtInputSize + 'px');
+        root.style.setProperty('--mt-eng-box-width', mtEngBoxWidth + 'em');
+        root.style.setProperty('--mt-eng-box-gap', mtEngBoxGap + 'px');
 
         if(document.getElementById('mtKorSizeInput')) document.getElementById('mtKorSizeInput').value = mtKorSize;
         if(document.getElementById('mtParenSizeInput')) document.getElementById('mtParenSizeInput').value = mtParenSize;
         if(document.getElementById('mtEngBoxSizeInput')) document.getElementById('mtEngBoxSizeInput').value = mtEngBoxSize;
         if(document.getElementById('mtInputSizeInput')) document.getElementById('mtInputSizeInput').value = mtInputSize;
+        if(document.getElementById('mtBoxWidthInput')) document.getElementById('mtBoxWidthInput').value = mtEngBoxWidth.toFixed(2);
+        if(document.getElementById('mtBoxGapInput')) document.getElementById('mtBoxGapInput').value = mtEngBoxGap;
     }
 
     function mtAdjustFontSize(type, delta) {
@@ -2601,6 +2635,17 @@ Rules:
         } else if(type === 'input') {
             mtInputSize = Math.max(10, Math.min(50, mtInputSize + delta));
             localStorage.setItem('mtInputSize', mtInputSize);
+        }
+        mtApplyFontSettings();
+    }
+
+    function mtAdjustLayout(type, delta) {
+        if(type === 'boxWidth') {
+            mtEngBoxWidth = Math.max(0.5, Math.min(4.0, mtEngBoxWidth + delta));
+            localStorage.setItem('mtEngBoxWidth', mtEngBoxWidth.toFixed(2));
+        } else if(type === 'boxGap') {
+            mtEngBoxGap = Math.max(0, Math.min(30, mtEngBoxGap + delta));
+            localStorage.setItem('mtEngBoxGap', mtEngBoxGap);
         }
         mtApplyFontSettings();
     }
@@ -3109,7 +3154,7 @@ Rules:
     });
 
     /* ========================================== */
-    /* [새 기능] 5. 게시판(IndexedDB) 기능 관리    */
+    /* [게시판] IndexedDB 기능 관리                */
     /* ========================================== */
     let boardDataList = []; 
     let currentBoardId = null;
