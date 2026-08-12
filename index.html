@@ -405,7 +405,7 @@
         #mtEngInput { font-size: var(--mt-input-size); padding: 12px; width: 70%; max-width: 500px; text-align: center; border: 2px solid var(--border-color); border-radius: 6px; outline: none; font-family: inherit; }
         #mtEngInput:focus { border-color: #111827; }
 
-        .mt-nav-buttons { display: flex; justify-content: center; gap: 15px; margin-bottom: 10px; }
+        .mt-nav-buttons { display: flex; justify-content: center; gap: 15px; margin-bottom: 10px; flex-wrap: wrap;}
 
         /* 폰트/레이아웃 조절 컨트롤러 바 */
         .mt-font-ctrl-bar {
@@ -433,7 +433,7 @@
             min-height: 500px;
         }
 
-        .board-btn-dark { background-color: #111827; color: #ffffff; border: 1px solid #111827; }
+        .board-btn-dark { background-color: #111827; color: #ffffff; border: 1px solid #111827; border-radius: 6px; cursor: pointer; font-weight: 600; padding: 5px 10px; font-size: 11px; transition: all 0.15s ease-in-out;}
         .board-btn-dark:hover { background-color: #374151; }
 
         .board-header-section {
@@ -947,7 +947,15 @@
 
             <div class="mt-nav-buttons">
                 <button class="btn-excel" style="padding: 10px 24px; font-size: 13px;" onclick="mtPrevWord()">이전 카드</button>
+                <button class="board-btn-dark" style="padding: 10px 24px; font-size: 13px; border-radius: 6px;" onclick="copyMtAiPrompt()">AI도움</button>
+                <button class="btn-excel" style="padding: 10px 24px; font-size: 13px;" onclick="toggleMtAiExtraInput()">요청추가</button>
                 <button class="btn-excel" style="padding: 10px 24px; font-size: 13px;" onclick="mtNextWord()">다음 카드</button>
+            </div>
+
+            <div id="mtAiExtraBox" style="display: none; flex-direction: column; gap: 6px; background: #ffffff; border: 1px solid var(--border-color); padding: 12px; border-radius: 8px; width: 250px; margin: 0 auto 15px auto; box-shadow: 0 4px 12px rgba(0,0,0,0.15); text-align: left;">
+                <span style="font-size: 11px; color: var(--text-sub);">추가 입력 내용:</span>
+                <textarea id="mtAiExtraText" style="width: 100%; height: 80px; resize: vertical; border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; font-size: 12px; outline: none; font-family: inherit; box-sizing: border-box;" placeholder="추가할 요청사항을 입력하세요..." oninput="autoSaveMtAiExtra()"></textarea>
+                <button class="board-btn-dark" style="align-self: flex-end; padding: 8px 12px; border-radius: 6px; font-size: 12px;" onclick="saveAndHideMtAiExtra()">저장 & 닫기</button>
             </div>
             
             <div style="text-align: right; margin-top: -10px; margin-bottom: 10px;">
@@ -3284,6 +3292,55 @@ Rules:
         }
     }
 
+    // --- 타이핑 to 언마스크 AI 도움 기능 ---
+    function toggleMtAiExtraInput() {
+        const box = document.getElementById('mtAiExtraBox');
+        box.style.display = (box.style.display === 'flex') ? 'none' : 'flex';
+    }
+
+    function autoSaveMtAiExtra() {
+        localStorage.setItem('mtAiExtraText', document.getElementById('mtAiExtraText').value);
+    }
+
+    function loadMtAiExtraText() {
+        const savedText = localStorage.getItem('mtAiExtraText');
+        if (savedText) document.getElementById('mtAiExtraText').value = savedText;
+    }
+
+    function saveAndHideMtAiExtra() {
+        autoSaveMtAiExtra();
+        document.getElementById('mtAiExtraBox').style.display = 'none';
+        alert("추가 내용이 저장되었습니다.");
+    }
+
+    function copyMtAiPrompt() {
+        if (!mtCurrentStudyWords || mtCurrentStudyWords.length === 0) return alert("학습 중인 카드가 없습니다.");
+        const currentWord = mtCurrentStudyWords[mtCurrentIndex];
+        
+        let kor = currentWord.kor || ''; 
+        let eng = currentWord.eng || ''; 
+        
+        let mainKor = kor;
+        let subKor = "";
+        const match = kor.match(/^(.*?)\s*\(([^)]+)\)$/);
+        if (match) {
+            mainKor = match[1].trim();
+            subKor = match[2].trim();
+        }
+
+        const extraText = document.getElementById('mtAiExtraText').value.trim();
+
+        let prompt = `[${mainKor}], [${subKor}], [${eng}] 에서의 영어문장과 비슷한 표현을 알려주고, 각각의 뉘앙스가 어떠한 차이가 있는지 알려줘`;
+        if (extraText) prompt += `\n\n[추가 요청사항]\n${extraText}`;
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(prompt).then(() => alert("다음 내용이 클립보드에 복사되었습니다.\n\n------------------------\n" + prompt + "\n------------------------"))
+            .catch(err => alert("복사 실패: " + err));
+        } else {
+            fallbackCopyPrompt(prompt);
+        }
+    }
+
     document.addEventListener("DOMContentLoaded", function() {
         const mtInputEl = document.getElementById('mtEngInput');
         if (mtInputEl) {
@@ -3775,6 +3832,7 @@ Rules:
         
         // 타이핑 to 언마스크 초기화 (슬롯 불러오기 연동)
         mtApplyFontSettings();
+        loadMtAiExtraText();
         if (typeof mtInitSlots === 'function') mtInitSlots();
     })();
 
