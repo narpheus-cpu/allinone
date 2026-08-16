@@ -503,15 +503,6 @@
             position: fixed; bottom: 40px; right: 40px; display: flex; flex-direction: column; gap: 8px; z-index: 1000;
         }
         .board-ai-widget button { box-shadow: 0 4px 12px rgba(0,0,0,0.15); padding: 12px 18px; font-size: 13px; border-radius: 30px; }
-        .board-ai-extra-box {
-            display: none; flex-direction: column; gap: 6px; background: #ffffff; border: 1px solid var(--border-color);
-            padding: 12px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); width: 250px; margin-bottom: 10px;
-        }
-        .board-ai-extra-box textarea {
-            width: 100%; height: 80px; resize: vertical; box-sizing: border-box; border: 1px solid var(--border-color);
-            border-radius: 6px; padding: 8px; font-size: 12px; outline: none; font-family: inherit;
-        }
-        .board-ai-extra-box textarea:focus { border-color: #111827; }
         
         .active-view { display: block !important; }
         #boardListView, #boardDetailView { display: none; }
@@ -639,12 +630,12 @@
                 <div id="normalSlotControlGroup" style="display:inline-flex; gap:4px; margin-right:auto; align-items:center;">
                     <button class="btn-ai" style="padding: 5px 10px; font-size: 11px;" onclick="chunkSplitCurrentSentence()">한국어 청크 분리하기</button>
                     <button class="btn-ai" style="padding: 5px 10px; font-size: 11px; background: #4b5563; color: #ffffff;" onclick="copyDeepStudyPromptPractice()">AI도움</button>
-                    <button class="btn-excel" style="padding: 5px 10px; font-size: 11px;" onclick="toggleAiHelpGuideline('practice')">추가요청</button>
+                    <button class="btn-excel" style="padding: 5px 10px; font-size: 11px;" onclick="toggleAiHelpEdit('practice')">AI도움 편집</button>
                 </div>
                 
                 <div id="slot3ControlGroup" style="display:none; margin-right: auto; gap: 4px; align-items: center;">
                     <button class="btn-ai" style="padding: 5px 10px; font-size: 11px; background: #4b5563; color: #ffffff; height: 26px;" onclick="copyDeepStudyPromptPractice()">AI도움</button>
-                    <button class="btn-excel" style="padding: 5px 10px; font-size: 11px; height: 26px;" onclick="toggleAiHelpGuideline('practice')">추가요청</button>
+                    <button class="btn-excel" style="padding: 5px 10px; font-size: 11px; height: 26px;" onclick="toggleAiHelpEdit('practice')">AI도움 편집</button>
                     
                     <button id="btnStarToggleSlot3" class="btn-star-group" style="padding: 5px 10px; font-size: 11px; font-weight: 900; border-radius: 4px; height: 26px; cursor: pointer; transition: 0.2s;" onclick="toggleStarSlot3()">☆</button>
                     <input type="text" id="slot3RangeInput" placeholder="예: 3-330" style="width: 70px; font-size: 11px; padding: 4px 6px; border: 1px solid var(--border-color); border-radius: 4px; text-align: center; height: 26px; box-sizing: border-box;" onkeydown="if(event.key==='Enter') moveIndexForSlot(activeSlotIndex, 1, true);">
@@ -659,8 +650,16 @@
                 <button onclick="adjustNovelFont(1)">+</button>
             </div>
 
-            <div id="aiHelpGuidelineArea_practice" style="display: none; margin-bottom: 12px; margin-top: 6px;">
-                <input type="text" id="aiHelpInput_practice" placeholder="AI 도움 시 반영할 추가 요청사항을 입력하세요 (예: 단어 뜻도 자세히 알려줘)" style="width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 12px; box-sizing: border-box; outline: none;" oninput="saveGuidelineInput('practice')">
+            <!-- AI 프롬프트 템플릿 편집 영역 (Practice) -->
+            <div id="aiHelpEditBox_practice" style="display: none; flex-direction: column; gap: 6px; background: #ffffff; border: 1px solid var(--border-color); padding: 12px; border-radius: 8px; margin-bottom: 12px; margin-top: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-size: 12px; font-weight: 600; color: var(--text-main);">AI 프롬프트 템플릿 편집 <span style="color:var(--text-sub); font-weight:400;">(* 사용 가능 변수: [한국어], [영어])</span></span>
+                    <button class="btn-excel" style="padding: 4px 8px; font-size: 11px;" onclick="resetAiTemplate('practice')">초기화</button>
+                </div>
+                <textarea id="aiHelpTemplate_practice" style="width: 100%; height: 180px; resize: vertical; border: 1px solid var(--border-color); border-radius: 6px; padding: 10px; font-size: 13px; outline: none; font-family: inherit; box-sizing: border-box;" oninput="saveAiTemplate('practice')"></textarea>
+                <div style="display:flex; justify-content:flex-end; gap:8px;">
+                    <button class="board-btn-dark" style="padding: 8px 14px; border-radius: 6px; font-size: 12px;" onclick="toggleAiHelpEdit('practice')">저장 & 닫기</button>
+                </div>
             </div>
 
             <div class="sentence-box">
@@ -950,14 +949,20 @@
             <div class="mt-nav-buttons">
                 <button class="btn-excel" style="padding: 10px 24px; font-size: 13px;" onclick="mtPrevWord()">이전 카드</button>
                 <button class="board-btn-dark" style="padding: 10px 24px; font-size: 13px; border-radius: 6px;" onclick="copyMtAiPrompt()">AI도움</button>
-                <button class="btn-excel" style="padding: 10px 24px; font-size: 13px;" onclick="toggleMtAiExtraInput()">요청추가</button>
+                <button class="btn-excel" style="padding: 10px 24px; font-size: 13px;" onclick="toggleAiHelpEdit('mt')">AI도움 편집</button>
                 <button class="btn-excel" style="padding: 10px 24px; font-size: 13px;" onclick="mtNextWord()">다음 카드</button>
             </div>
 
-            <div id="mtAiExtraBox" style="display: none; flex-direction: column; gap: 6px; background: #ffffff; border: 1px solid var(--border-color); padding: 12px; border-radius: 8px; width: 250px; margin: 0 auto 15px auto; box-shadow: 0 4px 12px rgba(0,0,0,0.15); text-align: left;">
-                <span style="font-size: 11px; color: var(--text-sub);">추가 입력 내용:</span>
-                <textarea id="mtAiExtraText" style="width: 100%; height: 80px; resize: vertical; border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; font-size: 12px; outline: none; font-family: inherit; box-sizing: border-box;" placeholder="추가할 요청사항을 입력하세요..." oninput="autoSaveMtAiExtra()"></textarea>
-                <button class="board-btn-dark" style="align-self: flex-end; padding: 8px 12px; border-radius: 6px; font-size: 12px;" onclick="saveAndHideMtAiExtra()">저장 & 닫기</button>
+            <!-- AI 프롬프트 템플릿 편집 영역 (MT) -->
+            <div id="aiHelpEditBox_mt" style="display: none; flex-direction: column; gap: 6px; background: #ffffff; border: 1px solid var(--border-color); padding: 12px; border-radius: 8px; width: 100%; max-width: 500px; margin: 0 auto 15px auto; box-shadow: 0 4px 12px rgba(0,0,0,0.15); text-align: left;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-size: 12px; font-weight: 600; color: var(--text-main);">AI 프롬프트 템플릿 편집 <br><span style="color:var(--text-sub); font-weight:400;">(* 변수: [주문장], [보조문장], [영어])</span></span>
+                    <button class="btn-excel" style="padding: 4px 8px; font-size: 11px;" onclick="resetAiTemplate('mt')">초기화</button>
+                </div>
+                <textarea id="aiHelpTemplate_mt" style="width: 100%; height: 120px; resize: vertical; border: 1px solid var(--border-color); border-radius: 6px; padding: 10px; font-size: 13px; outline: none; font-family: inherit; box-sizing: border-box;" oninput="saveAiTemplate('mt')"></textarea>
+                <div style="display:flex; justify-content:flex-end; gap:8px;">
+                    <button class="board-btn-dark" style="padding: 8px 14px; border-radius: 6px; font-size: 12px;" onclick="toggleAiHelpEdit('mt')">저장 & 닫기</button>
+                </div>
             </div>
             
             <div style="text-align: right; margin-top: -10px; margin-bottom: 10px;">
@@ -1101,11 +1106,16 @@
             <!-- 스크롤 추적 AI 도움 플로팅 영역 (게시글 볼 때만 동작) -->
             <div class="board-ai-widget">
                 <button class="board-btn-dark" onclick="copyBoardAiPrompt()">AI도움</button>
-                <button class="btn-excel" onclick="toggleBoardAiExtraInput()">추가</button>
-                <div id="boardAiExtraBox" class="board-ai-extra-box">
-                    <span style="font-size: 11px; color: var(--text-sub);">추가 입력 내용:</span>
-                    <textarea id="boardAiExtraText" placeholder="추가할 요청사항을 입력하세요..." oninput="autoSaveBoardAiExtra()"></textarea>
-                    <button class="board-btn-dark" style="align-self: flex-end;" onclick="saveAndHideBoardAiExtra()">저장 & 닫기</button>
+                <button class="btn-excel" onclick="toggleAiHelpEdit('board')">AI도움 편집</button>
+                
+                <!-- AI 프롬프트 템플릿 편집 영역 (Board) -->
+                <div id="aiHelpEditBox_board" style="display: none; flex-direction: column; gap: 6px; background: #ffffff; border: 1px solid var(--border-color); padding: 12px; border-radius: 8px; width: 280px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); text-align: left;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-size: 11px; font-weight: 600; color: var(--text-main);">AI 템플릿 편집 <br><span style="color:var(--text-sub); font-weight:400;">(* 변수: [제목], [내용])</span></span>
+                        <button class="btn-excel" style="padding: 2px 6px; font-size: 10px;" onclick="resetAiTemplate('board')">초기화</button>
+                    </div>
+                    <textarea id="aiHelpTemplate_board" style="width: 100%; height: 120px; resize: vertical; border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; font-size: 12px; outline: none; font-family: inherit; box-sizing: border-box;" oninput="saveAiTemplate('board')"></textarea>
+                    <button class="board-btn-dark" style="align-self: flex-end; padding: 6px 12px; border-radius: 6px; font-size: 11px;" onclick="toggleAiHelpEdit('board')">저장 & 닫기</button>
                 </div>
             </div>
         </div>
@@ -1173,6 +1183,43 @@
 </div>
 
 <script>
+    /* ========================================== */
+    /* [신규] AI 프롬프트 템플릿 관리 기능 */
+    /* ========================================== */
+    const defaultAiTemplates = {
+        practice: `'[한국어]'에 대한 영어 번역인 '[영어]'이(가) 올바른 지 채점해줘\n[출력 형식]\n★ 종합점수: 100점 만점\n★ 종합피드백: (왜 그렇게 평가했는지, 논리적이고 기술적인 분석을 짧고 굵게 적어라.)\n★ 교정답안: (가장 깔끔하고 최적화된 결과물 제시.)\n★ 원어민식 답변: (원어민들은 실생활에서 실제로 이렇게 말해요 라고 할 수 있는 문장 제시)\n★ 핵심영작포인트: (실수를 주의해야 할 문법/뉘앙스적 포인트 1~2줄 요약.)\n\n[채점 가이드]\n- 해당 답안이 해당 한국어에 대한 올바른 구어체 영작으로 볼 수 있는지만 판단할 것\n- 문장부호, 대소문자 사용법은 깡그리 무시하고 아예 언급자체를 절대하지 말 것.`,
+        mt: `[[주문장]], [[보조문장]], [[영어]] 에서의 영어문장과 비슷한 표현을 알려주고, 각각의 뉘앙스가 어떠한 차이가 있는지 알려줘`,
+        board: `[[제목]][[내용]][의 영어 표현과 비슷한 표현과 비슷한 뉘앙스의 문장을 알려줘]`
+    };
+
+    function loadAiTemplates() {
+        document.getElementById('aiHelpTemplate_practice').value = localStorage.getItem('aiTemplate_practice') || defaultTemplates.practice;
+        document.getElementById('aiHelpTemplate_mt').value = localStorage.getItem('aiTemplate_mt') || defaultTemplates.mt;
+        document.getElementById('aiHelpTemplate_board').value = localStorage.getItem('aiTemplate_board') || defaultTemplates.board;
+    }
+
+    function saveAiTemplate(type) {
+        const val = document.getElementById(`aiHelpTemplate_${type}`).value;
+        localStorage.setItem(`aiTemplate_${type}`, val);
+    }
+
+    function resetAiTemplate(type) {
+        if(confirm('기본 템플릿으로 초기화하시겠습니까? (이전에 수정한 내용은 삭제됩니다)')) {
+            document.getElementById(`aiHelpTemplate_${type}`).value = defaultAiTemplates[type];
+            saveAiTemplate(type);
+        }
+    }
+
+    function toggleAiHelpEdit(type) {
+        const box = document.getElementById(`aiHelpEditBox_${type}`);
+        box.style.display = box.style.display === 'flex' ? 'none' : 'flex';
+        if (box.style.display === 'flex') {
+            document.getElementById(`aiHelpTemplate_${type}`).focus();
+        } else {
+            alert("프롬프트 템플릿이 저장되었습니다.");
+        }
+    }
+
     /* ========================================== */
     /* [공통] 커스텀 폰트(글꼴) 동적 적용 로직    */
     /* ========================================== */
@@ -1470,17 +1517,6 @@
         } else {
             activeGuideline = inputEl.value.trim();
             localStorage.setItem('mySavedEvalGuideline', activeGuideline);
-            area.style.display = 'none';
-        }
-    }
-
-    function toggleAiHelpGuideline(type) {
-        const area = document.getElementById(`aiHelpGuidelineArea_${type}`);
-        const inputEl = document.getElementById(`aiHelpInput_${type}`);
-        if (area.style.display === 'none') {
-            area.style.display = 'block';
-            inputEl.focus();
-        } else {
             area.style.display = 'none';
         }
     }
@@ -2609,30 +2645,26 @@ Rules:
 
     function copyDeepStudyPromptPractice() {
         saveCurrentNovelInput(); 
-        const kor = document.getElementById('koreanInput').value.trim(); const eng = document.getElementById('englishInputNovel').value.trim();
+        const kor = document.getElementById('koreanInput').value.trim(); 
+        const eng = document.getElementById('englishInputNovel').value.trim();
         if (!kor && !eng) return alert('입력된 문장이 없습니다.');
-        const extra = document.getElementById('aiHelpInput_practice') ? document.getElementById('aiHelpInput_practice').value.trim() : '';
-        const extraText = extra ? `\n\n[추가 요청사항]\n${extra}` : '';
+        
+        let template = document.getElementById('aiHelpTemplate_practice').value || defaultAiTemplates.practice;
+        let promptText = template.replace(/\[한국어\]/g, kor).replace(/\[영어\]/g, eng);
 
-        const promptText = `'${kor}'에 대한 영어 번역인 '${eng}'이(가) 올바른 지 채점해줘
-[출력 형식]
-★ 종합점수: 100점 만점
-★ 종합피드백: (왜 그렇게 평가했는지, 논리적이고 기술적인 분석을 짧고 굵게 적어라.)
-★ 교정답안: (가장 깔끔하고 최적화된 결과물 제시.)
-★ 원어민식 답변: (원어민들은 실생활에서 실제로 이렇게 말해요 라고 할 수 있는 문장 제시)
-★ 핵심영작포인트: (실수를 주의해야 할 문법/뉘앙스적 포인트 1~2줄 요약.)
-
-[채점 가이드]
-- 해당 답안이 해당 한국어에 대한 올바른 구어체 영작으로 볼 수 있는지만 판단할 것
-- 문장부호, 대소문자 사용법은 깡그리 무시하고 아예 언급자체를 절대하지 말 것.${extraText}`;
-
-        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(promptText).then(() => alert(`질문 프롬프트가 클립보드에 복사되었습니다!\n다른 곳에 붙여넣어 바로 사용할 수 있습니다:\n\n${promptText}`)).catch(() => fallbackCopyPrompt(promptText));
-        else fallbackCopyPrompt(promptText);
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(promptText)
+                .then(() => alert(`프롬프트가 클립보드에 복사되었습니다!\n\n${promptText}`))
+                .catch(() => fallbackCopyPrompt(promptText));
+        } else {
+            fallbackCopyPrompt(promptText);
+        }
     }
+    
     function fallbackCopyPrompt(text) {
         const textArea = document.createElement("textarea"); textArea.value = text; textArea.style.position = "fixed"; textArea.style.left = "-9999px";
         document.body.appendChild(textArea); textArea.select();
-        try { document.execCommand('copy'); alert(`질문 프롬프트가 클립보드에 복사되었습니다!\n다른 곳에 붙여넣어 바로 사용할 수 있습니다:\n\n${text}`); } 
+        try { document.execCommand('copy'); alert(`프롬프트가 클립보드에 복사되었습니다!\n\n${text}`); } 
         catch (err) { alert('복사에 실패했습니다. 직접 복사해 주세요.'); }
         document.body.removeChild(textArea);
     }
@@ -3294,27 +3326,6 @@ Rules:
         }
     }
 
-    // --- 타이핑 to 언마스크 AI 도움 기능 ---
-    function toggleMtAiExtraInput() {
-        const box = document.getElementById('mtAiExtraBox');
-        box.style.display = (box.style.display === 'flex') ? 'none' : 'flex';
-    }
-
-    function autoSaveMtAiExtra() {
-        localStorage.setItem('mtAiExtraText', document.getElementById('mtAiExtraText').value);
-    }
-
-    function loadMtAiExtraText() {
-        const savedText = localStorage.getItem('mtAiExtraText');
-        if (savedText) document.getElementById('mtAiExtraText').value = savedText;
-    }
-
-    function saveAndHideMtAiExtra() {
-        autoSaveMtAiExtra();
-        document.getElementById('mtAiExtraBox').style.display = 'none';
-        alert("추가 내용이 저장되었습니다.");
-    }
-
     function copyMtAiPrompt() {
         if (!mtCurrentStudyWords || mtCurrentStudyWords.length === 0) return alert("학습 중인 카드가 없습니다.");
         const currentWord = mtCurrentStudyWords[mtCurrentIndex];
@@ -3330,16 +3341,15 @@ Rules:
             subKor = match[2].trim();
         }
 
-        const extraText = document.getElementById('mtAiExtraText').value.trim();
-
-        let prompt = `[${mainKor}], [${subKor}], [${eng}] 에서의 영어문장과 비슷한 표현을 알려주고, 각각의 뉘앙스가 어떠한 차이가 있는지 알려줘`;
-        if (extraText) prompt += `\n\n[추가 요청사항]\n${extraText}`;
+        let template = document.getElementById('aiHelpTemplate_mt').value || defaultAiTemplates.mt;
+        let promptText = template.replace(/\[주문장\]/g, mainKor).replace(/\[보조문장\]/g, subKor).replace(/\[영어\]/g, eng);
 
         if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(prompt).then(() => alert("다음 내용이 클립보드에 복사되었습니다.\n\n------------------------\n" + prompt + "\n------------------------"))
-            .catch(err => alert("복사 실패: " + err));
+            navigator.clipboard.writeText(promptText)
+                .then(() => alert(`프롬프트가 클립보드에 복사되었습니다!\n\n${promptText}`))
+                .catch(() => fallbackCopyPrompt(promptText));
         } else {
-            fallbackCopyPrompt(prompt);
+            fallbackCopyPrompt(promptText);
         }
     }
 
@@ -3788,30 +3798,22 @@ Rules:
         localStorage.setItem('communityFontSize', boardFontSize); 
     }
 
-    // 게시판 AI 도움 플로팅 위젯
-    function toggleBoardAiExtraInput() {
-        const box = document.getElementById('boardAiExtraBox');
-        box.style.display = (box.style.display === 'flex') ? 'none' : 'flex';
-    }
-    function autoSaveBoardAiExtra() { localStorage.setItem('communityAiExtraText', document.getElementById('boardAiExtraText').value); }
-    function loadBoardAiExtraText() {
-        const savedText = localStorage.getItem('communityAiExtraText');
-        if (savedText) document.getElementById('boardAiExtraText').value = savedText;
-    }
-    function saveAndHideBoardAiExtra() { autoSaveBoardAiExtra(); document.getElementById('boardAiExtraBox').style.display = 'none'; alert("추가 내용이 저장되었습니다."); }
-    
     function copyBoardAiPrompt() {
         if (!boardActiveOpenItem) return alert("현재 내용이 열려 있는 게시글이 없습니다. 게시글을 클릭하여 내용을 연 후 눌러주세요.");
         const board = boardDataList.find(b => b.id === currentBoardId); if (!board) return;
         const title = String(boardActiveOpenItem.cells[board.krColIdx] || '').trim();
         const content = String(boardActiveOpenItem.cells[board.enColIdx] || '').trim();
-        const extraText = document.getElementById('boardAiExtraText').value.trim();
 
-        let prompt = `[${title}][${content}][의 영어 표현과 비슷한 표현과 비슷한 뉘앙스의 문장을 알려줘]`;
-        if (extraText) prompt += `\n\n[추가 요청사항]\n${extraText}`;
+        let template = document.getElementById('aiHelpTemplate_board').value || defaultAiTemplates.board;
+        let promptText = template.replace(/\[제목\]/g, title).replace(/\[내용\]/g, content);
 
-        navigator.clipboard.writeText(prompt).then(() => alert("다음 내용이 클립보드에 복사되었습니다.\n\n------------------------\n" + prompt + "\n------------------------"))
-        .catch(err => alert("복사 실패: " + err));
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(promptText)
+                .then(() => alert(`프롬프트가 클립보드에 복사되었습니다!\n\n${promptText}`))
+                .catch(() => fallbackCopyPrompt(promptText));
+        } else {
+            fallbackCopyPrompt(promptText);
+        }
     }
 
 
@@ -3822,19 +3824,19 @@ Rules:
         // 공통 / 영작 시스템 초기화
         loadCustomFontFromStorage();
         applyFontSettings();
+        loadAiTemplates();
+        
         renderAllSlotsUI();
         switchSlot(activeSlotIndex, false);
         renderWords();
 
         // 게시판 시스템 초기화
         loadBoardSettingsFromLocalStorage();
-        loadBoardAiExtraText();
         await loadFromDatabase();
         renderBoardList();
         
         // 타이핑 to 언마스크 초기화 (슬롯 불러오기 연동)
         mtApplyFontSettings();
-        loadMtAiExtraText();
         if (typeof mtInitSlots === 'function') mtInitSlots();
     })();
 
