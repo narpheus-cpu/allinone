@@ -572,64 +572,7 @@
         <input type="file" id="globalFileInput" accept=".xlsx, .xls, .csv, .txt, .srt" style="display:none;" onchange="importFileForSlot(event)">
 
         <!-- 6개 슬롯 영역 -->
-        <div class="multi-slot-container">
-            <script>
-                for(let i=0; i<3; i++) {
-                    document.write(`
-                        <div id="slotRow_${i}" class="slot-row" onclick="switchSlot(${i})">
-                            <span class="slot-tag">슬롯 ${i+1}</span>
-                            <div id="slotTitle_${i}" class="slot-title-area">비어 있음 (클릭하여 이동 또는 파일 추가)</div>
-                            <div class="slot-actions" onclick="event.stopPropagation()">
-                                <button class="btn-excel" onclick="triggerImport(${i})">불러오기</button>
-                                <button class="btn-download" onclick="exportResultExcelForSlot(${i})">다운로드</button>
-                                <div id="slotNav_${i}" class="slot-nav" style="display: none;">
-                                    <button class="btn-nav" onclick="moveIndexForSlot(${i}, -1)">&lt;</button>
-                                    <input type="text" id="slotIndexInput_${i}" value="00001" onchange="jumpToIndexForSlot(${i}, this.value)">
-                                    <span id="slotTotalSpan_${i}" style="font-family: monospace;">/ 00000</span>
-                                    <button class="btn-nav" onclick="moveIndexForSlot(${i}, 1)">&gt;</button>
-                                </div>
-                            </div>
-                        </div>
-                    `);
-                }
-            </script>
-            <script>
-                for(let i=3; i<5; i++) {
-                    document.write(`
-                        <div id="slotRow_${i}" class="slot-row" onclick="switchSlot(${i})">
-                            <span class="slot-tag" style="background:#111827; color:#fff;">슬롯 ${i+1}</span>
-                            <div id="slotTitle_${i}" class="slot-title-area">비어 있음 (3열 전용: 불러오기 및 붙여넣기 등록 가능)</div>
-                            <div class="slot-actions" onclick="event.stopPropagation()">
-                                <button class="btn-excel" onclick="triggerImport(${i})">불러오기</button>
-                                <button class="btn-excel" onclick="openPasteModalSlot3(${i})">붙여넣기</button>
-                                <button class="btn-download" onclick="exportResultExcelForSlot(${i})">다운로드</button>
-                                <div id="slotNav_${i}" class="slot-nav" style="display: none;">
-                                    <button class="btn-nav" onclick="moveIndexForSlot(${i}, -1)">&lt;</button>
-                                    <input type="text" id="slotIndexInput_${i}" value="00001" onchange="jumpToIndexForSlot(${i}, this.value)">
-                                    <span id="slotTotalSpan_${i}" style="font-family: monospace;">/ 00000</span>
-                                    <button class="btn-nav" onclick="moveIndexForSlot(${i}, 1)">&gt;</button>
-                                </div>
-                            </div>
-                        </div>
-                    `);
-                }
-            </script>
-            <div id="slotRow_5" class="slot-row" onclick="switchSlot(5)">
-                <span class="slot-tag">슬롯 6</span>
-                <div id="slotTitle_5" class="slot-title-area">비어 있음 (붙여넣기 버튼으로 텍스트 파싱 전용)</div>
-                <div class="slot-actions" onclick="event.stopPropagation()">
-                    <button class="btn-excel" onclick="triggerImport(5)">불러오기</button>
-                    <button class="btn-excel" onclick="openPasteModalNovel()">붙여넣기</button>
-                    <button class="btn-download" onclick="exportResultExcelForSlot(5)">다운로드</button>
-                    <div id="slotNav_5" class="slot-nav" style="display: none;">
-                        <button class="btn-nav" onclick="moveIndexForSlot(5, -1)">&lt;</button>
-                        <input type="text" id="slotIndexInput_5" value="00001" onchange="jumpToIndexForSlot(5, this.value)">
-                        <span id="slotTotalSpan_5" style="font-family: monospace;">/ 00000</span>
-                        <button class="btn-nav" onclick="moveIndexForSlot(5, 1)">&gt;</button>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <div class="multi-slot-container" id="novelSlotContainer"></div>
 
         <!-- 영작 입력칸 및 컨트롤 바 -->
         <div id="practiceArea" class="practice-card" style="display: none;">
@@ -1363,6 +1306,8 @@
             }
 
             if (document.getElementById('novelTab').classList.contains('active')) saveCurrentNovelInput();
+            await saveSlotsToDatabase();
+            await saveWordsToDatabase();
 
             const mtBackupData = {};
             for (let i = 1; i <= 10; i++) {
@@ -1448,7 +1393,7 @@
                 mtApplyFontSettings();
             }
 
-            saveAllSlotsToStorage();
+            saveAllSlotsToStorage(true);
             saveAndRenderWords();
             renderAllSlotsUI();
             switchSlot(activeSlotIndex, false);
@@ -1472,31 +1417,17 @@
     /* ========================================== */
     /* [공통/영작] 상태 및 초기화 관리             */
     /* ========================================== */
-    let rawSlotsData = JSON.parse(localStorage.getItem('myNovelPracticeMultiSlots')) || [];
-    let slotsData = [];
     const defaultSlots = [
-        { fileName: '', data: [], currentIndex: 0 }, 
-        { fileName: '', data: [], currentIndex: 0 }, 
-        { fileName: '', data: [], currentIndex: 0 }, 
-        { fileName: '', data: [], currentIndex: 0 }, 
-        { fileName: '', data: [], currentIndex: 0 }, 
-        { fileName: '', data: [], currentIndex: 0, rawText: '' } 
+        { fileName: '', data: [], currentIndex: 0 },
+        { fileName: '', data: [], currentIndex: 0 },
+        { fileName: '', data: [], currentIndex: 0 },
+        { fileName: '', data: [], currentIndex: 0 },
+        { fileName: '', data: [], currentIndex: 0 },
+        { fileName: '', data: [], currentIndex: 0, rawText: '' }
     ];
 
-    if (rawSlotsData.length === 4) {
-        slotsData[0] = rawSlotsData[0] || defaultSlots[0];
-        slotsData[1] = rawSlotsData[1] || defaultSlots[1];
-        slotsData[2] = defaultSlots[2]; 
-        slotsData[3] = rawSlotsData[2] || defaultSlots[3]; 
-        slotsData[4] = defaultSlots[4]; 
-        slotsData[5] = rawSlotsData[3] || defaultSlots[5]; 
-        localStorage.setItem('myNovelPracticeMultiSlots', JSON.stringify(slotsData));
-    } else {
-        slotsData = rawSlotsData;
-        for (let i = 0; i < 6; i++) {
-            if (!slotsData[i]) slotsData[i] = defaultSlots[i];
-        }
-    }
+    // 대용량 데이터는 IndexedDB에서 비동기로 읽어옵니다.
+    let slotsData = defaultSlots.map(slot => ({ ...slot, data: [] }));
 
     function isSlot3Type(idx) { return idx >= 3 && idx <= 4; }
 
@@ -1507,7 +1438,7 @@
     let slot3HintIndex = 0; 
     let activePasteSlot3 = 3; 
 
-    let words = JSON.parse(localStorage.getItem('myScoreVocaWords')) || [];
+    let words = [];
     let hideAll = false;
     let currentPage = 1;
     const itemsPerPage = 20;
@@ -1816,7 +1747,7 @@
                         }
 
                         slotsData[targetImportSlot] = { fileName: customFileName, data: parsedList, currentIndex: 0, rawText: rawText };
-                        saveAllSlotsToStorage();
+                        saveAllSlotsToStorage(true);
                         renderAllSlotsUI();
                         switchSlot(targetImportSlot, false);
                         alert(`[슬롯 ${targetImportSlot + 1}] 불러오기 완료! (언어 자동 감지 적용)`);
@@ -1849,7 +1780,7 @@
                         }
 
                         slotsData[targetImportSlot] = { fileName: customFileName, data: parsedList, currentIndex: 0 };
-                        saveAllSlotsToStorage();
+                        saveAllSlotsToStorage(true);
                         renderAllSlotsUI();
                         switchSlot(targetImportSlot, false);
                         alert(`[슬롯 ${targetImportSlot + 1}] 불러오기 완료! (언어 자동 감지 적용)`);
@@ -1910,7 +1841,7 @@
         const slot = slotsData[activeSlotIndex];
         if (slot && slot.data[slot.currentIndex]) {
             slot.data[slot.currentIndex].text = document.getElementById('koreanInput').value;
-            saveAllSlotsToStorage();
+            scheduleSlotsSave();
         }
     }
 
@@ -1918,7 +1849,7 @@
         const slot = slotsData[activeSlotIndex];
         if (slot && slot.data[slot.currentIndex] && !isSlot3Type(activeSlotIndex)) {
             slot.data[slot.currentIndex].userAnswer = document.getElementById('englishInputNovel').value;
-            saveAllSlotsToStorage();
+            scheduleSlotsSave();
         }
     }
 
@@ -1929,11 +1860,138 @@
             if (!isSlot3Type(activeSlotIndex)) {
                 currentSlot.data[currentSlot.currentIndex].userAnswer = document.getElementById('englishInputNovel').value;
             }
-            saveAllSlotsToStorage();
+            // 슬롯 이동/백업 직전에는 대기 중 저장을 즉시 반영합니다.
+            saveAllSlotsToStorage(true);
         }
     }
 
-    function saveAllSlotsToStorage() { localStorage.setItem('myNovelPracticeMultiSlots', JSON.stringify(slotsData)); }
+    function scheduleSlotsSave() {
+        clearTimeout(slotSaveTimer);
+        slotSaveTimer = setTimeout(() => {
+            slotSaveTimer = null;
+            saveSlotsToDatabase();
+        }, SLOT_SAVE_DEBOUNCE_MS);
+    }
+
+    function saveAllSlotsToStorage(immediate = false) {
+        clearTimeout(slotSaveTimer);
+        slotSaveTimer = null;
+        if (immediate) return saveSlotsToDatabase();
+        scheduleSlotsSave();
+    }
+
+    function renderNovelSlotRows() {
+        const container = document.getElementById('novelSlotContainer');
+        if (!container || container.childElementCount > 0) return;
+
+        const fragment = document.createDocumentFragment();
+        for (let i = 0; i < 6; i++) {
+            const row = document.createElement('div');
+            row.id = `slotRow_${i}`;
+            row.className = 'slot-row';
+            row.dataset.slotIndex = String(i);
+
+            const tag = document.createElement('span');
+            tag.className = 'slot-tag';
+            if (isSlot3Type(i)) { tag.style.background = '#111827'; tag.style.color = '#fff'; }
+            tag.textContent = `슬롯 ${i + 1}`;
+
+            const title = document.createElement('div');
+            title.id = `slotTitle_${i}`;
+            title.className = 'slot-title-area';
+
+            const actions = document.createElement('div');
+            actions.className = 'slot-actions';
+
+            const importBtn = document.createElement('button');
+            importBtn.className = 'btn-excel';
+            importBtn.textContent = '불러오기';
+            importBtn.dataset.action = 'import';
+            importBtn.dataset.slotIndex = String(i);
+
+            const downloadBtn = document.createElement('button');
+            downloadBtn.className = 'btn-download';
+            downloadBtn.textContent = '다운로드';
+            downloadBtn.dataset.action = 'download';
+            downloadBtn.dataset.slotIndex = String(i);
+
+            actions.appendChild(importBtn);
+            if (i === 3 || i === 4) {
+                const pasteBtn = document.createElement('button');
+                pasteBtn.className = 'btn-excel';
+                pasteBtn.textContent = '붙여넣기';
+                pasteBtn.dataset.action = 'paste-slot3';
+                pasteBtn.dataset.slotIndex = String(i);
+                actions.appendChild(pasteBtn);
+            } else if (i === 5) {
+                const pasteBtn = document.createElement('button');
+                pasteBtn.className = 'btn-excel';
+                pasteBtn.textContent = '붙여넣기';
+                pasteBtn.dataset.action = 'paste-novel';
+                pasteBtn.dataset.slotIndex = String(i);
+                actions.appendChild(pasteBtn);
+            }
+
+            actions.appendChild(downloadBtn);
+
+            const nav = document.createElement('div');
+            nav.id = `slotNav_${i}`;
+            nav.className = 'slot-nav';
+            nav.style.display = 'none';
+
+            const prevBtn = document.createElement('button');
+            prevBtn.className = 'btn-nav'; prevBtn.textContent = '<';
+            prevBtn.dataset.action = 'move'; prevBtn.dataset.dir = '-1'; prevBtn.dataset.slotIndex = String(i);
+
+            const indexInput = document.createElement('input');
+            indexInput.type = 'text'; indexInput.id = `slotIndexInput_${i}`; indexInput.value = '00001';
+            indexInput.dataset.action = 'jump'; indexInput.dataset.slotIndex = String(i);
+
+            const totalSpan = document.createElement('span');
+            totalSpan.id = `slotTotalSpan_${i}`; totalSpan.style.fontFamily = 'monospace'; totalSpan.textContent = '/ 00000';
+
+            const nextBtn = document.createElement('button');
+            nextBtn.className = 'btn-nav'; nextBtn.textContent = '>';
+            nextBtn.dataset.action = 'move'; nextBtn.dataset.dir = '1'; nextBtn.dataset.slotIndex = String(i);
+
+            nav.append(prevBtn, indexInput, totalSpan, nextBtn);
+            actions.appendChild(nav);
+            row.append(tag, title, actions);
+            fragment.appendChild(row);
+        }
+
+        container.appendChild(fragment);
+
+        if (!container.dataset.bound) {
+            container.addEventListener('click', handleNovelSlotContainerClick);
+            container.addEventListener('change', handleNovelSlotContainerChange);
+            container.dataset.bound = 'true';
+        }
+    }
+
+    function handleNovelSlotContainerClick(event) {
+        const button = event.target.closest('[data-action]');
+        const row = event.target.closest('.slot-row');
+        if (!row) return;
+
+        const slotIdx = Number(row.dataset.slotIndex);
+        if (Number.isNaN(slotIdx)) return;
+
+        if (!button) { switchSlot(slotIdx); return; }
+        event.stopPropagation();
+        const action = button.dataset.action;
+        if (action === 'import') triggerImport(slotIdx);
+        else if (action === 'download') exportResultExcelForSlot(slotIdx);
+        else if (action === 'paste-slot3') openPasteModalSlot3(slotIdx);
+        else if (action === 'paste-novel') openPasteModalNovel();
+        else if (action === 'move') moveIndexForSlot(slotIdx, Number(button.dataset.dir));
+    }
+
+    function handleNovelSlotContainerChange(event) {
+        const input = event.target.closest('[data-action="jump"]');
+        if (!input) return;
+        jumpToIndexForSlot(Number(input.dataset.slotIndex), input.value);
+    }
 
     function renderAllSlotsUI() {
         for(let i=0; i<6; i++) {
@@ -2010,7 +2068,7 @@
         if (!slot || !slot.data || slot.data.length === 0) return;
         const cIdx = slot.currentIndex;
         slot.data[cIdx].isImportant = !slot.data[cIdx].isImportant;
-        saveAllSlotsToStorage();
+        saveAllSlotsToStorage(true);
         renderPracticeUI();
     }
 
@@ -2038,7 +2096,7 @@
 
         if (candidates.length === 0) return alert(onlyStarred ? '지정한 범위 내에 ☆(중요) 체크된 문장이 없습니다.' : '지정한 범위 내에 문장이 없습니다.');
         slot.currentIndex = candidates[Math.floor(Math.random() * candidates.length)];
-        saveAllSlotsToStorage();
+        saveAllSlotsToStorage(true);
         renderAllSlotsUI();
         renderPracticeUI();
     }
@@ -2091,14 +2149,14 @@
                         let prevCand = [...candidates].reverse().find(idx => idx < slot.currentIndex);
                         slot.currentIndex = prevCand !== undefined ? prevCand : candidates[candidates.length - 1];
                     }
-                    saveAllSlotsToStorage(); renderAllSlotsUI(); renderPracticeUI(); return;
+                    saveAllSlotsToStorage(true); renderAllSlotsUI(); renderPracticeUI(); return;
                 } else return alert("범위 형식이 올바르지 않습니다. (예: 3-330)");
             }
         }
         let next = slot.currentIndex + dir;
         if(next >= 0 && next < slot.data.length) {
             slot.currentIndex = next;
-            saveAllSlotsToStorage(); renderAllSlotsUI(); renderPracticeUI();
+            saveAllSlotsToStorage(true); renderAllSlotsUI(); renderPracticeUI();
         }
     }
 
@@ -2112,7 +2170,7 @@
         if(target >= slot.data.length) target = slot.data.length - 1;
 
         slot.currentIndex = target;
-        saveAllSlotsToStorage(); renderAllSlotsUI(); renderPracticeUI();
+        saveAllSlotsToStorage(true); renderAllSlotsUI(); renderPracticeUI();
     }
 
     function handleKoreanKey(event) {
@@ -2201,7 +2259,7 @@ Process the Original Korean sentence and return ONLY a valid JSON object matchin
                     const korFormatted = "▶ " + validChunks.map(c => `[${c.korean.trim()}]`).join(' ');
                     const targetFormatted = "▶ " + validChunks.map(c => c.isBlank ? '[■]' : `[${c.target.trim()}]`).join(' ');
                     const resultString = `${korFormatted}\n${targetFormatted}`;
-                    feedbackArea.innerText = resultString; item.feedback = resultString; saveAllSlotsToStorage();
+                    feedbackArea.innerText = resultString; item.feedback = resultString; saveAllSlotsToStorage(true);
                 } else throw new Error("Invalid format");
             } else throw new Error("No JSON found");
         } catch(e) {
@@ -2219,7 +2277,7 @@ Process the Original Korean sentence and return ONLY a valid JSON object matchin
         if(!mean) mean = currentKorSentence;
 
         words.push({ id: Date.now(), createdAt: Date.now(), english: eng, meaning: mean, hint: hint, score: 0, lastQueriedAt: 0, selected: false, isEditing: false });
-        localStorage.setItem('myScoreVocaWords', JSON.stringify(words)); renderWords();
+        saveWordsToDatabase(); renderWords();
         document.getElementById('quickEngInput').value = ''; document.getElementById('quickMeanInput').value = ''; document.getElementById('quickHintInput').value = '';
         alert(`단어장에 성공적으로 추가되었습니다:\n[${eng}] : ${mean}`);
     }
@@ -2312,7 +2370,7 @@ Rules:
 
             if(parsed) {
                 const formattedResult = `★ 종합점수: ${parsed.score || ''}\n\n★ 종합피드백: ${parsed.feedback || ''}\n\n★ 교정답안: ${parsed.corrected || ''}\n\n★ 원어민식 답변: ${parsed.native || ''}\n\n★ 핵심학습포인트: ${parsed.keyPoint || ''}`;
-                feedbackArea.innerText = formattedResult; item.userAnswer = userAns; item.feedback = formattedResult; saveAllSlotsToStorage();
+                feedbackArea.innerText = formattedResult; item.userAnswer = userAns; item.feedback = formattedResult; saveAllSlotsToStorage(true);
             } else {
                 feedbackArea.innerText = `채점 파싱 오류가 발생했습니다. 아래 원문 결과를 참조해 주세요.\n\n[AI 원본 응답]\n${resText}`; 
             }
@@ -2340,7 +2398,7 @@ Rules:
         let customFileName = `[한-영] ${firstText}`;
 
         slotsData[activePasteSlot3] = { fileName: customFileName, data: parsedList, currentIndex: 0, rawText: rawText };
-        saveAllSlotsToStorage(); closePasteModalSlot3(); switchSlot(activePasteSlot3, false);
+        saveAllSlotsToStorage(true); closePasteModalSlot3(); switchSlot(activePasteSlot3, false);
         alert(`[슬롯 ${activePasteSlot3 + 1}] 텍스트 (${parsedList.length}개 문장) 등록 완료! (언어 자동 감지 적용)`);
     }
 
@@ -2373,7 +2431,7 @@ Rules:
                         let firstText = parsedList[0].text;
                         if (firstText.length > 20) firstText = firstText.substring(0, 20) + '...';
                         slotsData[activePasteSlot3] = { fileName: `[한-영] ${firstText}`, data: parsedList, currentIndex: 0, rawText: rawText };
-                        saveAllSlotsToStorage(); closePasteModalSlot3(); switchSlot(activePasteSlot3, false);
+                        saveAllSlotsToStorage(true); closePasteModalSlot3(); switchSlot(activePasteSlot3, false);
                         alert(`[슬롯 ${activePasteSlot3 + 1}] 20문장 일상 대화문 생성 및 등록 완료!`);
                     } else throw new Error("JSON 내부 dialogue 배열 형식이 올바르지 않습니다.");
                 } else throw new Error("JSON 형태의 응답을 찾을 수 없습니다.");
@@ -2393,7 +2451,7 @@ Rules:
         const parsedList = parseTextToSentencesByRule(rawText, true);
         if (parsedList.length === 0) return alert('유효한 문장을 찾지 못했습니다.');
         slotsData[5] = { fileName: '직접 붙여넣은 텍스트', data: parsedList, currentIndex: 0, rawText: rawText };
-        saveAllSlotsToStorage(); closePasteModalNovel(); switchSlot(5, false);
+        saveAllSlotsToStorage(true); closePasteModalNovel(); switchSlot(5, false);
         alert(`[슬롯 6] 붙여넣은 텍스트 (${parsedList.length}개 문장) 등록 완료!`);
     }
 
@@ -2430,7 +2488,7 @@ Rules:
                         let parsedList = parsed.dialogue.map((text, idx) => ({ id: idx + 1, text: text.trim(), userAnswer: '', feedback: '' }));
                         if (parsedList.length === 0) return alert('유효한 문장을 찾지 못했습니다.');
                         slotsData[5] = { fileName: 'AI 생성 대화문', data: parsedList, currentIndex: 0, rawText: rawText };
-                        saveAllSlotsToStorage(); closePasteModalNovel(); switchSlot(5, false);
+                        saveAllSlotsToStorage(true); closePasteModalNovel(); switchSlot(5, false);
                         alert(`[슬롯 6] 유머러스한 일상 대화문 (${parsedList.length}개 문장) 생성 및 등록 완료!`);
                     } else throw new Error("JSON 내부 dialogue 배열 형식이 올바르지 않습니다.");
                 } else throw new Error("JSON 형태의 응답을 찾을 수 없습니다.");
@@ -2456,7 +2514,7 @@ Rules:
         const res = await fetchGemini(`Target word: '${eng}' (meaning: '${mean}')\n\nCreate a single simple daily-life ${targetLang} sentence that includes or uses the target word.\nDO NOT output any thinking process, analysis, bullet points, or extra text.\nOutput ONLY the single final ${targetLang} sentence.`);
         if(res) document.getElementById('vocaHintInput').value = res;
     }
-    function saveAndRenderWords() { localStorage.setItem('myScoreVocaWords', JSON.stringify(words)); renderWords(); }
+    function saveAndRenderWords() { saveWordsToDatabase(); renderWords(); }
     function getGroup(word) {
         const s = typeof word === 'object' ? (word.score || 0) : word;
         if(s < 0) return 'MINUS'; if(s === 0) return 'ZERO'; if(s <= 2) return 'LOW'; if(s <= 4) return 'MID'; return 'MAX';
@@ -2502,6 +2560,7 @@ Rules:
         const start = (currentPage - 1) * itemsPerPage;
         const pageWords = filtered.slice(start, start + itemsPerPage);
 
+        const fragment = document.createDocumentFragment();
         pageWords.forEach(w => {
             const li = document.createElement('li'); li.className = 'word-item';
             const isHidden = hideAll ? 'hidden' : '';
@@ -2529,8 +2588,9 @@ Rules:
                     <button class="btn-excel" style="font-size:11px; padding:3px 8px;" onclick="startEditWord(${w.id})">수정</button>
                 `;
             }
-            listEl.appendChild(li);
+            fragment.appendChild(li);
         });
+        listEl.appendChild(fragment);
 
         const pageContainer = document.getElementById('paginationContainer');
         pageContainer.style.display = 'flex';
@@ -3440,14 +3500,32 @@ Rules:
     let boardActiveOpenItem = null;
 
     const DB_NAME = "CommunityViewerDB";
+    // v2: 게시판 외에 대용량 소설 슬롯/단어장도 IndexedDB로 분리 저장
+    const DB_VERSION = 2;
     const STORE_NAME = "boardsStore";
+    const SLOT_STORE_NAME = "slotsStore";
+    const VOCA_STORE_NAME = "vocaStore";
+    const SLOT_DATA_KEY = "novelPracticeSlotsData";
+    const VOCA_DATA_KEY = "scoreVocaWords";
+    const SLOT_SAVE_DEBOUNCE_MS = 700;
+    let slotSaveTimer = null;
+
+    function waitForTransaction(tx) {
+        return new Promise((resolve, reject) => {
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error || new Error("IndexedDB transaction failed"));
+            tx.onabort = () => reject(tx.error || new Error("IndexedDB transaction aborted"));
+        });
+    }
 
     function initDB() {
         return new Promise((resolve, reject) => {
-            const request = indexedDB.open(DB_NAME, 1);
+            const request = indexedDB.open(DB_NAME, DB_VERSION);
             request.onupgradeneeded = (e) => {
                 const db = e.target.result;
                 if (!db.objectStoreNames.contains(STORE_NAME)) db.createObjectStore(STORE_NAME);
+                if (!db.objectStoreNames.contains(SLOT_STORE_NAME)) db.createObjectStore(SLOT_STORE_NAME);
+                if (!db.objectStoreNames.contains(VOCA_STORE_NAME)) db.createObjectStore(VOCA_STORE_NAME);
             };
             request.onsuccess = () => resolve(request.result);
             request.onerror = () => reject(request.error);
@@ -3455,13 +3533,44 @@ Rules:
     }
 
     async function saveToDatabase() {
+        let db;
         try {
-            const db = await initDB();
+            db = await initDB();
             const tx = db.transaction(STORE_NAME, "readwrite");
-            const store = tx.objectStore(STORE_NAME);
-            store.put(boardDataList, "communityBoardsData"); 
+            tx.objectStore(STORE_NAME).put(boardDataList, "communityBoardsData");
+            await waitForTransaction(tx);
         } catch (e) {
-            console.error("데이터베이스 저장 오류:", e);
+            console.error("게시판 데이터베이스 저장 오류:", e);
+        } finally {
+            if (db) db.close();
+        }
+    }
+
+    async function saveSlotsToDatabase() {
+        let db;
+        try {
+            db = await initDB();
+            const tx = db.transaction(SLOT_STORE_NAME, "readwrite");
+            tx.objectStore(SLOT_STORE_NAME).put(slotsData, SLOT_DATA_KEY);
+            await waitForTransaction(tx);
+        } catch (e) {
+            console.error("소설 슬롯 IndexedDB 저장 오류:", e);
+        } finally {
+            if (db) db.close();
+        }
+    }
+
+    async function saveWordsToDatabase() {
+        let db;
+        try {
+            db = await initDB();
+            const tx = db.transaction(VOCA_STORE_NAME, "readwrite");
+            tx.objectStore(VOCA_STORE_NAME).put(words, VOCA_DATA_KEY);
+            await waitForTransaction(tx);
+        } catch (e) {
+            console.error("단어장 IndexedDB 저장 오류:", e);
+        } finally {
+            if (db) db.close();
         }
     }
 
@@ -3471,26 +3580,104 @@ Rules:
             if (oldData) {
                 let parsedBoards = JSON.parse(oldData);
                 boardDataList = parsedBoards.map(b => migrateBoardData(b));
-                await saveToDatabase(); 
-                localStorage.removeItem('communityBoards'); 
+                await saveToDatabase();
+                localStorage.removeItem('communityBoards');
                 return;
             }
 
             const db = await initDB();
             const tx = db.transaction(STORE_NAME, "readonly");
-            const store = tx.objectStore(STORE_NAME);
-            const request = store.get("communityBoardsData");
-
-            return new Promise((resolve) => {
+            const request = tx.objectStore(STORE_NAME).get("communityBoardsData");
+            await new Promise((resolve) => {
                 request.onsuccess = () => {
                     if (request.result) boardDataList = request.result.map(b => migrateBoardData(b));
                     resolve();
                 };
                 request.onerror = () => resolve();
             });
+            db.close();
         } catch (e) {
-            console.error("데이터베이스 불러오기 오류:", e);
+            console.error("게시판 데이터베이스 불러오기 오류:", e);
         }
+    }
+
+    async function loadSlotsAndWordsFromDatabase() {
+        let db;
+        try {
+            db = await initDB();
+            const tx = db.transaction([SLOT_STORE_NAME, VOCA_STORE_NAME], "readonly");
+            const slotRequest = tx.objectStore(SLOT_STORE_NAME).get(SLOT_DATA_KEY);
+            const vocaRequest = tx.objectStore(VOCA_STORE_NAME).get(VOCA_DATA_KEY);
+
+            const [storedSlots, storedWords] = await Promise.all([
+                new Promise(resolve => { slotRequest.onsuccess = () => resolve(slotRequest.result); slotRequest.onerror = () => resolve(undefined); }),
+                new Promise(resolve => { vocaRequest.onsuccess = () => resolve(vocaRequest.result); vocaRequest.onerror = () => resolve(undefined); })
+            ]);
+
+            if (Array.isArray(storedSlots)) {
+                slotsData = normalizeSlotsData(storedSlots);
+            } else {
+                const legacySlotsText = localStorage.getItem('myNovelPracticeMultiSlots');
+                if (legacySlotsText) {
+                    try {
+                        const legacySlots = JSON.parse(legacySlotsText);
+                        slotsData = normalizeSlotsData(legacySlots);
+                        await saveSlotsToDatabase();
+                        localStorage.removeItem('myNovelPracticeMultiSlots');
+                    } catch (e) {
+                        console.error("기존 슬롯 데이터 이전 오류:", e);
+                        slotsData = defaultSlots.map(slot => ({ ...slot, data: [] }));
+                    }
+                }
+            }
+
+            if (Array.isArray(storedWords)) {
+                words = storedWords;
+            } else {
+                const legacyWordsText = localStorage.getItem('myScoreVocaWords');
+                if (legacyWordsText) {
+                    try {
+                        const legacyWords = JSON.parse(legacyWordsText);
+                        words = Array.isArray(legacyWords) ? legacyWords : [];
+                        await saveWordsToDatabase();
+                        localStorage.removeItem('myScoreVocaWords');
+                    } catch (e) {
+                        console.error("기존 단어장 데이터 이전 오류:", e);
+                        words = [];
+                    }
+                }
+            }
+        } catch (e) {
+            console.error("슬롯/단어장 IndexedDB 불러오기 오류:", e);
+        } finally {
+            if (db) db.close();
+        }
+    }
+
+    function normalizeSlotsData(source) {
+        const normalized = defaultSlots.map((slot, idx) => {
+            const incoming = source?.[idx];
+            if (!incoming || typeof incoming !== 'object') return { ...slot, data: [] };
+            return {
+                ...slot,
+                ...incoming,
+                data: Array.isArray(incoming.data) ? incoming.data : [],
+                currentIndex: Number.isInteger(incoming.currentIndex) ? incoming.currentIndex : 0
+            };
+        });
+
+        // 구버전(4슬롯 저장 방식) 데이터도 기존 의미를 유지하도록 보정
+        if (Array.isArray(source) && source.length === 4) {
+            return [
+                source[0] || normalized[0],
+                source[1] || normalized[1],
+                normalized[2],
+                source[2] || normalized[3],
+                normalized[4],
+                source[3] || normalized[5]
+            ];
+        }
+        return normalized;
     }
 
     function extractBoardRandomAuthor(text) {
@@ -3523,26 +3710,71 @@ Rules:
 
     function renderBoardList() {
         const grid = document.getElementById('boardGrid');
-        grid.innerHTML = '';
+        if (!grid) return;
+
         if (boardDataList.length === 0) {
             grid.innerHTML = '<div class="board-empty-msg">등록된 게시판이 없습니다. 위에서 파일을 업로드하거나 텍스트를 붙여넣으세요.</div>';
             return;
         }
 
+        const fragment = document.createDocumentFragment();
         boardDataList.forEach(board => {
             const slot = document.createElement('div');
             slot.className = 'board-slot';
-            slot.innerHTML = `
-                <div class="board-title" title="${board.name}">${board.name}</div>
-                <div class="board-meta">게시물: ${board.items.length}개</div>
-                <div class="board-actions">
-                    <button class="btn-excel" onclick="event.stopPropagation(); deleteBoard('${board.id}')">삭제</button>
-                    <button class="board-btn-dark" onclick="event.stopPropagation(); openBoard('${board.id}')">입장</button>
-                </div>
-            `;
-            slot.onclick = () => openBoard(board.id);
-            grid.appendChild(slot);
+            slot.dataset.boardId = board.id;
+
+            const title = document.createElement('div');
+            title.className = 'board-title';
+            title.title = board.name;
+            title.textContent = board.name;
+
+            const meta = document.createElement('div');
+            meta.className = 'board-meta';
+            meta.textContent = `게시물: ${board.items.length}개`;
+
+            const actions = document.createElement('div');
+            actions.className = 'board-actions';
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'btn-excel';
+            deleteBtn.textContent = '삭제';
+            deleteBtn.dataset.action = 'delete-board';
+            deleteBtn.dataset.boardId = board.id;
+
+            const openBtn = document.createElement('button');
+            openBtn.className = 'board-btn-dark';
+            openBtn.textContent = '입장';
+            openBtn.dataset.action = 'open-board';
+            openBtn.dataset.boardId = board.id;
+
+            actions.append(deleteBtn, openBtn);
+            slot.append(title, meta, actions);
+            fragment.appendChild(slot);
         });
+
+        grid.replaceChildren(fragment);
+    }
+
+    function initBoardListEventDelegation() {
+        const grid = document.getElementById('boardGrid');
+        if (!grid || grid.dataset.bound) return;
+        grid.addEventListener('click', event => {
+            const actionEl = event.target.closest('[data-action]');
+            const slot = event.target.closest('.board-slot');
+            if (!slot) return;
+            const boardId = slot.dataset.boardId;
+            if (!boardId) return;
+            if (actionEl?.dataset.action === 'delete-board') {
+                event.stopPropagation();
+                deleteBoard(boardId);
+            } else if (actionEl?.dataset.action === 'open-board') {
+                event.stopPropagation();
+                openBoard(boardId);
+            } else if (!actionEl) {
+                openBoard(boardId);
+            }
+        });
+        grid.dataset.bound = 'true';
     }
 
     function switchBoardView(viewId) {
@@ -3726,10 +3958,64 @@ Rules:
         boardCurrentPage = newPage; boardActiveOpenItem = null; renderBoardPage();
     }
 
+    function initBoardBodyEventDelegation() {
+        const tbody = document.getElementById('boardBody');
+        if (!tbody || tbody.dataset.bound) return;
+
+        tbody.addEventListener('click', handleBoardBodyClick);
+        tbody.dataset.bound = 'true';
+    }
+
+    function handleBoardBodyClick(event) {
+        const board = boardDataList.find(b => b.id === currentBoardId);
+        if (!board) return;
+
+        const starTarget = event.target.closest('.board-star-btn');
+        if (starTarget && starTarget.closest('#boardBody')) {
+            event.stopPropagation();
+            const serial = Number(starTarget.dataset.serial);
+            const item = board.items.find(candidate => candidate.serial === serial);
+            if (!item) return;
+            item.starred = !item.starred;
+            starTarget.classList.toggle('active', item.starred);
+            starTarget.textContent = item.starred ? '★' : '☆';
+            saveToDatabase();
+            updateBoardStarCountUI();
+            return;
+        }
+
+        const titleRow = event.target.closest('.board-title-row');
+        if (!titleRow || !titleRow.closest('#boardBody')) return;
+        const serial = Number(titleRow.dataset.serial);
+        const item = board.items.find(candidate => candidate.serial === serial);
+        const contentRow = document.querySelector(`#boardBody .board-content-row[data-serial="${serial}"]`);
+        if (!item || !contentRow) return;
+
+        const isHidden = window.getComputedStyle(contentRow).display === 'none';
+        if (isHidden) {
+            document.querySelectorAll('#boardBody .board-content-row').forEach(row => { row.style.display = 'none'; });
+            contentRow.style.display = 'table-row';
+            const now = Date.now();
+            if (!item.lastViewedAt || (now - item.lastViewedAt) >= 60000) {
+                item.views += 1;
+                item.lastViewedAt = now;
+            }
+            const viewsCell = titleRow.querySelector('.board-views-col');
+            if (viewsCell) viewsCell.textContent = item.views;
+            boardActiveOpenItem = item;
+            board.lastViewedSerial = item.serial;
+            saveToDatabase();
+        } else {
+            contentRow.style.display = 'none';
+            if (boardActiveOpenItem === item) boardActiveOpenItem = null;
+        }
+    }
+
     function renderBoardPage() {
         const board = boardDataList.find(b => b.id === currentBoardId);
         if(!board) return;
-        const tbody = document.getElementById('boardBody'); tbody.innerHTML = '';
+        const tbody = document.getElementById('boardBody');
+        if (!tbody) return;
 
         const totalItems = boardFilteredData.length;
         document.getElementById('boardTotalCount').textContent = `총 ${totalItems}개`;
@@ -3740,52 +4026,63 @@ Rules:
         const startIndex = (boardCurrentPage - 1) * boardItemsPerPage;
         const endIndex = Math.min(startIndex + boardItemsPerPage, totalItems);
         const pageData = boardFilteredData.slice(startIndex, endIndex);
+        const fragment = document.createDocumentFragment();
 
         pageData.forEach(item => {
             const title = String(item.cells[board.krColIdx] || '').trim();
             const content = String(item.cells[board.enColIdx] || '').trim();
             if (!title && !content) return;
 
-            const trTitle = document.createElement('tr'); trTitle.className = 'board-title-row';
+            const trTitle = document.createElement('tr');
+            trTitle.className = 'board-title-row';
+            trTitle.dataset.serial = String(item.serial);
 
-            const tdNum = document.createElement('td'); tdNum.className = 'board-num-col';
-            const numContainer = document.createElement('div'); numContainer.className = 'board-num-flex';
+            const tdNum = document.createElement('td');
+            tdNum.className = 'board-num-col';
+            const numContainer = document.createElement('div');
+            numContainer.className = 'board-num-flex';
+
             const starSpan = document.createElement('span');
-            starSpan.className = 'board-star-btn ' + (item.starred ? 'active' : '');
-            starSpan.innerHTML = item.starred ? '★' : '☆';
-            starSpan.onclick = function(e) {
-                e.stopPropagation(); item.starred = !item.starred;
-                starSpan.className = 'board-star-btn ' + (item.starred ? 'active' : ''); starSpan.innerHTML = item.starred ? '★' : '☆';
-                saveToDatabase(); updateBoardStarCountUI(); 
-            };
-            const serialSpan = document.createElement('span'); serialSpan.textContent = item.serial;
-            numContainer.appendChild(starSpan); numContainer.appendChild(serialSpan); tdNum.appendChild(numContainer);
+            starSpan.className = 'board-star-btn' + (item.starred ? ' active' : '');
+            starSpan.dataset.serial = String(item.serial);
+            starSpan.textContent = item.starred ? '★' : '☆';
 
-            const tdTitle = document.createElement('td'); tdTitle.className = 'board-subject-col'; tdTitle.textContent = title || "(제목 없음)";
-            const tdAuthor = document.createElement('td'); tdAuthor.className = 'board-author-col'; tdAuthor.innerHTML = `<b>${item.author}</b>`;
-            const tdViews = document.createElement('td'); tdViews.className = 'board-views-col'; tdViews.textContent = item.views;
+            const serialSpan = document.createElement('span');
+            serialSpan.textContent = item.serial;
+            numContainer.append(starSpan, serialSpan);
+            tdNum.appendChild(numContainer);
 
-            trTitle.appendChild(tdNum); trTitle.appendChild(tdTitle); trTitle.appendChild(tdAuthor); trTitle.appendChild(tdViews);
+            const tdTitle = document.createElement('td');
+            tdTitle.className = 'board-subject-col';
+            tdTitle.textContent = title || '(제목 없음)';
 
-            const trContent = document.createElement('tr'); trContent.className = 'board-content-row';
-            const tdContent = document.createElement('td'); tdContent.colSpan = 4; tdContent.className = 'board-content-cell';
-            tdContent.innerHTML = (content || "(내용 없음)").replace(/\n/g, '<br>');
+            const tdAuthor = document.createElement('td');
+            tdAuthor.className = 'board-author-col';
+            const authorBold = document.createElement('b');
+            authorBold.textContent = item.author || '익명';
+            tdAuthor.appendChild(authorBold);
+
+            const tdViews = document.createElement('td');
+            tdViews.className = 'board-views-col';
+            tdViews.textContent = item.views || 0;
+
+            trTitle.append(tdNum, tdTitle, tdAuthor, tdViews);
+
+            const trContent = document.createElement('tr');
+            trContent.className = 'board-content-row';
+            trContent.dataset.serial = String(item.serial);
+
+            const tdContent = document.createElement('td');
+            tdContent.colSpan = 4;
+            tdContent.className = 'board-content-cell';
+            tdContent.textContent = content || '(내용 없음)';
             trContent.appendChild(tdContent);
 
-            trTitle.onclick = function() {
-                const isHidden = window.getComputedStyle(trContent).display === 'none';
-                if (isHidden) {
-                    tbody.querySelectorAll('.board-content-row').forEach(row => { row.style.display = 'none'; });
-                    trContent.style.display = 'table-row';
-                    const now = Date.now();
-                    if (!item.lastViewedAt || (now - item.lastViewedAt) >= 60000) { item.views += 1; item.lastViewedAt = now; }
-                    tdViews.textContent = item.views; boardActiveOpenItem = item; board.lastViewedSerial = item.serial;
-                    saveToDatabase();
-                } else { trContent.style.display = 'none'; if (boardActiveOpenItem === item) boardActiveOpenItem = null; }
-            };
-
-            tbody.appendChild(trTitle); tbody.appendChild(trContent);
+            fragment.append(trTitle, trContent);
         });
+
+        tbody.replaceChildren(fragment);
+        initBoardBodyEventDelegation();
     }
 
     function exportBoardAllData() {
@@ -3850,21 +4147,32 @@ Rules:
     /* [실행] 통합 앱 초기화 로직                 */
     /* ========================================== */
     (async function initApp() {
-        // 공통 / 영작 시스템 초기화
-        loadCustomFontFromStorage();
-        applyFontSettings();
-        renderAllSlotsUI();
-        switchSlot(activeSlotIndex, false);
-        renderWords();
+        try {
+            // 공통 / 영작 시스템 초기화
+            loadCustomFontFromStorage();
+            applyFontSettings();
+            renderNovelSlotRows();
+            initBoardListEventDelegation();
+            initBoardBodyEventDelegation();
 
-        // 게시판 시스템 초기화
-        loadBoardSettingsFromLocalStorage();
-        await loadFromDatabase();
-        renderBoardList();
+            // 기존 localStorage 데이터가 있으면 여기서 IndexedDB로 1회 이전합니다.
+            await loadSlotsAndWordsFromDatabase();
+            renderAllSlotsUI();
+            switchSlot(activeSlotIndex, false);
+            renderWords();
 
-        // 타이핑 to 언마스크 초기화 (슬롯 불러오기 연동)
-        mtApplyFontSettings();
-        if (typeof mtInitSlots === 'function') mtInitSlots();
+            // 게시판 시스템 초기화
+            loadBoardSettingsFromLocalStorage();
+            await loadFromDatabase();
+            renderBoardList();
+
+            // 타이핑 to 언마스크 초기화 (슬롯 불러오기 연동)
+            mtApplyFontSettings();
+            if (typeof mtInitSlots === 'function') mtInitSlots();
+        } catch (error) {
+            console.error('앱 초기화 오류:', error);
+            alert('데이터 초기화 중 오류가 발생했습니다. 브라우저 콘솔을 확인해 주세요.');
+        }
     })();
 
 </script>
