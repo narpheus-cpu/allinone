@@ -3501,7 +3501,7 @@ Rules:
 
     const DB_NAME = "CommunityViewerDB";
     // v2: 게시판 외에 대용량 소설 슬롯/단어장도 IndexedDB로 분리 저장
-    const DB_VERSION = 2;
+    const DB_VERSION = 3;
     const STORE_NAME = "boardsStore";
     const SLOT_STORE_NAME = "slotsStore";
     const VOCA_STORE_NAME = "vocaStore";
@@ -3520,16 +3520,46 @@ Rules:
 
     function initDB() {
         return new Promise((resolve, reject) => {
+            if (!window.indexedDB) {
+                reject(new Error('이 브라우저에서는 IndexedDB를 사용할 수 없습니다.'));
+                return;
+            }
+
             const request = indexedDB.open(DB_NAME, DB_VERSION);
+
             request.onupgradeneeded = (e) => {
                 const db = e.target.result;
-                if (!db.objectStoreNames.contains(STORE_NAME)) db.createObjectStore(STORE_NAME);
-                if (!db.objectStoreNames.contains(SLOT_STORE_NAME)) db.createObjectStore(SLOT_STORE_NAME);
-                if (!db.objectStoreNames.contains(VOCA_STORE_NAME)) db.createObjectStore(VOCA_STORE_NAME);
+                // v3에서 세 스토어 존재를 확실하게 보장합니다.
+                if (!db.objectStoreNames.contains(STORE_NAME)) {
+                    db.createObjectStore(STORE_NAME);
+                }
+                if (!db.objectStoreNames.contains(SLOT_STORE_NAME)) {
+                    db.createObjectStore(SLOT_STORE_NAME);
+                }
+                if (!db.objectStoreNames.contains(VOCA_STORE_NAME)) {
+                    db.createObjectStore(VOCA_STORE_NAME);
+                }
             };
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = () => reject(request.error);
+
+            request.onsuccess = () => {
+                const db = request.result;
+                // 다른 탭에서 DB 업그레이드가 필요한 경우 현재 연결을 즉시 닫습니다.
+                db.onversionchange = () => db.close();
+                resolve(db);
+            };
+            request.onerror = () => reject(request.error || new Error('IndexedDB 열기 실패'));
+            request.onblocked = () => {
+                console.warn('IndexedDB 업그레이드가 다른 탭/창에 의해 대기 중입니다.');
+            };
         });
+    }
+
+    function ensureSlotsShape() {
+        if (!Array.isArray(slotsData) || slotsData.length === 0) {
+            slotsData = defaultSlots.map(slot => ({ ...slot, data: [] }));
+        } else {
+            slotsData = normalizeSlotsData(slotsData);
+        }
     }
 
     async function saveToDatabase() {
@@ -3605,13 +3635,28 @@ Rules:
         let db;
         try {
             db = await initDB();
-            const tx = db.transaction([SLOT_STORE_NAME, VOCA_STORE_NAME], "readonly");
+
+            // 필요한 스토어가 실제 DB에 존재하는지 한 번 더 검증합니다.
+            const missingStores = [SLOT_STORE_NAME, VOCA_STORE_NAME].filter(
+                name => !db.objectStoreNames.contains(name)
+            );
+            if (missingStores.length) {
+                throw new Error(`IndexedDB 스토어 누락: ${missingStores.join(', ')}`);
+            }
+
+            const tx = db.transaction([SLOT_STORE_NAME, VOCA_STORE_NAME], 'readonly');
             const slotRequest = tx.objectStore(SLOT_STORE_NAME).get(SLOT_DATA_KEY);
             const vocaRequest = tx.objectStore(VOCA_STORE_NAME).get(VOCA_DATA_KEY);
 
             const [storedSlots, storedWords] = await Promise.all([
-                new Promise(resolve => { slotRequest.onsuccess = () => resolve(slotRequest.result); slotRequest.onerror = () => resolve(undefined); }),
-                new Promise(resolve => { vocaRequest.onsuccess = () => resolve(vocaRequest.result); vocaRequest.onerror = () => resolve(undefined); })
+                new Promise((resolve) => {
+                    slotRequest.onsuccess = () => resolve(slotRequest.result);
+                    slotRequest.onerror = () => resolve(undefined);
+                }),
+                new Promise((resolve) => {
+                    vocaRequest.onsuccess = () => resolve(vocaRequest.result);
+                    vocaRequest.onerror = () => resolve(undefined);
+                })
             ]);
 
             if (Array.isArray(storedSlots)) {
@@ -3625,9 +3670,11 @@ Rules:
                         await saveSlotsToDatabase();
                         localStorage.removeItem('myNovelPracticeMultiSlots');
                     } catch (e) {
-                        console.error("기존 슬롯 데이터 이전 오류:", e);
-                        slotsData = defaultSlots.map(slot => ({ ...slot, data: [] }));
+                        console.error('기존 슬롯 데이터 이전 오류:', e);
+                        ensureSlotsShape();
                     }
+                } else {
+                    ensureSlotsShape();
                 }
             }
 
@@ -3642,13 +3689,32 @@ Rules:
                         await saveWordsToDatabase();
                         localStorage.removeItem('myScoreVocaWords');
                     } catch (e) {
-                        console.error("기존 단어장 데이터 이전 오류:", e);
+                        console.error('기존 단어장 데이터 이전 오류:', e);
                         words = [];
                     }
+                } else if (!Array.isArray(words)) {
+                    words = [];
                 }
             }
         } catch (e) {
-            console.error("슬롯/단어장 IndexedDB 불러오기 오류:", e);
+            // IndexedDB가 일시적으로 실패해도 앱 전체 초기화를 중단하지 않습니다.
+            // 기존 localStorage 데이터가 있으면 읽기 전용으로라도 복구합니다.
+            console.error('슬롯/단어장 IndexedDB 불러오기 오류:', e);
+            try {
+                const legacySlotsText = localStorage.getItem('myNovelPracticeMultiSlots');
+                if (legacySlotsText) {
+                    slotsData = normalizeSlotsData(JSON.parse(legacySlotsText));
+                }
+            } catch (_) {}
+            try {
+                const legacyWordsText = localStorage.getItem('myScoreVocaWords');
+                if (legacyWordsText) {
+                    const parsedWords = JSON.parse(legacyWordsText);
+                    words = Array.isArray(parsedWords) ? parsedWords : [];
+                }
+            } catch (_) {}
+            ensureSlotsShape();
+            if (!Array.isArray(words)) words = [];
         } finally {
             if (db) db.close();
         }
@@ -4170,8 +4236,12 @@ Rules:
             mtApplyFontSettings();
             if (typeof mtInitSlots === 'function') mtInitSlots();
         } catch (error) {
-            console.error('앱 초기화 오류:', error);
-            alert('데이터 초기화 중 오류가 발생했습니다. 브라우저 콘솔을 확인해 주세요.');
+            // 초기화 중 한 모듈이 실패해도 다른 기능까지 중단하지 않습니다.
+            console.error('앱 초기화 중 일부 기능 오류:', error);
+            try { ensureSlotsShape(); } catch (_) {}
+            try { if (typeof renderAllSlotsUI === 'function') renderAllSlotsUI(); } catch (_) {}
+            try { if (typeof renderWords === 'function') renderWords(); } catch (_) {}
+            try { if (typeof renderBoardList === 'function') renderBoardList(); } catch (_) {}
         }
     })();
 
