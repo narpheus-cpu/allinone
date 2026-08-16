@@ -3355,21 +3355,52 @@ Rules:
 
     function mtExportSlot(e, slotIndex) {
         e.stopPropagation();
-        let rawData = localStorage.getItem(mtGetSlotStorageKey(slotIndex));
-        if (!rawData) return;
-        let parsed = JSON.parse(rawData);
-        let words = Array.isArray(parsed) ? parsed : parsed.words;
-        if (!words || words.length === 0) return alert('저장할 데이터가 없습니다.');
 
-        let exportData = words.map((w, i) => [i + 1, w.starred ? "★" : "", w.kor, w.eng]);
-        exportData.unshift(["NO", "중요", "한국어", "영어"]);
+        const rawData = localStorage.getItem(mtGetSlotStorageKey(slotIndex));
+        if (!rawData) {
+            alert('내보낼 저장 데이터가 없습니다.');
+            return;
+        }
 
-        let ws = XLSX.utils.aoa_to_sheet(exportData);
-        let wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "단어장");
+        let parsed;
+        try {
+            parsed = JSON.parse(rawData);
+        } catch (err) {
+            alert('슬롯 데이터를 읽을 수 없습니다.');
+            return;
+        }
 
-        let safeName = (parsed.name || `slot_${slotIndex}`).replace(/[\\/:*?"<>|]/g, '');
-        XLSX.writeFile(wb, `[마스킹타이핑]_${safeName}.xlsx`);
+        const words = Array.isArray(parsed) ? parsed : (Array.isArray(parsed.words) ? parsed.words : []);
+        if (words.length === 0) {
+            alert('내보낼 카드가 없습니다.');
+            return;
+        }
+
+        // 저장 순서 그대로 엑셀에 기록합니다.
+        // NO는 현재 카드 순번이며, ★ 표시 여부도 함께 보존합니다.
+        const exportData = words.map((w, i) => [
+            i + 1,
+            w && w.starred ? '★' : '',
+            w && w.kor ? String(w.kor) : '',
+            w && w.eng ? String(w.eng) : ''
+        ]);
+        exportData.unshift(['NO', '중요', '한국어', '영어']);
+
+        const ws = XLSX.utils.aoa_to_sheet(exportData);
+        ws['!cols'] = [
+            { wch: 8 },
+            { wch: 8 },
+            { wch: 45 },
+            { wch: 70 }
+        ];
+
+        const wb = XLSX.utils.book_new();
+        const sheetName = slotIndex === 'naver' ? '네이버영어회화' : '단어장';
+        XLSX.utils.book_append_sheet(wb, ws, sheetName);
+
+        const fallbackName = slotIndex === 'naver' ? '네이버영어회화' : `슬롯_${slotIndex}`;
+        const safeName = String(parsed.name || fallbackName).replace(/[\\/:*?"<>|]/g, '').trim() || fallbackName;
+        XLSX.writeFile(wb, `[마스킹타이핑]_요약_${safeName}.xlsx`);
     }
 
     function mtExportStarred(e) {
@@ -3446,7 +3477,7 @@ Rules:
                         <span style="color: #d97706; font-weight: 600;">★표기카드수: ${starredCount}개</span>
                     </div>
                     <div>
-                        <button class="btn-download" style="padding: 5px 10px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-right: 5px;" onclick="mtExportSlot(event, ${i})">저장</button>
+                        <button class="btn-download" style="padding: 5px 10px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-right: 5px;" onclick="mtExportSlot(event, ${i})">내보내기</button>
                         <button class="mt-btn-delete" onclick="mtDeleteSlot(event, ${i})">삭제</button>
                     </div>
                 `;
@@ -3456,7 +3487,10 @@ Rules:
                 div.innerHTML = `
                     <div class="mt-slot-title">슬롯 ${i}</div>
                     <div class="mt-slot-desc">[비어 있음]</div>
-                    <div style="font-size: 11px; font-weight: 600; color: #4A90E2;">클릭하여 파일 추가</div>
+                    <div style="display:flex; gap:5px; flex-wrap:wrap; justify-content:center; align-items:center;">
+                        <button class="btn-download" disabled style="padding:5px 10px; border-radius:4px; font-size:11px; font-weight:600;">내보내기</button>
+                        <span style="font-size:11px; font-weight:600; color:#4A90E2;">클릭하여 파일 추가</span>
+                    </div>
                 `;
                 div.onclick = () => mtTriggerUpload(i);
             }
@@ -3475,7 +3509,7 @@ Rules:
                 <span style="color: #d97706; font-weight: 600;">(모든 슬롯의 ★ 자동 수집)</span>
             </div>
             <div>
-                <button class="btn-download" style="padding: 5px 10px; border-radius: 4px; font-size: 11px; font-weight: 600; background: #ffffff;" onclick="mtExportStarred(event)">저장</button>
+                <button class="btn-download" style="padding: 5px 10px; border-radius: 4px; font-size: 11px; font-weight: 600; background: #ffffff;" onclick="mtExportStarred(event)">내보내기</button>
             </div>
         `;
         let starSlotData = { name: "★ 모아보기 슬롯", words: allStarredWords, isStarSlot: true };
@@ -3527,7 +3561,7 @@ Rules:
                 <span class="mt-special-badge">실시간 누적 슬롯</span>
             </div>
             <div style="display:flex; gap:5px; flex-wrap:wrap; justify-content:center;">
-                ${naverWords.length ? `<button class="btn-download" style="padding:5px 10px; border-radius:4px; font-size:11px; font-weight:600;" onclick="mtExportSlot(event, 'naver')">저장</button>` : ''}
+                ${naverWords.length ? `<button class="btn-download" style="padding:5px 10px; border-radius:4px; font-size:11px; font-weight:600;" onclick="mtExportSlot(event, 'naver')">내보내기</button>` : ''}
                 ${naverWords.length ? `<button class="mt-btn-delete" onclick="mtDeleteSlot(event, 'naver')">전체 삭제</button>` : ''}
             </div>
         `;
