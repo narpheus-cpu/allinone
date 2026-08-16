@@ -1324,12 +1324,7 @@
                 vocaFontSize: vocaFontSize,
                 boardDataList: boardDataList,
                 mtBackupData: mtBackupData, 
-                mtFontSettings: { 
-                    kor: mtKorSize, paren: mtParenSize, 
-                    engBox: mtEngBoxSize, input: mtInputSize,
-                    boxWidth: mtEngBoxWidth, boxGap: mtEngBoxGap,
-                    spaceWidth: mtSpaceWidth
-                },
+                mtFontSettings: mtGetFontSettingsForBackup(),
                 lastSaved: new Date().toISOString()
             };
 
@@ -1375,21 +1370,7 @@
                 }
             }
             if (parsed.mtFontSettings) {
-                mtKorSize = parsed.mtFontSettings.kor; 
-                mtParenSize = parsed.mtFontSettings.paren;
-                mtEngBoxSize = parsed.mtFontSettings.engBox; 
-                mtInputSize = parsed.mtFontSettings.input;
-                mtEngBoxWidth = parsed.mtFontSettings.boxWidth !== undefined ? parsed.mtFontSettings.boxWidth : 0.8;
-                mtEngBoxGap = parsed.mtFontSettings.boxGap !== undefined ? parsed.mtFontSettings.boxGap : 4;
-                mtSpaceWidth = parsed.mtFontSettings.spaceWidth !== undefined ? parsed.mtFontSettings.spaceWidth : 0.8;
-
-                localStorage.setItem('mtKorSize', mtKorSize); 
-                localStorage.setItem('mtParenSize', mtParenSize);
-                localStorage.setItem('mtEngBoxSize', mtEngBoxSize); 
-                localStorage.setItem('mtInputSize', mtInputSize);
-                localStorage.setItem('mtEngBoxWidth', mtEngBoxWidth); 
-                localStorage.setItem('mtEngBoxGap', mtEngBoxGap);
-                localStorage.setItem('mtSpaceWidth', mtSpaceWidth);
+                mtSetFontSettings(parsed.mtFontSettings);
                 mtApplyFontSettings();
             }
 
@@ -2786,7 +2767,80 @@ Rules:
     let mtCurrentStudyWords = []; 
     let mtCurrentIndex = 0;
     let mtRevealedSet = new Set(); 
-    let mtTempParsedData = null; 
+    let mtTempParsedData = null;
+
+    // 타이핑 to 언마스크 전용 글꼴/레이아웃 상태
+    // CSS 기본값과 동일한 값을 사용하고, 이전 저장값이 있으면 복원합니다.
+    const MT_FONT_DEFAULTS = Object.freeze({
+        kor: 26,
+        paren: 16,
+        engBox: 22,
+        input: 20,
+        boxWidth: 0.8,
+        boxGap: 4,
+        spaceWidth: 0.8
+    });
+
+    function mtGetStoredNumber(key, fallback, min, max) {
+        const raw = localStorage.getItem(key);
+        const value = Number(raw);
+        if (!Number.isFinite(value)) return fallback;
+        return Math.max(min, Math.min(max, value));
+    }
+
+    let mtKorSize = mtGetStoredNumber('mtKorSize', MT_FONT_DEFAULTS.kor, 10, 50);
+    let mtParenSize = mtGetStoredNumber('mtParenSize', MT_FONT_DEFAULTS.paren, 10, 50);
+    let mtEngBoxSize = mtGetStoredNumber('mtEngBoxSize', MT_FONT_DEFAULTS.engBox, 10, 50);
+    let mtInputSize = mtGetStoredNumber('mtInputSize', MT_FONT_DEFAULTS.input, 10, 50);
+    let mtEngBoxWidth = mtGetStoredNumber('mtEngBoxWidth', MT_FONT_DEFAULTS.boxWidth, 0.2, 4.0);
+    let mtEngBoxGap = mtGetStoredNumber('mtEngBoxGap', MT_FONT_DEFAULTS.boxGap, 0, 30);
+    let mtSpaceWidth = mtGetStoredNumber('mtSpaceWidth', MT_FONT_DEFAULTS.spaceWidth, 0.1, 4.0);
+
+    function mtNormalizeFontSettings(settings = {}) {
+        return {
+            kor: Number.isFinite(Number(settings.kor)) ? Math.max(10, Math.min(50, Number(settings.kor))) : MT_FONT_DEFAULTS.kor,
+            paren: Number.isFinite(Number(settings.paren)) ? Math.max(10, Math.min(50, Number(settings.paren))) : MT_FONT_DEFAULTS.paren,
+            engBox: Number.isFinite(Number(settings.engBox)) ? Math.max(10, Math.min(50, Number(settings.engBox))) : MT_FONT_DEFAULTS.engBox,
+            input: Number.isFinite(Number(settings.input)) ? Math.max(10, Math.min(50, Number(settings.input))) : MT_FONT_DEFAULTS.input,
+            boxWidth: Number.isFinite(Number(settings.boxWidth)) ? Math.max(0.2, Math.min(4.0, Number(settings.boxWidth))) : MT_FONT_DEFAULTS.boxWidth,
+            boxGap: Number.isFinite(Number(settings.boxGap)) ? Math.max(0, Math.min(30, Number(settings.boxGap))) : MT_FONT_DEFAULTS.boxGap,
+            spaceWidth: Number.isFinite(Number(settings.spaceWidth)) ? Math.max(0.1, Math.min(4.0, Number(settings.spaceWidth))) : MT_FONT_DEFAULTS.spaceWidth
+        };
+    }
+
+    function mtSetFontSettings(settings = {}) {
+        const normalized = mtNormalizeFontSettings(settings);
+        mtKorSize = normalized.kor;
+        mtParenSize = normalized.paren;
+        mtEngBoxSize = normalized.engBox;
+        mtInputSize = normalized.input;
+        mtEngBoxWidth = normalized.boxWidth;
+        mtEngBoxGap = normalized.boxGap;
+        mtSpaceWidth = normalized.spaceWidth;
+
+        localStorage.setItem('mtKorSize', String(mtKorSize));
+        localStorage.setItem('mtParenSize', String(mtParenSize));
+        localStorage.setItem('mtEngBoxSize', String(mtEngBoxSize));
+        localStorage.setItem('mtInputSize', String(mtInputSize));
+        localStorage.setItem('mtEngBoxWidth', String(mtEngBoxWidth));
+        localStorage.setItem('mtEngBoxGap', String(mtEngBoxGap));
+        localStorage.setItem('mtSpaceWidth', String(mtSpaceWidth));
+
+        return normalized;
+    }
+
+    function mtGetFontSettingsForBackup() {
+        // 저장 시점에도 값이 숫자가 아니거나 범위를 벗어나면 기본값으로 교정합니다.
+        return mtSetFontSettings({
+            kor: mtKorSize,
+            paren: mtParenSize,
+            engBox: mtEngBoxSize,
+            input: mtInputSize,
+            boxWidth: mtEngBoxWidth,
+            boxGap: mtEngBoxGap,
+            spaceWidth: mtSpaceWidth
+        });
+    }
 
     function mtApplyFontSettings() {
         const root = document.documentElement;
