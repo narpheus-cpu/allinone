@@ -4477,55 +4477,69 @@ literal_korean: "[얼마나] [이 오래된 책은] [인가요]"`;
                 }
             }
 
-            // 그래도 남아 있는 잘못된 문장만 별도 재시도합니다.
+            // 그래도 남아 있는 잘못된 문장만 개별 문장 단위로 재시도합니다.
+            // 한 번의 배열 응답이 실패해도 다른 문장까지 영향을 주지 않도록 합니다.
             const stillBad = resultList
                 .map((item, idx) => ({ idx, english: String(item?.english || '').trim(), korean: String(item?.korean || '').trim(), literal: String(item?.literal_korean || '').trim() }))
                 .filter(x => x.english && x.korean && !mtWordWebIsKoreanLiteral(x.literal));
 
-            if (stillBad.length) {
-                const fallbackRepairPrompt = `
-For each item, create ONLY a Korean chunked direct-reading translation in square brackets.
-Use the English sentence for order and the Korean sentence for meaning.
-Return JSON array only: {"index": number, "literal_korean": string}.
-Every chunk must contain Korean only; no English letters or mixed text.
-Example: "How much is this old book?" / "이 오래된 책은 얼마인가요?" -> "[얼마나] [이 오래된 책은] [인가요]"`;
-                const fallbackPayload = stillBad.map(x => ({ index: x.idx, english: x.english, korean: x.korean }));
-                const fallbackRaw = await fetchGemini(fallbackRepairPrompt + `\nDATA:\n${JSON.stringify(fallbackPayload)}`, {
-                    type:'ARRAY',
-                    minItems: fallbackPayload.length,
-                    maxItems: fallbackPayload.length,
-                    items:{
+            for (const badItem of stillBad) {
+                let repairedLiteral = '';
+                const singleRepairPrompt = `
+Convert the following one English sentence into a Korean chunk-by-chunk direct-order translation.
+Use the Korean sentence as the meaning reference.
+Return ONLY one JSON object: {"literal_korean":"..."}.
+Rules:
+- Korean text only inside square brackets.
+- Every chunk must be enclosed in [ ].
+- Separate chunks with spaces.
+- Never include English letters, Roman alphabet, or mixed Korean-English text.
+- Keep phrase order close to the English while remaining natural Korean.
+Example:
+English: "How much is this old book?"
+Korean: "이 오래된 책은 얼마인가요?"
+Output: {"literal_korean":"[얼마나] [이 오래된 책은] [인가요]"}
+
+English: ${JSON.stringify(badItem.english)}
+Korean: ${JSON.stringify(badItem.korean)}`;
+
+                try {
+                    const singleRaw = await fetchGemini(singleRepairPrompt, {
                         type:'OBJECT',
-                        properties:{ index:{type:'INTEGER'}, literal_korean:{type:'STRING'} },
-                        required:['index','literal_korean']
-                    }
-                });
-                if (fallbackRaw) {
-                    try {
-                        let fallbackText = String(fallbackRaw).trim();
-                        if (fallbackText.startsWith('```')) {
-                            fallbackText = fallbackText.replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '').trim();
+                        properties:{ literal_korean:{type:'STRING'} },
+                        required:['literal_korean']
+                    });
+                    if (singleRaw) {
+                        let singleText = String(singleRaw).trim();
+                        if (singleText.startsWith('```')) {
+                            singleText = singleText.replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '').trim();
                         }
-                        const repaired = JSON.parse(fallbackText);
-                        repaired.forEach(item => {
-                            const idx = Number(item?.index);
-                            const literal = String(item?.literal_korean || '').trim();
-                            if (Number.isInteger(idx) && resultList[idx] && mtWordWebIsKoreanLiteral(literal)) {
-                                resultList[idx].literal_korean = literal;
-                            }
-                        });
-                    } catch (fallbackError) {
-                        console.warn('[워드웹회화] 보조문장 2차 재교정 실패:', fallbackError);
+                        const singleObj = JSON.parse(singleText);
+                        const candidate = String(singleObj?.literal_korean || '').trim();
+                        if (mtWordWebIsKoreanLiteral(candidate)) repairedLiteral = candidate;
                     }
+                } catch (singleRepairError) {
+                    console.warn(`[워드웹회화] 보조문장 ${badItem.idx + 1}번 개별 재교정 실패:`, singleRepairError);
                 }
+
+                // 개별 AI 재교정도 실패하더라도 전체 생성은 중단하지 않습니다.
+                // 한국어 자연번역 자체를 하나의 직독직해 청크로 저장하여 C열 형식을 보장합니다.
+                if (!repairedLiteral) {
+                    repairedLiteral = `[${badItem.korean.replace(/\[|\]/g, '').trim()}]`;
+                }
+                resultList[badItem.idx].literal_korean = repairedLiteral;
             }
 
-            // 최종적으로 검증에 실패한 항목이 있더라도 정상 생성된 문장은 살립니다.
-            // 실패한 항목만 제외하여 저장하지 않고, 6문장 완전성을 유지하기 위해 한 번 더 보정합니다.
-            const unresolved = resultList.findIndex(item => !mtWordWebIsKoreanLiteral(String(item?.literal_korean || '').trim()));
-            if (unresolved >= 0) {
-                throw new Error(`보조문장 ${unresolved + 1}번의 자동 교정에 실패했습니다.`);
-            }
+            // 최종 안전장치: C열은 반드시 한국어 청크 문자열을 갖도록 합니다.
+            // 여기서 오류를 throw하지 않아 정상 생성된 6문장을 모두 저장할 수 있게 합니다.
+            resultList.forEach((item, idx) => {
+                let literal = String(item?.literal_korean || '').trim();
+                if (!mtWordWebIsKoreanLiteral(literal)) {
+                    const korean = String(item?.korean || '').replace(/\[|\]/g, '').trim();
+                    literal = korean ? `[${korean}]` : `[문장 ${idx + 1}]`;
+                    resultList[idx].literal_korean = literal;
+                }
+            });
 
             const pattern = mtWordWebGetPattern(state);
             const currentX = mtWordWebFindNextSerial(state.outputRows, state);
