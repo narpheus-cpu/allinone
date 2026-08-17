@@ -3201,6 +3201,7 @@ Rules:
     let mtCurrentStudyWords = []; 
     let mtCurrentIndex = 0;
     let mtRevealedSet = new Set(); 
+    let mtCardHadDirectTyping = false;
     let mtTempParsedData = null;
 
     // 타이핑 to 언마스크 영구 통계
@@ -5533,6 +5534,9 @@ Example:
         mtRevealedSet.clear();
         mtTypedWordCompletionSet = new Set();
         mtCardCompletionRecorded = false;
+        // 별표 클릭 여부와 통계는 완전히 독립적으로 관리합니다.
+        // 이 카드에서 실제 키보드 입력이 있었는지만 별도로 추적합니다.
+        mtCardHadDirectTyping = false;
 
         let currentWord = mtCurrentStudyWords[index];
 
@@ -5580,6 +5584,8 @@ Example:
 
     function mtToggleStar() {
         let currentWord = mtCurrentStudyWords[mtCurrentIndex];
+        if (!currentWord) return;
+        // 별표 토글은 즐겨찾기 상태만 변경합니다. 통계(카드/단어)는 절대로 변경하지 않습니다.
         currentWord.starred = !currentWord.starred;
 
         document.getElementById('mtStarBtn').innerText = currentWord.starred ? '★' : '☆';
@@ -5794,6 +5800,13 @@ Example:
     }
 
     function mtRecordTypedCompletedWords(typedStr, targetStr) {
+        // 별표/힌트와 무관하게, 실제 입력칸에 사용자가 직접 입력한 접두사만 집계합니다.
+        // typedStr는 input 이벤트에서 검증된 실제 타이핑값이므로, 힌트 공개로는 이 함수가 호출되어도
+        // 단어 수가 증가하지 않습니다.
+        if (typeof typedStr !== 'string' || typeof targetStr !== 'string') return;
+        if (!typedStr.length) return;
+        mtCardHadDirectTyping = true;
+
         const tokens = [];
         const re = /\S+/g;
         let match;
@@ -5801,15 +5814,17 @@ Example:
             const token = match[0];
             const start = match.index;
             const end = start + token.length;
-            // 문장 마지막 구두점은 입력하지 않아도 되므로, 그 부분은 단어 완료 판정에서 제외합니다.
             let requiredEnd = end;
             while (requiredEnd > start && /[.!?。！？]/.test(targetStr[requiredEnd - 1])) requiredEnd--;
             tokens.push({ start, end, requiredEnd, token });
         }
+
         tokens.forEach((item, idx) => {
             if (mtTypedWordCompletionSet.has(idx)) return;
+            // 현재 입력이 이 단어의 시작부터 끝까지 정확히 도달했을 때만 카운트합니다.
             const requiredText = targetStr.slice(item.start, item.requiredEnd);
-            if (typedStr.length >= item.requiredEnd && typedStr.slice(item.start, item.requiredEnd).toLowerCase() === requiredText.toLowerCase()) {
+            const typedSegment = typedStr.slice(item.start, item.requiredEnd);
+            if (typedStr.length >= item.requiredEnd && typedSegment.toLowerCase() === requiredText.toLowerCase()) {
                 mtTypedWordCompletionSet.add(idx);
                 mtRecordDailyStat('words', 1);
             }
@@ -5818,6 +5833,8 @@ Example:
 
     function mtRecordTypedCompletedCard() {
         if (mtCardCompletionRecorded) return;
+        // 별표를 눌렀는지와 관계없이, 실제 타이핑 완료로 Enter 정답 처리된 경우에만 카드 1개를 기록합니다.
+        if (!mtCardHadDirectTyping) return;
         mtCardCompletionRecorded = true;
         mtRecordDailyStat('cards', 1);
     }
@@ -5840,6 +5857,7 @@ Example:
                 }
 
                 this.value = typed.substring(0, validLength);
+                if (this.value.length > 0) mtCardHadDirectTyping = true;
                 mtRecordTypedCompletedWords(this.value, target);
                 mtRenderMask(this.value);
             });
