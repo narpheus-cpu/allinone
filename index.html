@@ -352,6 +352,28 @@
             border-color: #115e59 !important;
             background: #ecfeff !important;
         }
+        .mt-wordweb-slot { }
+        .mt-wordweb-slot:hover { }
+        .mt-wordweb-badge {
+            display: inline-block;
+            margin-top: 4px;
+            padding: 2px 6px;
+            border-radius: 999px;
+            background: #dbeafe;
+            color: #1d4ed8;
+            font-size: 10px;
+            font-weight: 700;
+        }
+        .mt-wordweb-status {
+            margin-top: 6px;
+            padding: 5px 7px;
+            border-radius: 5px;
+            background: #ffffff;
+            color: #475569;
+            font-size: 10px;
+            line-height: 1.45;
+        }
+
         .mt-special-badge {
             display: inline-block;
             margin-top: 4px;
@@ -995,6 +1017,11 @@
                 <button class="btn-primary" style="width: 100%; padding: 12px; margin-bottom: 10px; font-size: 14px;" id="mtBtnContinue" onclick="mtContinueStudy()">이어서 하기</button>
                 <button class="btn-excel" style="width: 100%; padding: 12px; margin-bottom: 15px; font-size: 14px;" onclick="mtOpenOptionsFromAction()">새로 시작 (설정)</button>
 
+                <div id="mtWordWebActionArea" style="display:none; border-top:1px solid var(--border-color); padding-top:15px; margin-top:2px;">
+                    <button class="btn-excel" style="width:100%; padding:10px; font-size:12px;" onclick="mtOpenWordWebPatternEditor()">입력패턴 수정</button>
+                    <button class="btn-excel" style="width:100%; padding:10px; margin-top:8px; font-size:12px; font-weight:700; border-color:#64748b;" onclick="mtOpenWordWebListEditor()">목록편집</button>
+                </div>
+
                 <div id="mtNaverActionArea" style="display:none; border-top:1px solid var(--border-color); padding-top:15px; margin-top:2px;">
                     <button class="btn-excel" style="width:100%; padding:10px; font-size:13px; font-weight:700; border-color:#0f766e; color:#0f766e;" onclick="mtToggleNaverPaste()">텍스트 붙여넣기</button>
                     <button class="btn-excel" style="width:100%; padding:10px; margin-top:8px; font-size:12px;" onclick="mtOpenNaverPatternEditor()">입력패턴 수정</button>
@@ -1061,6 +1088,73 @@
             </div>
         </div>
 
+        <!-- 워드웹회화 입력패턴 편집 모달 -->
+        <div id="mtWordWebPatternModal" class="mt-list-edit-panel" onclick="if(event.target===this) mtCloseWordWebPatternEditor()">
+            <div class="mt-list-edit-card" style="max-width:520px;">
+                <div class="mt-list-edit-head">
+                    <div class="mt-list-edit-head-title">워드웹회화 입력패턴</div>
+                    <button class="btn-excel" style="padding:6px 10px;" onclick="mtCloseWordWebPatternEditor()">닫기</button>
+                </div>
+                <div class="mt-list-edit-body" style="padding:16px;">
+                    <div class="mt-pattern-grid">
+                        <label>차례 시트 이름
+                            <input type="text" id="mtWordWebTopicSheet" value="차례">
+                        </label>
+                        <label>시트1 이름
+                            <input type="text" id="mtWordWebOutputSheet" value="시트1">
+                        </label>
+                        <label>주제 시작 열
+                            <input type="number" id="mtWordWebTopicStartCol" min="1" value="1">
+                        </label>
+                        <label>주제 열 수
+                            <input type="number" id="mtWordWebTopicColCount" min="1" max="3" value="3">
+                        </label>
+                        <label>영어 열
+                            <input type="number" id="mtWordWebEngCol" min="1" value="1">
+                        </label>
+                        <label>주문장 열
+                            <input type="number" id="mtWordWebMainKorCol" min="1" value="2">
+                        </label>
+                        <label>보조문장 열
+                            <input type="number" id="mtWordWebSubKorCol" min="1" value="3">
+                        </label>
+                        <label>일련번호 열
+                            <input type="number" id="mtWordWebSerialCol" min="1" value="4">
+                        </label>
+                        <label style="grid-column:1 / -1;">주제 열
+                            <input type="number" id="mtWordWebTopicOutputCol" min="1" value="5">
+                        </label>
+                    </div>
+                    <div class="mt-pattern-note">시트1의 보조문장 열은 한국어 직독직해 청크입니다. 예: [나는 먹었다] [밥을] [오전에]</div>
+                    <div style="display:flex; justify-content:flex-end; margin-top:10px;">
+                        <button class="btn-primary" style="padding:7px 12px;" onclick="mtSaveWordWebPattern()">패턴 저장</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 워드웹회화 목록 편집 모달 -->
+        <div id="mtWordWebListEditModal" class="mt-list-edit-panel" onclick="if(event.target===this) mtCloseWordWebListEditor()">
+            <div class="mt-list-edit-card">
+                <div class="mt-list-edit-head">
+                    <div class="mt-list-edit-head-title">워드웹회화 목록편집</div>
+                    <button class="btn-excel" style="padding:6px 10px;" onclick="mtCloseWordWebListEditor()">닫기</button>
+                </div>
+                <div class="mt-list-edit-toolbar">
+                    <div class="mt-list-edit-toolbar-left">
+                        <label style="display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color:#374151; cursor:pointer;">
+                            <input type="checkbox" id="mtWordWebListSelectAll" onchange="mtToggleWordWebListSelectAll(this)"> 전체 선택
+                        </label>
+                        <span class="mt-list-edit-count" id="mtWordWebListSelectedCount">0개 선택</span>
+                    </div>
+                    <div class="mt-list-edit-toolbar-right">
+                        <button class="btn-danger" style="padding:7px 12px;" onclick="mtDeleteSelectedWordWebWords()">선택 삭제</button>
+                    </div>
+                </div>
+                <div class="mt-list-edit-body" id="mtWordWebListEditBody"></div>
+            </div>
+        </div>
+
         <!-- 옵션 설정 모달 -->
         <div id="mtOptionsModal" class="modal-overlay">
             <div class="modal-card" style="width: 320px;">
@@ -1105,7 +1199,7 @@
                     <select id="mtColMainKor" style="width:100%; padding:6px; border-radius:4px; border:1px solid var(--border-color); outline:none; font-size:13px;"></select>
                 </div>
                 <div style="margin-bottom:10px;">
-                    <label style="font-size:13px; font-weight:600; display:block; margin-bottom:4px;">보조문장 (괄호 처리)</label>
+                    <label style="font-size:13px; font-weight:600; display:block; margin-bottom:4px;">보조문장 (한국어 직독직해 청크)</label>
                     <select id="mtColSubKor" style="width:100%; padding:6px; border-radius:4px; border:1px solid var(--border-color); outline:none; font-size:13px;"></select>
                 </div>
                 <div style="margin-bottom:20px;">
@@ -1127,7 +1221,7 @@
                 <div class="mt-progress-text" id="mtProgressText">0 / 0</div>
             </div>
 
-            <div id="mtKorText">한국어 단어</div>
+            <div id="mtKorText"></div>
 
             <div id="mtMaskContainer" class="mt-mask-container"></div>
 
@@ -1145,7 +1239,7 @@
 
             <!-- AI 도움 편집기 (타이핑 to 언마스크 탭) -->
             <div id="aiPromptEditArea_mt" class="ai-prompt-edit-box" style="position: relative; width: 100%; max-width: 500px; margin: 0 auto 15px auto;">
-                <span class="prompt-help-text">※ {메인한국어}, {서브한국어}, {영어} 태그는 AI도움 버튼 클릭 시 실제 단어로 치환되어 복사됩니다.</span>
+                <span class="prompt-help-text">※ {메인한국어}, {서브한국어}, {영어} 태그는 현재 카드의 한국어 주문장, 한국어 직독직해 청크, 영어문장으로 치환됩니다.</span>
                 <textarea id="aiPromptTextarea_mt"></textarea>
                 <div style="display: flex; justify-content: flex-end; gap: 6px;">
                     <button class="btn-excel" onclick="resetAiPrompt('mt')">초기화</button>
@@ -1554,6 +1648,8 @@
             if (naverSlot) mtBackupData['naver_english_conversation'] = naverSlot;
             const naverPattern = localStorage.getItem('word_slot_naver_english_conversation_pattern');
             if (naverPattern) mtBackupData['naver_english_conversation_pattern'] = naverPattern;
+            const wordWebSlot = localStorage.getItem(MT_WORDWEB_STORAGE_KEY);
+            if (wordWebSlot) mtBackupData['wordweb_conversation'] = wordWebSlot;
 
             const dataToSave = {
                 slotsData: slotsData,
@@ -1614,6 +1710,11 @@
                 if(parsed.mtBackupData['naver_english_conversation_pattern']) {
                     localStorage.setItem('word_slot_naver_english_conversation_pattern', parsed.mtBackupData['naver_english_conversation_pattern']);
                 }
+                if (parsed.mtBackupData['wordweb_conversation']) {
+                    localStorage.setItem(MT_WORDWEB_STORAGE_KEY, parsed.mtBackupData['wordweb_conversation']);
+                } else {
+                    localStorage.removeItem(MT_WORDWEB_STORAGE_KEY);
+                }
             }
             if (parsed.mtFontSettings) {
                 mtSetFontSettings(parsed.mtFontSettings);
@@ -1625,7 +1726,8 @@
             renderAllSlotsUI();
             switchSlot(activeSlotIndex, false);
 
-            if (typeof mtInitSlots === 'function') mtInitSlots(); 
+            if (typeof mtInitSlots === 'function') mtInitSlots();
+            if (typeof mtWordWebStartAutoTrigger === 'function') mtWordWebStartAutoTrigger(false);
 
             const reminder = document.getElementById('saveReminder');
             if (reminder) reminder.style.display = 'none';
@@ -1726,6 +1828,7 @@
         if(tabId === 'quizTab') resetToSetup();
         if(tabId === 'maskingTypingTab') {
             if(typeof mtInitSlots === 'function') mtInitSlots();
+            if(typeof mtWordWebStartAutoTrigger === 'function') mtWordWebStartAutoTrigger(false);
         }
     }
 
@@ -3448,8 +3551,15 @@ Rules:
         let allStarredWords = [];
 
         for (let i = 1; i <= 10; i++) {
-            let rawData = localStorage.getItem('word_slot_' + i);
             let div = document.createElement('div');
+
+            if (i === 10) {
+                mtRenderWordWebSlot(div);
+                grid.appendChild(div);
+                continue;
+            }
+
+            let rawData = localStorage.getItem('word_slot_' + i);
 
             if (rawData) {
                 let parsedData = JSON.parse(rawData);
@@ -3520,9 +3630,8 @@ Rules:
                 mtPromptAction('star', starSlotData);
             }
         };
-        grid.appendChild(starDiv);
+        // 네이버영어회화 스페셜 슬롯 — 모아보기 슬롯과 위치를 서로 교체
 
-        // 네이버영어회화 스페셜 슬롯 — 모아보기 슬롯 바로 옆에 추가
         let naverSlot = { name: '네이버영어회화', words: [], lastSession: null, isSpecialSlot: true };
         const naverRaw = localStorage.getItem(MT_NAVER_STORAGE_KEY);
         if (naverRaw) {
@@ -3567,6 +3676,9 @@ Rules:
         `;
         naverDiv.onclick = () => mtPromptAction('naver', naverSlot);
         grid.appendChild(naverDiv);
+
+        // ★ 모아보기 슬롯을 네이버영어회화 다음에 배치
+        grid.appendChild(starDiv);
     }
 
     function mtPromptAction(slotIndex, slotData) {
@@ -3577,16 +3689,24 @@ Rules:
         const naverActionArea = document.getElementById('mtNaverActionArea');
         const naverPastePanel = document.getElementById('mtNaverPastePanel');
         const naverPatternPanel = document.getElementById('mtNaverPatternPanel');
+        const wordWebActionArea = document.getElementById('mtWordWebActionArea');
         if (naverActionArea) naverActionArea.style.display = slotIndex === 'naver' ? 'block' : 'none';
+        if (wordWebActionArea) wordWebActionArea.style.display = slotIndex === 'wordweb' ? 'block' : 'none';
         if (naverPastePanel) naverPastePanel.classList.remove('open');
         if (naverPatternPanel) naverPatternPanel.classList.remove('open');
         if (slotIndex === 'naver') mtSetNaverPatternInputs();
+        if (slotIndex === 'wordweb') mtSetWordWebPatternInputs();
 
         if (slotIndex === 'star') {
             let starSessRaw = localStorage.getItem('word_slot_star_session');
             if (starSessRaw) {
                 slotData.lastSession = JSON.parse(starSessRaw);
             }
+        }
+        if (slotIndex === 'wordweb') {
+            const wwState = mtWordWebGetState();
+            slotData = mtWordWebBuildSlotData(wwState);
+            mtOriginalSlotData = slotData;
         }
 
         const btnContinue = document.getElementById('mtBtnContinue');
@@ -3774,10 +3894,613 @@ Rules:
             };
             if (mtActiveSlotIndex === 'star') {
                 localStorage.setItem('word_slot_star_session', JSON.stringify(mtOriginalSlotData.lastSession));
+            } else if (mtActiveSlotIndex === 'wordweb') {
+                mtWordWebSyncLastSession(mtOriginalSlotData.lastSession);
             } else {
                 localStorage.setItem(mtGetSlotStorageKey(mtActiveSlotIndex), JSON.stringify(mtOriginalSlotData));
             }
         }
+    }
+
+    // ==========================================
+    // 워드웹회화 (타이핑 to 언마스크 슬롯 10)
+    // ==========================================
+    const MT_WORDWEB_STORAGE_KEY = 'word_slot_wordweb_conversation';
+    const MT_WORDWEB_INTERVAL_MS = 5 * 60 * 1000;
+    let mtWordWebTimerId = null;
+    let mtWordWebBusy = false;
+
+    function mtWordWebGetState() {
+        try {
+            const saved = JSON.parse(localStorage.getItem(MT_WORDWEB_STORAGE_KEY) || 'null');
+            if (saved && Array.isArray(saved.topics) && Array.isArray(saved.outputRows)) return saved;
+        } catch (e) {}
+        return { fileName: '', topicRows: [], topics: [], outputRows: [], lastRun: null, nextRun: null, totalGenerated: 0, lastError: '', starredSerials: [], pattern: null };
+    }
+
+    function mtWordWebSaveState(state) {
+        localStorage.setItem(MT_WORDWEB_STORAGE_KEY, JSON.stringify(state));
+    }
+
+    function mtWordWebGetStarredCount(state = mtWordWebGetState()) {
+        const starred = new Set(Array.isArray(state.starredSerials) ? state.starredSerials.map(String) : []);
+        const serialIdx = mtWordWebGetPattern(state).serialCol - 1;
+        return (state.outputRows || []).filter(row => {
+            const serial = String((row || [])[serialIdx] ?? '').trim();
+            return serial && starred.has(serial);
+        }).length;
+    }
+
+    function mtWordWebRenderStatus(extraMessage = '') {
+        const status = document.getElementById('mtWordWebStatus');
+        if (!status) return;
+        const state = mtWordWebGetState();
+        let line = '';
+        if (mtWordWebBusy) line = '<span style="color:#1d4ed8;font-weight:700;">생성 중…</span>';
+        else if (state.lastError) line = `<span style="color:#dc2626;">최근 오류: ${mtEscapeHTML(state.lastError)}</span>`;
+        else if (extraMessage) line = `<span style="color:#0f766e;font-weight:700;">${mtEscapeHTML(extraMessage)}</span>`;
+        status.innerHTML = line;
+    }
+
+    function mtRenderWordWebSlot(div) {
+        const state = mtWordWebGetState();
+        const pattern = mtWordWebGetPattern(state);
+        const cardCount = (state.outputRows || []).filter(row => {
+            const eng = String((row || [])[pattern.engCol - 1] ?? '').trim();
+            const kor = String((row || [])[pattern.mainKorCol - 1] ?? '').trim();
+            return eng && kor;
+        }).length;
+        const starredCount = mtWordWebGetStarredCount(state);
+
+        div.className = 'mt-slot mt-wordweb-slot ' + (state.fileName ? 'has-data' : '');
+        div.innerHTML = `
+            <div class="mt-slot-title">워드웹회화</div>
+            <div class="mt-slot-desc" style="line-height:1.5;">
+                카드 수: ${cardCount}개<br>
+                <span style="color:#d97706; font-weight:600;">★표기카드수: ${starredCount}개</span>
+            </div>
+            <div style="display:flex; gap:5px; flex-wrap:wrap; justify-content:center; align-items:center;">
+                ${state.fileName ? `<button class="btn-download" style="padding:5px 10px; border-radius:4px; font-size:11px; font-weight:600;" onclick="mtWordWebDownloadClick(event)">내보내기</button>` : `<button class="btn-download" disabled style="padding:5px 10px; border-radius:4px; font-size:11px; font-weight:600;">내보내기</button>`}
+                ${state.fileName ? `<button class="mt-btn-delete" onclick="mtDeleteSlot(event, 'wordweb')">삭제</button>` : `<button class="mt-btn-delete" disabled>삭제</button>`}
+            </div>
+            <div id="mtWordWebStatus" class="mt-wordweb-status"></div>
+        `;
+        div.onclick = () => {
+            if (!state.fileName) {
+                mtWordWebTriggerUpload();
+                return;
+            }
+            mtPromptAction('wordweb', mtWordWebBuildSlotData(state));
+        };
+        mtWordWebRenderStatus();
+    }
+
+    function mtWordWebBuildSlotData(state = mtWordWebGetState()) {
+        const words = [];
+        const starredSet = new Set(Array.isArray(state.starredSerials) ? state.starredSerials.map(String) : []);
+        const pattern = mtWordWebGetPattern(state);
+        const engIdx = pattern.engCol - 1;
+        const mainKorIdx = pattern.mainKorCol - 1;
+        const subKorIdx = pattern.subKorCol - 1;
+        const serialIdx = pattern.serialCol - 1;
+        const topicIdx = pattern.topicOutputCol - 1;
+        (state.outputRows || []).forEach((row, idx) => {
+            const eng = String((row || [])[engIdx] ?? '').trim();
+            const mainKor = String((row || [])[mainKorIdx] ?? '').trim();
+            const subKor = String((row || [])[subKorIdx] ?? '').trim();
+            const serial = String((row || [])[serialIdx] ?? '').trim();
+            const topic = String((row || [])[topicIdx] ?? '').trim();
+
+            if (eng && mainKor) {
+                words.push({
+                    kor: mainKor,
+                    subKor,
+                    eng,
+                    literalKor: subKor,
+                    serial,
+                    topic,
+                    starred: starredSet.has(serial),
+                    originalIndex: idx
+                });
+            }
+        });
+        return {
+            name: '워드웹회화',
+            words,
+            lastSession: state.lastSession || null,
+            isWordWebSlot: true
+        };
+    }
+
+    function mtWordWebSyncLastSession(lastSession) {
+        const state = mtWordWebGetState();
+        state.lastSession = lastSession || null;
+        mtWordWebSaveState(state);
+    }
+
+    function mtWordWebTriggerUpload() {
+        mtActiveSlotIndex = 'wordweb';
+        const input = document.getElementById('mtFileUpload');
+        if (input) {
+            input.value = '';
+            input.click();
+        }
+    }
+
+    function mtWordWebNormalizeRow(row) {
+        return Array.isArray(row) ? row.map(v => (v === null || v === undefined ? '' : v)) : [];
+    }
+
+    function mtWordWebBuildTopics(rows) {
+        return rows
+            .map((row, idx) => ({
+                rowNumber: idx + 1,
+                topic: mtWordWebNormalizeRow(row).slice(0, 3).map(v => String(v).trim()).filter(Boolean).join(' - ')
+            }))
+            .filter(x => x.topic);
+    }
+
+    function mtWordWebFindNextSerial(rows, state = mtWordWebGetState()) {
+        let currentX = 1;
+        const serialIdx = mtWordWebGetPattern(state).serialCol - 1;
+        for (let i = rows.length - 1; i >= 0; i--) {
+            const value = String((rows[i] || [])[serialIdx] ?? '').trim();
+            const match = value.match(/^(\d+)-/);
+            if (match) {
+                currentX = parseInt(match[1], 10) + 1;
+                break;
+            }
+        }
+        return currentX;
+    }
+
+    async function mtWordWebHandleFile(file) {
+        try {
+            const data = new Uint8Array(await file.arrayBuffer());
+            const workbook = XLSX.read(data, { type: 'array' });
+            const priorState = mtWordWebGetState();
+            const pattern = mtWordWebGetPattern(priorState);
+            if (!workbook.SheetNames.includes(pattern.topicSheet) || !workbook.SheetNames.includes(pattern.outputSheet)) {
+                alert(`엑셀 파일에 [${pattern.topicSheet}]와 [${pattern.outputSheet}] 시트가 모두 있어야 합니다.`);
+                return;
+            }
+            const topicRows = XLSX.utils.sheet_to_json(workbook.Sheets[pattern.topicSheet], { header: 1, defval: '' });
+            const outputRows = XLSX.utils.sheet_to_json(workbook.Sheets[pattern.outputSheet], { header: 1, defval: '' });
+            const topics = topicRows.map((row, idx) => ({
+                rowNumber: idx + 1,
+                topic: Array.from({length: pattern.topicColCount}, (_, n) => String((row || [])[pattern.topicStartCol - 1 + n] ?? '').trim()).filter(Boolean).join(' - ')
+            })).filter(x => x.topic);
+            if (!topics.length) {
+                alert('[차례] 시트의 A~C열에서 사용할 주제를 찾지 못했습니다.');
+                return;
+            }
+
+            const previousState = mtWordWebGetState();
+            const state = {
+                fileName: file.name,
+                topicRows: topicRows.map(mtWordWebNormalizeRow),
+                topics,
+                outputRows: outputRows.map(mtWordWebNormalizeRow),
+                lastRun: null,
+                nextRun: Date.now() + MT_WORDWEB_INTERVAL_MS,
+                totalGenerated: 0,
+                lastError: '',
+                lastSession: null,
+                starredSerials: previousState.starredSerials || [],
+                pattern
+            };
+
+            state.outputRows = mtWordWebApplyPatternToRows(state.outputRows, state.pattern);
+            await mtWordWebRepairExistingLiteralColumns(state);
+            state.nextRun = Date.now() + MT_WORDWEB_INTERVAL_MS;
+            mtWordWebSaveState(state);
+            mtWordWebStartAutoTrigger(true);
+            mtInitSlots();
+            alert('[워드웹회화] 엑셀 등록이 완료되었습니다.');
+        } catch (error) {
+            console.error(error);
+            alert('엑셀 파일을 읽는 중 오류가 발생했습니다.');
+        }
+    }
+
+    function mtWordWebGetDefaultPattern() {
+        return {
+            topicSheet: '차례',
+            outputSheet: '시트1',
+            topicStartCol: 1,
+            topicColCount: 3,
+            engCol: 1,
+            mainKorCol: 2,
+            subKorCol: 3,
+            serialCol: 4,
+            topicOutputCol: 5
+        };
+    }
+
+    function mtWordWebGetPattern(state = mtWordWebGetState()) {
+        return Object.assign(mtWordWebGetDefaultPattern(), state.pattern || {});
+    }
+
+    function mtSetWordWebPatternInputs() {
+        const p = mtWordWebGetPattern();
+        const map = {
+            mtWordWebTopicSheet: p.topicSheet,
+            mtWordWebOutputSheet: p.outputSheet,
+            mtWordWebTopicStartCol: p.topicStartCol,
+            mtWordWebTopicColCount: p.topicColCount,
+            mtWordWebEngCol: p.engCol,
+            mtWordWebMainKorCol: p.mainKorCol,
+            mtWordWebSubKorCol: p.subKorCol,
+            mtWordWebSerialCol: p.serialCol,
+            mtWordWebTopicOutputCol: p.topicOutputCol
+        };
+        Object.entries(map).forEach(([id, value]) => {
+            const el = document.getElementById(id);
+            if (el) el.value = value;
+        });
+    }
+
+    function mtSaveWordWebPattern() {
+        const state = mtWordWebGetState();
+        state.pattern = {
+            topicSheet: String(document.getElementById('mtWordWebTopicSheet').value || '차례').trim() || '차례',
+            outputSheet: String(document.getElementById('mtWordWebOutputSheet').value || '시트1').trim() || '시트1',
+            topicStartCol: Math.max(1, parseInt(document.getElementById('mtWordWebTopicStartCol').value, 10) || 1),
+            topicColCount: Math.max(1, Math.min(3, parseInt(document.getElementById('mtWordWebTopicColCount').value, 10) || 3)),
+            engCol: Math.max(1, parseInt(document.getElementById('mtWordWebEngCol').value, 10) || 1),
+            mainKorCol: Math.max(1, parseInt(document.getElementById('mtWordWebMainKorCol').value, 10) || 2),
+            subKorCol: Math.max(1, parseInt(document.getElementById('mtWordWebSubKorCol').value, 10) || 3),
+            serialCol: Math.max(1, parseInt(document.getElementById('mtWordWebSerialCol').value, 10) || 4),
+            topicOutputCol: Math.max(1, parseInt(document.getElementById('mtWordWebTopicOutputCol').value, 10) || 5)
+        };
+        mtWordWebSaveState(state);
+        document.getElementById('mtWordWebPatternModal').style.display = 'none';
+        mtInitSlots();
+        alert('입력패턴이 저장되었습니다.');
+    }
+
+    function mtOpenWordWebPatternEditor() {
+        mtSetWordWebPatternInputs();
+        document.getElementById('mtWordWebPatternModal').style.display = 'flex';
+    }
+
+    function mtCloseWordWebPatternEditor() {
+        document.getElementById('mtWordWebPatternModal').style.display = 'none';
+    }
+
+    function mtOpenWordWebListEditor() {
+        const state = mtWordWebGetState();
+        const pattern = mtWordWebGetPattern(state);
+        const engIdx = pattern.engCol - 1, mainKorIdx = pattern.mainKorCol - 1, subKorIdx = pattern.subKorCol - 1;
+        const body = document.getElementById('mtWordWebListEditBody');
+        if (!body) return;
+        body.innerHTML = '';
+        const rows = state.outputRows || [];
+        const valid = rows.map((row, idx) => ({ row, idx })).filter(x => String(x.row?.[engIdx] || '').trim() && String(x.row?.[mainKorIdx] || '').trim());
+        if (!valid.length) {
+            body.innerHTML = '<div class="mt-list-edit-empty">저장된 문장이 없습니다.</div>';
+        } else {
+            valid.forEach(({row, idx}, n) => {
+                const div = document.createElement('div');
+                div.className = 'mt-list-edit-row';
+                div.innerHTML = `
+                    <div style="padding-top:2px; text-align:center;">
+                        <input type="checkbox" class="mt-wordweb-list-check" data-index="${idx}" onchange="mtUpdateWordWebListSelectionState()">
+                    </div>
+                    <div class="mt-list-edit-num">${n + 1}</div>
+                    <div>
+                        <div class="mt-list-edit-label">영어</div>
+                        <div class="mt-list-edit-text">${mtEscapeHTML(String(row[engIdx] || ''))}</div>
+                        <div class="mt-list-edit-label" style="margin-top:5px;">보조문장</div>
+                        <div class="mt-list-edit-text">${mtEscapeHTML(String(row[subKorIdx] || ''))}</div>
+                    </div>
+                    <div>
+                        <div class="mt-list-edit-label">주문장</div>
+                        <div class="mt-list-edit-text">${mtEscapeHTML(String(row[mainKorIdx] || ''))}</div>
+                    </div>
+                `;
+                body.appendChild(div);
+            });
+        }
+        const selectAll = document.getElementById('mtWordWebListSelectAll');
+        if (selectAll) { selectAll.checked = false; selectAll.indeterminate = false; selectAll.disabled = valid.length === 0; }
+        const count = document.getElementById('mtWordWebListSelectedCount');
+        if (count) count.innerText = '0개 선택';
+        document.getElementById('mtWordWebListEditModal').style.display = 'flex';
+    }
+
+    function mtCloseWordWebListEditor() {
+        document.getElementById('mtWordWebListEditModal').style.display = 'none';
+    }
+
+    function mtGetWordWebListChecks() {
+        return Array.from(document.querySelectorAll('#mtWordWebListEditBody .mt-wordweb-list-check'));
+    }
+
+    function mtToggleWordWebListSelectAll(checkbox) {
+        mtGetWordWebListChecks().forEach(chk => chk.checked = !!checkbox.checked);
+        mtUpdateWordWebListSelectionState();
+    }
+
+    function mtUpdateWordWebListSelectionState() {
+        const checks = mtGetWordWebListChecks();
+        const selected = checks.filter(chk => chk.checked).length;
+        const selectAll = document.getElementById('mtWordWebListSelectAll');
+        const count = document.getElementById('mtWordWebListSelectedCount');
+        if (count) count.innerText = `${selected}개 선택`;
+        if (selectAll) {
+            selectAll.disabled = checks.length === 0;
+            selectAll.checked = checks.length > 0 && selected === checks.length;
+            selectAll.indeterminate = selected > 0 && selected < checks.length;
+        }
+    }
+
+    function mtDeleteSelectedWordWebWords() {
+        const state = mtWordWebGetState();
+        const selectedIndexes = mtGetWordWebListChecks().filter(chk => chk.checked).map(chk => Number(chk.dataset.index)).filter(Number.isInteger).sort((a,b)=>b-a);
+        if (!selectedIndexes.length) return alert('삭제할 문장을 선택해 주세요.');
+        if (!confirm(`선택한 ${selectedIndexes.length}개 문장을 삭제하시겠습니까?`)) return;
+        const serialIdx = mtWordWebGetPattern(state).serialCol - 1;
+        const removedSerials = new Set(selectedIndexes.map(i => String(state.outputRows[i]?.[serialIdx] || '')));
+        state.outputRows = state.outputRows.filter((_, idx) => !selectedIndexes.includes(idx));
+        state.starredSerials = (state.starredSerials || []).filter(s => !removedSerials.has(String(s)));
+        state.lastSession = null;
+        mtWordWebSaveState(state);
+        mtCloseWordWebListEditor();
+        mtInitSlots();
+        mtPromptAction('wordweb', mtWordWebBuildSlotData(state));
+    }
+
+    function mtWordWebApplyPatternToRows(rows, pattern) {
+        return Array.isArray(rows) ? rows.map(mtWordWebNormalizeRow) : [];
+    }
+
+    function mtWordWebIsKoreanLiteral(str) {
+        const text = String(str || '').trim();
+        return !!text && /[가-힣]/.test(text) && !/[A-Za-z]/.test(text) && /\[[^\]]*가-힣[^\]]*\]/.test(text);
+    }
+
+    async function mtWordWebRepairExistingLiteralColumns(state) {
+        const bad = [];
+        const pattern = mtWordWebGetPattern(state);
+        const engIdx = pattern.engCol - 1;
+        const mainKorIdx = pattern.mainKorCol - 1;
+        const subKorIdx = pattern.subKorCol - 1;
+        (state.outputRows || []).forEach((row, idx) => {
+            const eng = String(row?.[engIdx] || '').trim();
+            const kor = String(row?.[mainKorIdx] || '').trim();
+            const literal = String(row?.[subKorIdx] || '').trim();
+            if (eng && kor && !mtWordWebIsKoreanLiteral(literal)) bad.push({idx, eng, kor});
+        });
+        if (!bad.length) return;
+
+        const prompt = `Convert the following English sentences into Korean chunk-by-chunk direct-order translations.
+Return ONLY a JSON array with one object per item: {"index": number, "literal_korean": string}.
+literal_korean MUST contain ONLY Korean text inside square brackets, separated by spaces. NEVER include English letters.
+Examples:
+English: "How much is this old book?"
+Korean: "이 오래된 책은 얼마인가요?"
+literal_korean: "[얼마나] [이 오래된 책은] [인가요]"`;
+
+        const payload = bad.slice(0, 60).map(x => ({ index: x.idx, english: x.eng, korean: x.kor }));
+        const raw = await fetchGemini(prompt + `\nDATA:\n${JSON.stringify(payload)}`, {
+            type:'ARRAY', minItems: payload.length, maxItems: payload.length,
+            items:{type:'OBJECT', properties:{index:{type:'INTEGER'}, literal_korean:{type:'STRING'}}, required:['index','literal_korean']}
+        });
+        if (!raw) throw new Error('기존 C열 보조문장 교정 응답이 없습니다.');
+
+        let parsed;
+        try {
+            parsed = JSON.parse(String(raw).trim());
+        } catch {
+            const txt = String(raw).replace(/^```json\s*/i,'').replace(/\s*```$/,'').trim();
+            parsed = JSON.parse(txt);
+        }
+        for (const item of parsed) {
+            const idx = Number(item?.index);
+            const literal = String(item?.literal_korean || '').trim();
+            if (Number.isInteger(idx) && mtWordWebIsKoreanLiteral(literal) && state.outputRows[idx]) {
+                state.outputRows[idx][subKorIdx] = literal;
+            }
+        }
+    }
+
+    function mtWordWebRandomTopic(state) {
+        return state.topics[Math.floor(Math.random() * state.topics.length)]?.topic || '';
+    }
+
+    async function mtWordWebGenerateSix() {
+        if (mtWordWebBusy) return;
+        const state = mtWordWebGetState();
+        if (!state.topics.length || !state.fileName) return;
+
+        const topicInfo = state.topics[Math.floor(Math.random() * state.topics.length)];
+        const topic = topicInfo.topic;
+        mtWordWebBusy = true;
+        state.lastError = '';
+        mtWordWebSaveState(state);
+        mtWordWebRenderStatus();
+
+        try {
+            const promptText = `
+You are an expert dialogue writer and English teacher.
+Create a continuous, natural everyday conversation between 2 people based on this topic: "${topic}"
+
+Strict Rules:
+1. Level: CEFR A2 (basic, everyday English).
+2. Length: EXACTLY 6 sentences in total. It must flow logically from sentence 1 to 6 as a single conversation.
+3. NO SPEAKER LABELS: Do NOT write "A:", "B:", "Person 1:", etc. Just write the sentences themselves.
+4. Output Format: MUST be a valid JSON array containing exactly 6 objects.
+5. Keys required in each object:
+   - "english": The A2 level English sentence.
+   - "korean": A natural Korean translation.
+   - "literal_korean": MUST be Korean-only chunked direct-order translation using square brackets [].
+
+Guidelines for "literal_korean" (Chunk-by-chunk):
+- This field is NOT English. Every chunk must be written in Korean.
+- Preserve the phrase/chunk order of the English sentence as much as Korean allows, but express each chunk naturally in Korean.
+- Separate every meaningful chunk with square brackets and spaces.
+- Do not include the English sentence, English words, Roman letters, or Korean-English mixed chunks in this field.
+- Example: "I ate breakfast in the morning." -> "[나는 먹었다] [아침을] [오전에]"
+- Example: "Without thinking, I looked out the window." -> "[생각 없이,] [나는 내다보았다] [창밖을]"
+
+Expected JSON Format:
+[
+  {
+    "english": "Sentence 1...",
+    "korean": "자연스러운 해석 1...",
+    "literal_korean": "[나는 먹었다] [밥을] [오전에]"
+  }
+]
+`;
+            const raw = await fetchGemini(promptText, {
+                type: 'ARRAY',
+                minItems: 6,
+                maxItems: 6,
+                items: {
+                    type: 'OBJECT',
+                    properties: {
+                        english: { type: 'STRING' },
+                        korean: { type: 'STRING' },
+                        literal_korean: { type: 'STRING' }
+                    },
+                    required: ['english', 'korean', 'literal_korean']
+                }
+            });
+            if (!raw) throw new Error('Gemini 응답이 없습니다.');
+
+            let text = String(raw || '').trim();
+            if (text.startsWith('```')) {
+                text = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
+            }
+
+            // Gemini가 JSON 뒤에 설명/추가 텍스트를 붙이거나, JSON이 두 번 이어져도
+            // 첫 번째 완전한 JSON 배열만 안전하게 추출합니다.
+            function extractFirstJsonArray(source) {
+                const start = source.indexOf('[');
+                if (start < 0) throw new Error('AI 응답에서 JSON 배열 시작을 찾지 못했습니다.');
+
+                let depth = 0;
+                let inString = false;
+                let escaped = false;
+
+                for (let i = start; i < source.length; i++) {
+                    const ch = source[i];
+
+                    if (inString) {
+                        if (escaped) {
+                            escaped = false;
+                        } else if (ch === '\\') {
+                            escaped = true;
+                        } else if (ch === '"') {
+                            inString = false;
+                        }
+                        continue;
+                    }
+
+                    if (ch === '"') {
+                        inString = true;
+                        continue;
+                    }
+                    if (ch === '[') depth++;
+                    else if (ch === ']') {
+                        depth--;
+                        if (depth === 0) return source.slice(start, i + 1);
+                    }
+                }
+
+                throw new Error('AI 응답의 JSON 배열이 완전히 닫히지 않았습니다.');
+            }
+
+            const jsonText = extractFirstJsonArray(text);
+            let resultList;
+            try {
+                resultList = JSON.parse(jsonText);
+            } catch (parseError) {
+                throw new Error(`AI JSON 파싱 실패: ${parseError.message}`);
+            }
+
+            if (!Array.isArray(resultList) || resultList.length !== 6) {
+                throw new Error('AI 응답이 정확히 6문장이 아닙니다.');
+            }
+
+            resultList.forEach((item, idx) => {
+                const literal = String(item?.literal_korean || '').trim();
+                if (!mtWordWebIsKoreanLiteral(literal)) {
+                    throw new Error(`보조문장 ${idx + 1}번이 한국어 직독직해 청크 형식이 아닙니다.`);
+                }
+            });
+
+            const pattern = mtWordWebGetPattern(state);
+            const currentX = mtWordWebFindNextSerial(state.outputRows, state);
+            const newRows = resultList.map((item, index) => {
+                const maxCol = Math.max(pattern.engCol, pattern.mainKorCol, pattern.subKorCol, pattern.serialCol, pattern.topicOutputCol);
+                const row = Array(maxCol).fill('');
+                row[pattern.engCol - 1] = String(item.english || '');
+                row[pattern.mainKorCol - 1] = String(item.korean || '');
+                row[pattern.subKorCol - 1] = String(item.literal_korean || '');
+                row[pattern.serialCol - 1] = `${currentX}-${index + 1}`;
+                row[pattern.topicOutputCol - 1] = topic;
+                return row;
+            });
+
+            state.outputRows.push(...newRows);
+            state.lastRun = Date.now();
+            state.nextRun = Date.now() + MT_WORDWEB_INTERVAL_MS;
+            state.totalGenerated = Number(state.totalGenerated || 0) + 1;
+            state.lastError = '';
+            mtWordWebSaveState(state);
+            mtWordWebRenderStatus('6문장 생성 완료');
+            mtInitSlots();
+        } catch (error) {
+            state.lastRun = Date.now();
+            state.nextRun = Date.now() + MT_WORDWEB_INTERVAL_MS;
+            state.lastError = String(error?.message || error).substring(0, 180);
+            mtWordWebSaveState(state);
+            mtWordWebRenderStatus();
+            console.error('[워드웹회화]', error);
+        } finally {
+            mtWordWebBusy = false;
+        }
+    }
+
+    function mtWordWebStartAutoTrigger(resetNextRun = false) {
+        if (mtWordWebTimerId) clearTimeout(mtWordWebTimerId);
+        const state = mtWordWebGetState();
+        if (!state.fileName || !state.topics.length) return;
+        if (resetNextRun || !state.nextRun) {
+            state.nextRun = Date.now() + MT_WORDWEB_INTERVAL_MS;
+            mtWordWebSaveState(state);
+        }
+
+        const delay = Math.max(1000, Number(state.nextRun) - Date.now());
+        mtWordWebTimerId = setTimeout(async () => {
+            await mtWordWebGenerateSix();
+            mtWordWebStartAutoTrigger(false);
+        }, delay);
+        mtWordWebRenderStatus();
+    }
+
+    function mtWordWebDownloadClick(event) {
+        if (event) event.stopPropagation();
+        mtWordWebDownload();
+    }
+
+    function mtWordWebDownload() {
+        const state = mtWordWebGetState();
+        if (!state.fileName) return;
+        const wb = XLSX.utils.book_new();
+        const topicAoA = Array.isArray(state.topicRows) && state.topicRows.length
+            ? state.topicRows
+            : state.topics.map(x => {
+                const parts = x.topic.split(' - ');
+                return [parts[0] || '', parts[1] || '', parts.slice(2).join(' - ') || ''];
+            });
+        const pattern = mtWordWebGetPattern(state);
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(topicAoA), pattern.topicSheet);
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(state.outputRows), pattern.outputSheet);
+        const baseName = state.fileName.replace(/\.(xlsx|xls)$/i, '');
+        XLSX.writeFile(wb, `${baseName}_워드웹회화.xlsx`);
     }
 
     function mtTriggerUpload(slotIndex) {
@@ -3787,8 +4510,15 @@ Rules:
 
     function mtDeleteSlot(event, slotIndex) {
         event.stopPropagation(); 
-        if(confirm(`${slotIndex === 'naver' ? '네이버영어회화의 모든 누적 데이터를' : `슬롯 ${slotIndex}의 데이터`} 삭제하시겠습니까?`)) {
-            localStorage.removeItem(mtGetSlotStorageKey(slotIndex));
+        const label = slotIndex === 'naver' ? '네이버영어회화의 모든 누적 데이터를' : (slotIndex === 'wordweb' ? '워드웹회화의 모든 데이터를' : `슬롯 ${slotIndex}의 데이터`);
+        if(confirm(`${label} 삭제하시겠습니까?`)) {
+            if (slotIndex === 'wordweb') {
+                localStorage.removeItem(MT_WORDWEB_STORAGE_KEY);
+                if (mtWordWebTimerId) clearTimeout(mtWordWebTimerId);
+                mtWordWebTimerId = null;
+            } else {
+                localStorage.removeItem(mtGetSlotStorageKey(slotIndex));
+            }
             mtInitSlots();
         }
     }
@@ -3799,6 +4529,12 @@ Rules:
 
         mtCurrentUploadedFileName = file.name.replace(/\.[^/.]+$/, ""); 
         let ext = file.name.split('.').pop().toLowerCase();
+        if (mtActiveSlotIndex === 'wordweb') {
+            mtWordWebHandleFile(file);
+            e.target.value = '';
+            return;
+        }
+
         let reader = new FileReader();
 
         if (ext === 'txt') {
@@ -3971,6 +4707,9 @@ Rules:
 
     function mtOpenOptionsModal(slotIndex, slotData) {
         mtActiveSlotIndex = slotIndex;
+        if (slotIndex === 'wordweb') {
+            slotData = mtWordWebBuildSlotData(mtWordWebGetState());
+        }
         mtOriginalSlotData = slotData;
 
         document.getElementById('mtModalSlotTitle').innerText = slotData.name;
@@ -4050,8 +4789,15 @@ Rules:
 
         let currentWord = mtCurrentStudyWords[index];
 
-        let safeKor = mtEscapeHTML(currentWord.kor);
-        let formattedKor = safeKor.replace(/\s*(\([^)]+\))/g, '<br><span class="mt-paren-text">$1</span>');
+        const mainKor = String(currentWord.kor || '').trim();
+        const subKor = String(currentWord.subKor || currentWord.literalKor || '').trim();
+
+        let formattedKor = mtEscapeHTML(mainKor);
+        if (subKor) {
+            formattedKor += `<br><span class="mt-paren-text">${mtEscapeHTML(subKor)}</span>`;
+        } else {
+            formattedKor = formattedKor.replace(/\s*(\([^)]+\))/g, '<br><span class="mt-paren-text">$1</span>');
+        }
 
         document.getElementById('mtKorText').innerHTML = formattedKor;
         document.getElementById('mtEngInput').value = '';
@@ -4059,7 +4805,7 @@ Rules:
 
         document.getElementById('mtStarBtn').innerText = currentWord.starred ? '★' : '☆';
 
-        let realSerialNumber = currentWord.originalIndex + 1;
+        let realSerialNumber = currentWord.serial || (currentWord.originalIndex + 1);
         document.getElementById('mtProgressText').innerText = `[${realSerialNumber}] ${index + 1} / ${mtCurrentStudyWords.length}`;
 
         mtRenderMask('');
@@ -4107,6 +4853,15 @@ Rules:
                     localStorage.setItem(mtGetSlotStorageKey(srcSlot), JSON.stringify(parsed));
                 }
             }
+        } else if (mtActiveSlotIndex === 'wordweb') {
+            const state = mtWordWebGetState();
+            const serial = String(currentWord.serial || '').trim();
+            state.starredSerials = Array.isArray(state.starredSerials) ? state.starredSerials.map(String) : [];
+            const set = new Set(state.starredSerials);
+            if (currentWord.starred) set.add(serial);
+            else set.delete(serial);
+            state.starredSerials = Array.from(set);
+            mtWordWebSaveState(state);
         } else {
             mtOriginalSlotData.words[currentWord.originalIndex].starred = currentWord.starred;
             localStorage.setItem(mtGetSlotStorageKey(mtActiveSlotIndex), JSON.stringify(mtOriginalSlotData));
@@ -4978,6 +5733,8 @@ Rules:
             // 타이핑 to 언마스크 초기화 (슬롯 불러오기 연동)
             mtApplyFontSettings();
             if (typeof mtInitSlots === 'function') mtInitSlots();
+            // 저장된 워드웹회화가 있으면 페이지 재진입 후에도 5분 자동 트리거를 복구합니다.
+            if (typeof mtWordWebStartAutoTrigger === 'function') mtWordWebStartAutoTrigger(false);
         } catch (error) {
             // 초기화 중 한 모듈이 실패해도 다른 기능까지 중단하지 않습니다.
             console.error('앱 초기화 중 일부 기능 오류:', error);
