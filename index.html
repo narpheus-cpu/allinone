@@ -531,6 +531,22 @@
             color: #111827;
             word-break: break-word;
         }
+        .mt-wordweb-edit-input {
+            width: 100%;
+            box-sizing: border-box;
+            min-height: 54px;
+            resize: vertical;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 8px;
+            font-size: 12px;
+            line-height: 1.45;
+            color: #111827;
+            background: #fff;
+            outline: none;
+            font-family: inherit;
+        }
+        .mt-wordweb-edit-input:focus { border-color: #111827; }
         .mt-list-edit-empty {
             text-align: center;
             padding: 48px 20px;
@@ -1148,6 +1164,7 @@
                         <span class="mt-list-edit-count" id="mtWordWebListSelectedCount">0개 선택</span>
                     </div>
                     <div class="mt-list-edit-toolbar-right">
+                        <button class="btn-primary" style="padding:7px 12px;" onclick="mtSaveAllWordWebEdits()">수정 내용 전체 저장</button>
                         <button class="btn-danger" style="padding:7px 12px;" onclick="mtDeleteSelectedWordWebWords()">선택 삭제</button>
                     </div>
                 </div>
@@ -4183,20 +4200,24 @@ Rules:
             valid.forEach(({row, idx}, n) => {
                 const div = document.createElement('div');
                 div.className = 'mt-list-edit-row';
+                div.style.gridTemplateColumns = '28px 44px minmax(0, 1fr) minmax(0, 1fr)';
                 div.innerHTML = `
-                    <div style="padding-top:2px; text-align:center;">
+                    <div style="padding-top:4px; text-align:center;">
                         <input type="checkbox" class="mt-wordweb-list-check" data-index="${idx}" onchange="mtUpdateWordWebListSelectionState()">
                     </div>
                     <div class="mt-list-edit-num">${n + 1}</div>
                     <div>
-                        <div class="mt-list-edit-label">영어</div>
-                        <div class="mt-list-edit-text">${mtEscapeHTML(String(row[engIdx] || ''))}</div>
-                        <div class="mt-list-edit-label" style="margin-top:5px;">보조문장</div>
-                        <div class="mt-list-edit-text">${mtEscapeHTML(String(row[subKorIdx] || ''))}</div>
+                        <div class="mt-list-edit-label">영어문장</div>
+                        <textarea class="mt-wordweb-edit-input" data-field="eng" data-index="${idx}" rows="3">${mtEscapeHTML(String(row[engIdx] || ''))}</textarea>
+                        <div class="mt-list-edit-label" style="margin-top:7px;">보조문장</div>
+                        <textarea class="mt-wordweb-edit-input" data-field="subKor" data-index="${idx}" rows="3" placeholder="예: [제발] [스트레칭하세요] [당신의 팔들을] [조심스럽게]">${mtEscapeHTML(String(row[subKorIdx] || ''))}</textarea>
                     </div>
                     <div>
                         <div class="mt-list-edit-label">주문장</div>
-                        <div class="mt-list-edit-text">${mtEscapeHTML(String(row[mainKorIdx] || ''))}</div>
+                        <textarea class="mt-wordweb-edit-input" data-field="mainKor" data-index="${idx}" rows="5">${mtEscapeHTML(String(row[mainKorIdx] || ''))}</textarea>
+                        <div style="display:flex; justify-content:flex-end; margin-top:8px;">
+                            <button class="btn-primary" style="padding:6px 10px;" onclick="mtSaveWordWebEditedRow(${idx})">이 문장 저장</button>
+                        </div>
                     </div>
                 `;
                 body.appendChild(div);
@@ -4215,6 +4236,58 @@ Rules:
 
     function mtGetWordWebListChecks() {
         return Array.from(document.querySelectorAll('#mtWordWebListEditBody .mt-wordweb-list-check'));
+    }
+
+    function mtGetWordWebEditedValue(index, field) {
+        const el = document.querySelector(`#mtWordWebListEditBody .mt-wordweb-edit-input[data-index="${index}"][data-field="${field}"]`);
+        return el ? String(el.value || '').trim() : '';
+    }
+
+    function mtValidateWordWebEdit(eng, mainKor, subKor) {
+        if (!eng) return '영어문장을 입력해 주세요.';
+        if (!mainKor) return '주문장을 입력해 주세요.';
+        if (!subKor) return '보조문장을 입력해 주세요.';
+        if (!mtWordWebIsKoreanChunkList(subKor)) {
+            return '보조문장은 [한국어 청크] [한국어 청크] 형식이어야 합니다.\n예: [제발] [스트레칭하세요] [당신의 팔들을] [조심스럽게]';
+        }
+        return '';
+    }
+
+    function mtSaveWordWebEditedRow(index, silent = false) {
+        const state = mtWordWebGetState();
+        const pattern = mtWordWebGetPattern(state);
+        const row = state.outputRows[index];
+        if (!row) return false;
+
+        const eng = mtGetWordWebEditedValue(index, 'eng');
+        const mainKor = mtGetWordWebEditedValue(index, 'mainKor');
+        const subKor = mtGetWordWebEditedValue(index, 'subKor');
+        const error = mtValidateWordWebEdit(eng, mainKor, subKor);
+        if (error) {
+            if (!silent) alert(error);
+            return false;
+        }
+
+        row[pattern.engCol - 1] = eng;
+        row[pattern.mainKorCol - 1] = mainKor;
+        row[pattern.subKorCol - 1] = subKor;
+        state.lastSession = null;
+        state.lastError = '';
+        mtWordWebSaveState(state);
+        return true;
+    }
+
+    function mtSaveAllWordWebEdits() {
+        const checks = mtGetWordWebListChecks();
+        const indexes = checks.map(chk => Number(chk.dataset.index)).filter(Number.isInteger);
+        if (!indexes.length) return alert('수정할 문장이 없습니다.');
+        for (const index of indexes) {
+            if (!mtSaveWordWebEditedRow(index, false)) return;
+        }
+        mtCloseWordWebListEditor();
+        mtInitSlots();
+        mtPromptAction('wordweb', mtWordWebBuildSlotData(mtWordWebGetState()));
+        alert(`${indexes.length}개 문장의 수정 내용이 저장되었습니다.`);
     }
 
     function mtToggleWordWebListSelectAll(checkbox) {
@@ -5893,7 +5966,7 @@ Do not include any direct-reading chunks in this step.`;
     /* ========================================== */
     // 코드 파일을 직접 수정했을 때만 이 값을 갱신합니다.
     // 페이지 실행 시각, AI 자동생성 시각, 엑셀 등록 시각 등은 이 값을 변경하지 않습니다.
-    const APP_BUILD_TIMESTAMP = '20260817174300';
+    const APP_BUILD_TIMESTAMP = '20260817185800';
 
     function mtSetAppUpdateTimestamp() {
         const el = document.getElementById('appUpdateTimestamp');
