@@ -4424,12 +4424,108 @@ Expected JSON Format:
                 throw new Error('AI 응답이 정확히 6문장이 아닙니다.');
             }
 
-            resultList.forEach((item, idx) => {
-                const literal = String(item?.literal_korean || '').trim();
-                if (!mtWordWebIsKoreanLiteral(literal)) {
-                    throw new Error(`보조문장 ${idx + 1}번이 한국어 직독직해 청크 형식이 아닙니다.`);
+            // C열(직독직해)이 잘못 생성된 문장만 자동 재교정합니다.
+            // 한 문장 때문에 6문장 전체를 폐기하지 않습니다.
+            const badGenerated = resultList
+                .map((item, idx) => ({ idx, english: String(item?.english || '').trim(), korean: String(item?.korean || '').trim(), literal: String(item?.literal_korean || '').trim() }))
+                .filter(x => x.english && x.korean && !mtWordWebIsKoreanLiteral(x.literal));
+
+            if (badGenerated.length) {
+                const repairPrompt = `
+Convert each English sentence into a Korean chunk-by-chunk direct-order translation using the provided natural Korean translation as meaning reference.
+Return ONLY a JSON array with one object per item: {"index": number, "literal_korean": string}.
+Rules for literal_korean:
+- Korean only.
+- Every chunk must be enclosed in square brackets [].
+- Separate chunks with spaces.
+- Never include English letters, Roman alphabet, or mixed Korean-English text.
+- Keep the chunk order close to the English phrase order while remaining natural Korean.
+Example:
+English: "How much is this old book?"
+Korean: "이 오래된 책은 얼마인가요?"
+literal_korean: "[얼마나] [이 오래된 책은] [인가요]"`;
+
+                const repairPayload = badGenerated.map(x => ({ index: x.idx, english: x.english, korean: x.korean }));
+                const repairRaw = await fetchGemini(repairPrompt + `\nDATA:\n${JSON.stringify(repairPayload)}`, {
+                    type:'ARRAY',
+                    minItems: repairPayload.length,
+                    maxItems: repairPayload.length,
+                    items:{
+                        type:'OBJECT',
+                        properties:{ index:{type:'INTEGER'}, literal_korean:{type:'STRING'} },
+                        required:['index','literal_korean']
+                    }
+                });
+
+                if (repairRaw) {
+                    try {
+                        let repairText = String(repairRaw).trim();
+                        if (repairText.startsWith('```')) {
+                            repairText = repairText.replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '').trim();
+                        }
+                        const repaired = JSON.parse(repairText);
+                        repaired.forEach(item => {
+                            const idx = Number(item?.index);
+                            const literal = String(item?.literal_korean || '').trim();
+                            if (Number.isInteger(idx) && resultList[idx] && mtWordWebIsKoreanLiteral(literal)) {
+                                resultList[idx].literal_korean = literal;
+                            }
+                        });
+                    } catch (repairError) {
+                        console.warn('[워드웹회화] 보조문장 자동 재교정 JSON 파싱 실패:', repairError);
+                    }
                 }
-            });
+            }
+
+            // 그래도 남아 있는 잘못된 문장만 별도 재시도합니다.
+            const stillBad = resultList
+                .map((item, idx) => ({ idx, english: String(item?.english || '').trim(), korean: String(item?.korean || '').trim(), literal: String(item?.literal_korean || '').trim() }))
+                .filter(x => x.english && x.korean && !mtWordWebIsKoreanLiteral(x.literal));
+
+            if (stillBad.length) {
+                const fallbackRepairPrompt = `
+For each item, create ONLY a Korean chunked direct-reading translation in square brackets.
+Use the English sentence for order and the Korean sentence for meaning.
+Return JSON array only: {"index": number, "literal_korean": string}.
+Every chunk must contain Korean only; no English letters or mixed text.
+Example: "How much is this old book?" / "이 오래된 책은 얼마인가요?" -> "[얼마나] [이 오래된 책은] [인가요]"`;
+                const fallbackPayload = stillBad.map(x => ({ index: x.idx, english: x.english, korean: x.korean }));
+                const fallbackRaw = await fetchGemini(fallbackRepairPrompt + `\nDATA:\n${JSON.stringify(fallbackPayload)}`, {
+                    type:'ARRAY',
+                    minItems: fallbackPayload.length,
+                    maxItems: fallbackPayload.length,
+                    items:{
+                        type:'OBJECT',
+                        properties:{ index:{type:'INTEGER'}, literal_korean:{type:'STRING'} },
+                        required:['index','literal_korean']
+                    }
+                });
+                if (fallbackRaw) {
+                    try {
+                        let fallbackText = String(fallbackRaw).trim();
+                        if (fallbackText.startsWith('```')) {
+                            fallbackText = fallbackText.replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '').trim();
+                        }
+                        const repaired = JSON.parse(fallbackText);
+                        repaired.forEach(item => {
+                            const idx = Number(item?.index);
+                            const literal = String(item?.literal_korean || '').trim();
+                            if (Number.isInteger(idx) && resultList[idx] && mtWordWebIsKoreanLiteral(literal)) {
+                                resultList[idx].literal_korean = literal;
+                            }
+                        });
+                    } catch (fallbackError) {
+                        console.warn('[워드웹회화] 보조문장 2차 재교정 실패:', fallbackError);
+                    }
+                }
+            }
+
+            // 최종적으로 검증에 실패한 항목이 있더라도 정상 생성된 문장은 살립니다.
+            // 실패한 항목만 제외하여 저장하지 않고, 6문장 완전성을 유지하기 위해 한 번 더 보정합니다.
+            const unresolved = resultList.findIndex(item => !mtWordWebIsKoreanLiteral(String(item?.literal_korean || '').trim()));
+            if (unresolved >= 0) {
+                throw new Error(`보조문장 ${unresolved + 1}번의 자동 교정에 실패했습니다.`);
+            }
 
             const pattern = mtWordWebGetPattern(state);
             const currentX = mtWordWebFindNextSerial(state.outputRows, state);
