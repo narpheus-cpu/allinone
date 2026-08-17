@@ -1516,7 +1516,11 @@
     // ★  ※ 자동생성 / 엑셀등록 / 데이터저장 / 페이지 실행으로는 변경되지 않습니다. ★
     // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
     // ============================================================================
-    const APP_BUILD_TIMESTAMP = '20260817204900';
+    // ============================================================================
+    // ★ 최근 코드 업데이트 시각: 20260817205700
+    // ★ ※ 코드를 직접 수정할 때마다 위 시간값도 변경하세요.
+    // ============================================================================
+    const APP_BUILD_TIMESTAMP = '20260817205700';
     
         /* ========================================== */
     /* [신규 기능] AI 도움 프롬프트 통합 템플릿 관리   */
@@ -5395,6 +5399,23 @@ Example:
         mtSaveSessionState();
     }
 
+    function mtIsAlwaysVisibleChunkPunctuation(target, index) {
+        const char = target[index];
+        if (char === "'" || char === '’' || char === '-' || char === '–' || char === '—') return true;
+
+        // 문장 맨 마지막에 붙는 마침표/느낌표/물음표는 마스킹하지 않습니다.
+        const lastNonSpace = target.search(/\S\s*$/) === -1 ? -1 : target.trimEnd().length - 1;
+        return index === lastNonSpace && /[.!?]/.test(char);
+    }
+
+    function mtGetChunkMaskTarget(target) {
+        let result = '';
+        for (let i = 0; i < target.length; i++) {
+            if (!mtIsAlwaysVisibleChunkPunctuation(target, i)) result += target[i];
+        }
+        return result;
+    }
+
     function mtRenderMask(typedStr) {
         const currentWord = mtCurrentStudyWords[mtCurrentIndex];
         if (!currentWord) return;
@@ -5404,10 +5425,12 @@ Example:
         if (!container) return;
         container.innerHTML = '';
 
-        // 청크별 마스킹: 공백 기준으로 나눈 각 영어 토큰을 하나의 검정 막대로 표시합니다.
-        // 막대 폭은 실제 토큰의 글자 수에 비례하며, 개별 글자는 보이지 않습니다.
+        // 청크별 마스킹: 공백으로 구분된 각 영어 청크를 하나의 검정 막대로 표시합니다.
+        // 단, 중간의 어퍼스트러피/대시는 항상 보이고, 문장 끝의 . ! ? 도 항상 보입니다.
         if (mtMaskMode === 'chunk') {
             const tokenRegex = /\S+/g;
+            const maskTarget = mtGetChunkMaskTarget(targetStr);
+            let maskCursor = 0;
             let match;
             let lastEnd = 0;
             let row = document.createElement('div');
@@ -5415,39 +5438,68 @@ Example:
 
             while ((match = tokenRegex.exec(targetStr)) !== null) {
                 if (match.index > lastEnd) {
+                    const between = targetStr.slice(lastEnd, match.index);
                     const spacer = document.createElement('span');
                     spacer.className = 'mt-space';
+                    spacer.textContent = between;
                     container.appendChild(row);
                     container.appendChild(spacer);
                     row = document.createElement('div');
                     row.className = 'mt-word-wrapper';
+                    maskCursor += between.length;
                 }
 
                 const start = match.index;
                 const end = match.index + match[0].length;
                 const token = match[0];
-                const isComplete = typedStr.length >= end;
-                const revealedByHint = Array.from({length: token.length}, (_, n) => mtRevealedSet.has(start + n)).every(Boolean);
+                let segment = '';
+                let segmentStart = null;
 
-                if (isComplete || revealedByHint) {
-                    const span = document.createElement('span');
-                    span.className = 'mt-revealed-text' + (revealedByHint && !isComplete ? ' hint' : '');
-                    span.textContent = token;
-                    row.appendChild(span);
-                } else {
-                    const bar = document.createElement('span');
-                    bar.className = 'mt-chunk-mask-box';
-                    // 글자 수에 비례한 폭. 너무 짧은 청크도 클릭 가능하도록 최소폭을 둡니다.
-                    const width = Math.max(20, token.length * Math.max(7, mtEngBoxSize * 0.48));
-                    bar.style.width = `${width}px`;
-                    bar.title = '클릭하면 이 청크를 힌트로 표시합니다.';
-                    bar.onclick = function() {
-                        for (let i = start; i < end; i++) mtRevealedSet.add(i);
-                        mtRenderMask(document.getElementById('mtEngInput').value);
-                        document.getElementById('mtEngInput').focus();
-                    };
-                    row.appendChild(bar);
+                const appendBar = (barStart, barEnd) => {
+                    if (barStart === null || barEnd <= barStart) return;
+                    const barText = targetStr.slice(barStart, barEnd);
+                    const maskStart = maskTarget.indexOf(barText, maskCursor);
+                    const effectiveMaskStart = maskStart >= 0 ? maskStart : maskCursor;
+                    const effectiveMaskEnd = effectiveMaskStart + barText.length;
+                    const isComplete = typedStr.length >= effectiveMaskEnd;
+                    const allHinted = Array.from({length: barText.length}, (_, n) => mtRevealedSet.has(barStart + n)).every(Boolean);
+
+                    if (isComplete || allHinted) {
+                        const span = document.createElement('span');
+                        span.className = 'mt-revealed-text' + (allHinted && !isComplete ? ' hint' : '');
+                        span.textContent = barText;
+                        row.appendChild(span);
+                    } else {
+                        const bar = document.createElement('span');
+                        bar.className = 'mt-chunk-mask-box';
+                        const width = Math.max(20, barText.length * Math.max(7, mtEngBoxSize * 0.48));
+                        bar.style.width = `${width}px`;
+                        bar.title = '클릭하면 이 부분을 힌트로 표시합니다.';
+                        bar.onclick = function() {
+                            for (let i = barStart; i < barEnd; i++) mtRevealedSet.add(i);
+                            mtRenderMask(document.getElementById('mtEngInput').value);
+                            document.getElementById('mtEngInput').focus();
+                        };
+                        row.appendChild(bar);
+                    }
+                    maskCursor = effectiveMaskEnd;
+                };
+
+                for (let i = 0; i < token.length; i++) {
+                    const absIndex = start + i;
+                    const char = token[i];
+                    if (mtIsAlwaysVisibleChunkPunctuation(targetStr, absIndex)) {
+                        appendBar(segmentStart, absIndex);
+                        segmentStart = null;
+                        const punct = document.createElement('span');
+                        punct.className = 'mt-unmasked-punct';
+                        punct.textContent = char;
+                        row.appendChild(punct);
+                    } else if (segmentStart === null) {
+                        segmentStart = absIndex;
+                    }
                 }
+                appendBar(segmentStart, end);
                 lastEnd = end;
             }
 
@@ -5528,10 +5580,11 @@ Example:
             mtInputEl.addEventListener('input', function(e) {
                 let typed = this.value;
                 let target = mtCurrentStudyWords[mtCurrentIndex].eng;
+                let typingTarget = mtMaskMode === 'chunk' ? mtGetChunkMaskTarget(target) : target;
 
                 let validLength = 0;
                 for (let i = 0; i < typed.length; i++) {
-                    if (typed[i].toLowerCase() === target[i].toLowerCase()) {
+                    if (typed[i].toLowerCase() === typingTarget[i].toLowerCase()) {
                         validLength++;
                     } else {
                         break;
@@ -5546,8 +5599,9 @@ Example:
                 if (e.key === 'Enter') {
                     let target = mtCurrentStudyWords[mtCurrentIndex].eng;
                     let typed = this.value;
+                    let typingTarget = mtMaskMode === 'chunk' ? mtGetChunkMaskTarget(target) : target;
 
-                    let remaining = target.substring(typed.length);
+                    let remaining = typingTarget.substring(typed.length);
                     let isMaskingLeft = /[a-zA-Z0-9]/.test(remaining);
 
                     if (!isMaskingLeft) {
