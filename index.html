@@ -5408,6 +5408,8 @@ Example:
         return index === lastNonSpace && /[.!?]/.test(char);
     }
 
+    // 청크별 마스킹에서는 이 함수가 '표시용 마스킹 대상' 계산에만 사용됩니다.
+    // 실제 입력 검사는 원문 전체(target)를 사용하므로 ', -, ., !, ?, 쉼표 등도 그대로 입력할 수 있습니다.
     function mtGetChunkMaskTarget(target) {
         let result = '';
         for (let i = 0; i < target.length; i++) {
@@ -5580,7 +5582,7 @@ Example:
             mtInputEl.addEventListener('input', function(e) {
                 let typed = this.value;
                 let target = mtCurrentStudyWords[mtCurrentIndex].eng;
-                let typingTarget = mtMaskMode === 'chunk' ? mtGetChunkMaskTarget(target) : target;
+                let typingTarget = target;
 
                 let validLength = 0;
                 for (let i = 0; i < typed.length; i++) {
@@ -5599,12 +5601,11 @@ Example:
                 if (e.key === 'Enter') {
                     let target = mtCurrentStudyWords[mtCurrentIndex].eng;
                     let typed = this.value;
-                    let typingTarget = mtMaskMode === 'chunk' ? mtGetChunkMaskTarget(target) : target;
+                    let typingTarget = target;
 
-                    let remaining = typingTarget.substring(typed.length);
-                    let isMaskingLeft = /[a-zA-Z0-9]/.test(remaining);
+                    let isComplete = typed.length >= typingTarget.length;
 
-                    if (!isMaskingLeft) {
+                    if (isComplete) {
                         mtNextWord();
                     }
                 } else if (e.key === 'PageUp') {
