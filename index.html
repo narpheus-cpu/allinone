@@ -1520,7 +1520,7 @@
     // ★ 최근 코드 업데이트 시각: 20260817205700
     // ★ ※ 코드를 직접 수정할 때마다 위 시간값도 변경하세요.
     // ============================================================================
-    const APP_BUILD_TIMESTAMP = '20260817205700';
+    const APP_BUILD_TIMESTAMP = '20260817212650';
     
         /* ========================================== */
     /* [신규 기능] AI 도움 프롬프트 통합 템플릿 관리   */
@@ -5599,11 +5599,15 @@ Example:
 
             mtInputEl.addEventListener('keydown', function(e) {
                 if (e.key === 'Enter') {
+                    e.preventDefault();
                     let target = mtCurrentStudyWords[mtCurrentIndex].eng;
                     let typed = this.value;
-                    let typingTarget = target;
 
-                    let isComplete = typed.length >= typingTarget.length;
+                    // 문장 끝의 구두점(. ! ? 。 ！ ？)은 입력하지 않아도 정답 처리합니다.
+                    // 중간의 어퍼스트러피, 쉼표, 대시 등은 그대로 입력해야 합니다.
+                    const typingTarget = target.replace(/[.!?。！？]+\s*$/, '');
+                    const isComplete = typed.toLowerCase() === typingTarget.toLowerCase() ||
+                                       typed.toLowerCase() === target.toLowerCase();
 
                     if (isComplete) {
                         mtNextWord();
