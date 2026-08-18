@@ -1246,10 +1246,10 @@
 
         <!-- 슬롯9 목록 편집 모달 -->
         <div id="mtSlot9ListEditModal" class="mt-list-edit-panel" onclick="if(event.target===this) mtCloseSlot9ListEditor()">
-            <div class="mt-list-edit-card">
+            <div class="mt-list-edit-card" style="width:min(760px,100%); max-width:760px;">
                 <div class="mt-list-edit-head"><div class="mt-list-edit-head-title">슬롯9 목록편집</div><button class="btn-excel" style="padding:6px 10px;" onclick="mtCloseSlot9ListEditor()">닫기</button></div>
                 <div class="mt-list-edit-toolbar"><div class="mt-list-edit-toolbar-left"><span class="mt-list-edit-count" id="mtSlot9ListSelectedCount">0개</span></div></div>
-                <div class="mt-list-edit-body" id="mtSlot9ListEditBody"></div>
+                <div class="mt-list-edit-body" id="mtSlot9ListEditBody" style="width:100%; box-sizing:border-box;"></div>
                 <div style="display:flex;justify-content:center;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 16px;border-top:1px solid var(--border-color);background:#fafafa;">
                     <button class="btn-excel" style="padding:6px 10px;" onclick="mtSlot9ListChangePage(-1)">이전</button>
                     <input type="number" id="mtSlot9ListPageInput" min="1" value="1" style="width:52px;text-align:center;padding:5px 6px;font-size:12px;font-weight:700;border:1px solid var(--border-color);border-radius:6px;" onkeydown="if(event.key==='Enter') mtSlot9ListJumpPage(this.value)">
@@ -1577,10 +1577,10 @@
 
 <script>
     // ============================================================================
-    // ★ 최근 코드 업데이트 시각: 20260818220430
+    // ★ 최근 코드 업데이트 시각: 20260818221610
     // ★ ※ 코드를 직접 수정할 때마다 위 시간값도 변경하세요.
     // ============================================================================
-    const APP_BUILD_TIMESTAMP = '20260818220430';
+    const APP_BUILD_TIMESTAMP = '20260818221610';
     
         /* ========================================== */
     /* [신규 기능] AI 도움 프롬프트 통합 템플릿 관리   */
