@@ -1577,10 +1577,10 @@
 
 <script>
     // ============================================================================
-    // ★ 최근 코드 업데이트 시각: 20260818224500
+    // ★ 최근 코드 업데이트 시각: 202608190127
     // ★ ※ 코드를 직접 수정할 때마다 위 시간값도 변경하세요.
     // ============================================================================
-    const APP_BUILD_TIMESTAMP = '20260818224500';
+    const APP_BUILD_TIMESTAMP = '202608190127';
     
         /* ========================================== */
     /* [신규 기능] AI 도움 프롬프트 통합 템플릿 관리   */
@@ -1767,6 +1767,10 @@
             if (naverPattern) mtBackupData['naver_english_conversation_pattern'] = naverPattern;
             const wordWebSlot = localStorage.getItem(MT_WORDWEB_STORAGE_KEY);
             if (wordWebSlot) mtBackupData['wordweb_conversation'] = wordWebSlot;
+            const slot9ApiKey = localStorage.getItem(MT_SLOT9_API_KEY_STORAGE_KEY);
+            if (slot9ApiKey) mtBackupData['slot9_api_key'] = slot9ApiKey;
+            const wordWebApiKey = localStorage.getItem(MT_WORDWEB_API_KEY_STORAGE_KEY);
+            if (wordWebApiKey) mtBackupData['wordweb_api_key'] = wordWebApiKey;
             mtBackupData['typing_unmask_stats'] = localStorage.getItem(MT_STATS_STORAGE_KEY) || JSON.stringify(mtGetStatsState());
 
             const dataToSave = {
@@ -1832,6 +1836,14 @@
                     localStorage.setItem(MT_WORDWEB_STORAGE_KEY, parsed.mtBackupData['wordweb_conversation']);
                 } else {
                     localStorage.removeItem(MT_WORDWEB_STORAGE_KEY);
+                }
+                if (Object.prototype.hasOwnProperty.call(parsed.mtBackupData, 'slot9_api_key')) {
+                    if (parsed.mtBackupData['slot9_api_key']) localStorage.setItem(MT_SLOT9_API_KEY_STORAGE_KEY, parsed.mtBackupData['slot9_api_key']);
+                    else localStorage.removeItem(MT_SLOT9_API_KEY_STORAGE_KEY);
+                }
+                if (Object.prototype.hasOwnProperty.call(parsed.mtBackupData, 'wordweb_api_key')) {
+                    if (parsed.mtBackupData['wordweb_api_key']) localStorage.setItem(MT_WORDWEB_API_KEY_STORAGE_KEY, parsed.mtBackupData['wordweb_api_key']);
+                    else localStorage.removeItem(MT_WORDWEB_API_KEY_STORAGE_KEY);
                 }
                 if (Object.prototype.hasOwnProperty.call(parsed.mtBackupData, 'typing_unmask_stats')) {
                     localStorage.setItem(MT_STATS_STORAGE_KEY, parsed.mtBackupData['typing_unmask_stats']);
@@ -1965,25 +1977,32 @@
     }
 
     // AI API 호출 통합 함수
-    async function fetchGemini(promptText, responseSchema = null) {
-        const apiKey = (localStorage.getItem('gemini_api_key') || '').trim();
-        if(!apiKey) { alert('상단 API 키 설정 메뉴에서 Gemini API Key를 먼저 입력하고 저장해 주세요!'); return null; }
+    async function fetchGemini(promptText, responseSchema = null, config = null) {
+        config = config || {};
+        const apiKey = String(config.apiKey || localStorage.getItem('gemini_api_key') || '').trim();
+        if(!apiKey) { alert(config.missingKeyMessage || '상단 API 키 설정 메뉴에서 Gemini API Key를 먼저 입력하고 저장해 주세요!'); return null; }
 
-        let candidateModels = ['gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-1.5-pro'];
-        try {
-            const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
-            const listRes = await fetch(listUrl);
-            if (listRes.ok) {
-                const listData = await listRes.json();
-                const fetchedModels = (listData.models || [])
-                    .filter(m => m.supportedGenerationMethods && m.supportedGenerationMethods.includes('generateContent'))
-                    .map(m => m.name.replace('models/', ''))
-                    .filter(m => !m.includes('2.0') && !m.includes('2.5')); 
-                if (fetchedModels.length > 0) candidateModels = Array.from(new Set([...candidateModels, ...fetchedModels]));
-            }
-        } catch (e) {}
+        let candidateModels = Array.isArray(config.models) && config.models.length
+            ? Array.from(new Set(config.models.map(String).map(s => s.trim()).filter(Boolean)))
+            : ['gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-1.5-pro'];
+        const blacklistSet = config.blacklistSet instanceof Set ? config.blacklistSet : blacklistedModels;
 
-        candidateModels = candidateModels.filter(m => !blacklistedModels.has(m));
+        if (!config.models || config.discoverModels !== false) {
+            try {
+                const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
+                const listRes = await fetch(listUrl);
+                if (listRes.ok) {
+                    const listData = await listRes.json();
+                    const fetchedModels = (listData.models || [])
+                        .filter(m => m.supportedGenerationMethods && m.supportedGenerationMethods.includes('generateContent'))
+                        .map(m => m.name.replace('models/', ''))
+                        .filter(m => !m.includes('2.0') && !m.includes('2.5'));
+                    if (fetchedModels.length > 0) candidateModels = Array.from(new Set([...candidateModels, ...fetchedModels]));
+                }
+            } catch (e) {}
+        }
+
+        candidateModels = candidateModels.filter(m => !blacklistSet.has(m));
         let lastError = '';
 
         for (const model of candidateModels) {
@@ -2002,23 +2021,59 @@
                     const candidate = data.candidates?.[0];
                     let text = candidate?.content?.parts?.[0]?.text?.trim() || '';
                     if (responseSchema && candidate?.finishReason === 'MAX_TOKENS') {
-                        blacklistedModels.add(model);
+                        blacklistSet.add(model);
                         lastError = `${model} 모델 응답이 길이 제한으로 잘렸습니다. 다른 모델로 재시도합니다.`;
                         continue;
                     }
                     if (text) return text;
                 } else {
-                    blacklistedModels.add(model);
+                    blacklistSet.add(model);
                     const errJson = await res.json().catch(() => ({}));
                     lastError = errJson.error?.message || `HTTP ${res.status}`;
                 }
             } catch (err) {
-                blacklistedModels.add(model);
+                blacklistSet.add(model);
                 lastError = err.message;
             }
         }
         alert(`AI 응답 생성 실패:\n${lastError}`);
         return null;
+    }
+
+
+    // ==========================================
+    // 슬롯별 Gemini API 설정
+    // ==========================================
+    const MT_SLOT9_API_KEY_STORAGE_KEY = 'word_slot_9_api_key';
+    const MT_WORDWEB_API_KEY_STORAGE_KEY = 'word_slot_wordweb_api_key';
+    const MT_SLOT9_FIXED_MODELS = ['gemini-1.5-flash','gemini-1.5-flash-8b','gemini-1.5-pro'];
+    const mtSlot9BlacklistedModels = new Set();
+
+    function mtGetSlotApiKey(slot) {
+        const key = slot === 'slot9' ? MT_SLOT9_API_KEY_STORAGE_KEY : MT_WORDWEB_API_KEY_STORAGE_KEY;
+        return (localStorage.getItem(key) || '').trim();
+    }
+    function mtSaveSlotApiKey(slot) {
+        const inputId = slot === 'slot9' ? 'mtSlot9ApiKeyInput' : 'mtWordWebApiKeyInput';
+        const keyName = slot === 'slot9' ? MT_SLOT9_API_KEY_STORAGE_KEY : MT_WORDWEB_API_KEY_STORAGE_KEY;
+        const el = document.getElementById(inputId);
+        if (!el) return;
+        const value = el.value.trim();
+        if (value) localStorage.setItem(keyName, value); else localStorage.removeItem(keyName);
+        if (slot === 'slot9') mtSlot9BlacklistedModels.clear(); else blacklistedModels.clear();
+        mtInitSlots();
+        alert(`${slot === 'slot9' ? '슬롯9' : '워드웹회화'} 전용 API 키가 ${value ? '저장되었습니다.' : '삭제되었습니다. 이제 메인 API 키를 사용합니다.'}`);
+    }
+    function mtApplySlotApiKeyInputs() {
+        const s9 = document.getElementById('mtSlot9ApiKeyInput'); if (s9) s9.value = mtGetSlotApiKey('slot9');
+        const ww = document.getElementById('mtWordWebApiKeyInput'); if (ww) ww.value = mtGetSlotApiKey('wordweb');
+    }
+    function mtGetSlot9AiConfig() {
+        return { apiKey: mtGetSlotApiKey('slot9'), models: MT_SLOT9_FIXED_MODELS, discoverModels:false, blacklistSet:mtSlot9BlacklistedModels, missingKeyMessage:'메인 API 키 또는 슬롯9 전용 API 키를 먼저 입력해 주세요.' };
+    }
+    function mtGetWordWebAiConfig() {
+        const key = mtGetSlotApiKey('wordweb');
+        return key ? { apiKey:key, blacklistSet:blacklistedModels, missingKeyMessage:'메인 API 키 또는 워드웹회화 전용 API 키를 먼저 입력해 주세요.' } : null;
     }
 
     /* ========================================== */
@@ -4146,7 +4201,7 @@ Rules:
         const words=mtSlot9BuildSlotData(st).words;
         const star=mtSlot9GetStarredCount(st);
         div.className='mt-slot mt-wordweb-slot '+(st.fileName?'has-data':'');
-        div.innerHTML=`<div class="mt-slot-title">${mtEscapeHTML(st.fileName || '슬롯 9')} (자동생성)</div><div class="mt-slot-desc" style="line-height:1.5;">카드 수: ${words.length}개<br><span style="color:#d97706;font-weight:600;">★표기카드수: ${star}개</span></div><div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:center;align-items:center;">${st.fileName?`<button class="btn-download" style="padding:5px 10px;font-size:11px;" onclick="mtSlot9DownloadClick(event)">내보내기</button>`:'<button class="btn-download" disabled style="padding:5px 10px;font-size:11px;">내보내기</button>'}${st.fileName?`<button class="mt-btn-delete" onclick="mtDeleteSlot(event,'slot9')">삭제</button>`:'<button class="mt-btn-delete" disabled>삭제</button>'}</div><div id="mtSlot9Status" class="mt-wordweb-status"></div>`;
+        div.innerHTML=`<div class="mt-slot-title">${mtEscapeHTML(st.fileName || '슬롯 9')} (자동생성)</div><div class="mt-slot-desc" style="line-height:1.5;">카드 수: ${words.length}개<br><span style="color:#d97706;font-weight:600;">★표기카드수: ${star}개</span></div><div style="width:100%;margin:6px 0 7px;" onclick="event.stopPropagation()" onpointerdown="event.stopPropagation()"><div style="display:flex;gap:4px;align-items:center;"><input id="mtSlot9ApiKeyInput" type="password" autocomplete="off" placeholder="슬롯9 전용 API Key (비워두면 메인 API 사용)" value="${mtEscapeHTML(mtGetSlotApiKey('slot9'))}" style="flex:1;min-width:0;padding:6px 7px;border:1px solid #d1d5db;border-radius:6px;font-size:10px;box-sizing:border-box;"><button class="btn-excel" style="padding:6px 8px;font-size:10px;" onclick="event.stopPropagation();mtSaveSlotApiKey('slot9')">저장</button></div></div><div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:center;align-items:center;">${st.fileName?`<button class="btn-download" style="padding:5px 10px;font-size:11px;" onclick="mtSlot9DownloadClick(event)">내보내기</button>`:'<button class="btn-download" disabled style="padding:5px 10px;font-size:11px;">내보내기</button>'}${st.fileName?`<button class="mt-btn-delete" onclick="mtDeleteSlot(event,'slot9')">삭제</button>`:'<button class="mt-btn-delete" disabled>삭제</button>'}</div><div id="mtSlot9Status" class="mt-wordweb-status"></div>`;
         div.onclick=()=>{ if(!st.fileName){ mtSlot9TriggerUpload(); return;} mtPromptAction('slot9',mtSlot9BuildSlotData(st)); };
         mtSlot9RenderStatus();
     }
@@ -4157,7 +4212,7 @@ Rules:
     }
     async function mtSlot9GenerateEnglishBatch(koreanItems){
         const prompt=`You are an expert English teacher. For each Korean sentence, create ONE faithful, natural everyday English sentence at CEFR A2 level. Preserve meaning exactly. Return ONLY a JSON array with exactly ${koreanItems.length} objects: [{"index":0,"english":"..."}]. Do not add greetings, names, time expressions, or unrelated content. DATA=${JSON.stringify(koreanItems.map((k,i)=>({index:i,korean:k})))}`;
-        const raw=await fetchGemini(prompt,{type:'ARRAY',minItems:koreanItems.length,maxItems:koreanItems.length,items:{type:'OBJECT',properties:{index:{type:'INTEGER'},english:{type:'STRING'}},required:['index','english']}}); if(!raw) return null; const arr=Array.isArray(raw)?raw:mtWordWebExtractJsonValue(raw); if(!Array.isArray(arr)||arr.length!==koreanItems.length)return null; return arr.sort((a,b)=>Number(a.index)-Number(b.index)).map(x=>String(x.english||'').trim());
+        const raw=await fetchGemini(prompt,{type:'ARRAY',minItems:koreanItems.length,maxItems:koreanItems.length,items:{type:'OBJECT',properties:{index:{type:'INTEGER'},english:{type:'STRING'}},required:['index','english']}},mtGetSlot9AiConfig()); if(!raw) return null; const arr=Array.isArray(raw)?raw:mtWordWebExtractJsonValue(raw); if(!Array.isArray(arr)||arr.length!==koreanItems.length)return null; return arr.sort((a,b)=>Number(a.index)-Number(b.index)).map(x=>String(x.english||'').trim());
     }
     async function mtSlot9GenerateSix(){
         if(mtSlot9Busy) return; const st=mtSlot9GetState(); if(!st.fileName||!st.sourceRows.length||st.nextSourceIndex>=st.sourceRows.length) return; mtSlot9Busy=true; st.lastError=''; mtSlot9SaveState(st); mtSlot9RenderStatus();
@@ -4168,8 +4223,9 @@ Rules:
             const english=await mtSlot9GenerateEnglishBatch(batch.map(v=>String(v)));
             if(!english) throw new Error('영어 문장 생성에 실패했습니다.');
             const items=batch.map((kor,i)=>({english:english[i],korean:String(kor),literal_korean:''}));
-            const validated=await mtWordWebValidateNaturalTranslations(items.map(x=>({english:x.english,korean:x.korean})).map(x=>({english:x.english,korean:x.korean}))); if(!validated) throw new Error('영어와 한국어의 의미 일치 검증에 실패했습니다.');
-            const literals=await mtWordWebGenerateLiteralForItems(validated); if(!literals||literals.some(x=>!x?.literal)) throw new Error('보조문장 직독직해 생성에 실패했습니다.');
+            const slot9AiConfig = mtGetSlot9AiConfig();
+            const validated=await mtWordWebValidateNaturalTranslations(items.map(x=>({english:x.english,korean:x.korean})), slot9AiConfig); if(!validated) throw new Error('영어와 한국어의 의미 일치 검증에 실패했습니다.');
+            const literals=await mtWordWebGenerateLiteralForItems(validated, slot9AiConfig); if(!literals||literals.some(x=>!x?.literal)) throw new Error('보조문장 직독직해 생성에 실패했습니다.');
             const p=mtSlot9GetPattern(st); const serialStart=(st.outputRows||[]).length+1;
             literals.forEach((lit,i)=>{
                 const row=[];
@@ -4312,6 +4368,12 @@ Rules:
                 카드 수: ${cardCount}개<br>
                 <span style="color:#d97706; font-weight:600;">★표기카드수: ${starredCount}개</span>
             </div>
+            <div style="width:100%;margin:6px 0 7px;" onclick="event.stopPropagation()" onpointerdown="event.stopPropagation()">
+                <div style="display:flex;gap:4px;align-items:center;">
+                    <input id="mtWordWebApiKeyInput" type="password" autocomplete="off" placeholder="워드웹 전용 API Key (비워두면 메인 API 사용)" value="${mtEscapeHTML(mtGetSlotApiKey('wordweb'))}" style="flex:1;min-width:0;padding:6px 7px;border:1px solid #d1d5db;border-radius:6px;font-size:10px;box-sizing:border-box;">
+                    <button class="btn-excel" style="padding:6px 8px;font-size:10px;" onclick="event.stopPropagation();mtSaveSlotApiKey('wordweb')">저장</button>
+                </div>
+            </div>
             <div style="display:flex; gap:5px; flex-wrap:wrap; justify-content:center; align-items:center;">
                 ${state.fileName ? `<button class="btn-download" style="padding:5px 10px; border-radius:4px; font-size:11px; font-weight:600;" onclick="mtWordWebDownloadClick(event)">내보내기</button>` : `<button class="btn-download" disabled style="padding:5px 10px; border-radius:4px; font-size:11px; font-weight:600;">내보내기</button>`}
                 ${state.fileName ? `<button class="mt-btn-delete" onclick="mtDeleteSlot(event, 'wordweb')">삭제</button>` : `<button class="mt-btn-delete" disabled>삭제</button>`}
@@ -4444,7 +4506,7 @@ Rules:
             };
 
             state.outputRows = mtWordWebApplyPatternToRows(state.outputRows, state.pattern);
-            await mtWordWebRepairExistingLiteralColumns(state);
+            await mtWordWebRepairExistingLiteralColumns(state, mtGetWordWebAiConfig());
             state.nextRun = Date.now() + MT_WORDWEB_INTERVAL_MS;
             mtWordWebSaveState(state);
             mtWordWebStartAutoTrigger(true);
@@ -4854,7 +4916,7 @@ Rules:
         return true;
     }
 
-    async function mtWordWebGenerateEnglishChunksForOne(item) {
+    async function mtWordWebGenerateEnglishChunksForOne(item, config = null) {
         const prompt = `
 You are an expert English syntax teacher.
 Split the ENGLISH sentence into meaningful phrase chunks IN THE EXACT ORIGINAL ENGLISH ORDER.
@@ -4879,7 +4941,7 @@ Output: {"english_chunks":["Please","stretch","your arms","carefully"]}`;
                 type:'OBJECT',
                 properties:{english_chunks:{type:'ARRAY', items:{type:'STRING'}, minItems:2, maxItems:8}},
                 required:['english_chunks']
-            });
+            }, config);
             if (!raw) continue;
             try {
                 const obj = typeof raw === 'object' ? raw : mtWordWebExtractJsonValue(raw);
@@ -4894,7 +4956,7 @@ Output: {"english_chunks":["Please","stretch","your arms","carefully"]}`;
         return null;
     }
 
-    async function mtWordWebGenerateKoreanChunksForOne(item, englishChunks) {
+    async function mtWordWebGenerateKoreanChunksForOne(item, englishChunks, config = null) {
         const prompt = `
 You are an expert English-Korean direct-reading teacher.
 Translate EACH English phrase chunk into Korean while preserving the EXACT SAME CHUNK ORDER.
@@ -4925,7 +4987,7 @@ Korean chunks: ["제발","스트레칭하세요","당신의 팔들을","조심�
                 type:'OBJECT',
                 properties:{korean_chunks:{type:'ARRAY', items:{type:'STRING'}, minItems:englishChunks.length, maxItems:englishChunks.length}},
                 required:['korean_chunks']
-            });
+            }, config);
             if (!raw) continue;
             try {
                 const obj = typeof raw === 'object' ? raw : mtWordWebExtractJsonValue(raw);
@@ -4969,7 +5031,7 @@ Korean chunks: ["제발","스트레칭하세요","당신의 팔들을","조심�
         return false;
     }
 
-    async function mtWordWebRegenerateNaturalKoreanForOne(item) {
+    async function mtWordWebRegenerateNaturalKoreanForOne(item, config = null) {
         const prompt = `
 You are an expert English-Korean translator.
 Translate ONLY the given English sentence into ONE natural, fluent Korean sentence.
@@ -4988,7 +5050,7 @@ English sentence: ${JSON.stringify(item.english)}`;
                 type:'OBJECT',
                 properties:{korean:{type:'STRING'}},
                 required:['korean']
-            });
+            }, config);
             if (!raw) continue;
             try {
                 const obj = typeof raw === 'object' ? raw : mtWordWebExtractJsonValue(raw);
@@ -4999,7 +5061,7 @@ English sentence: ${JSON.stringify(item.english)}`;
         return null;
     }
 
-    async function mtWordWebValidateNaturalTranslations(items) {
+    async function mtWordWebValidateNaturalTranslations(items, config = null) {
         const candidates = items.map((item, idx) => ({
             index: idx,
             english: String(item?.english || '').trim(),
@@ -5042,7 +5104,7 @@ ${JSON.stringify(candidates)}`;
                     properties:{index:{type:'INTEGER'}, valid:{type:'BOOLEAN'}, reason:{type:'STRING'}},
                     required:['index','valid','reason']
                 }
-            });
+            }, config);
             if (!raw) continue;
             try {
                 verification = Array.isArray(raw) ? raw : mtWordWebExtractJsonValue(raw);
@@ -5062,7 +5124,7 @@ ${JSON.stringify(candidates)}`;
 
         // 잘못된 문장만 개별 재생성
         for (const idx of needsInitialRepair) {
-            const repaired = await mtWordWebRegenerateNaturalKoreanForOne(candidates[idx]);
+            const repaired = await mtWordWebRegenerateNaturalKoreanForOne(candidates[idx], config);
             if (repaired) candidates[idx].korean = repaired;
         }
 
@@ -5077,7 +5139,7 @@ ${JSON.stringify(finalPayload)}`;
         const finalRaw = await fetchGemini(finalPrompt, {
             type:'ARRAY', minItems:finalPayload.length, maxItems:finalPayload.length,
             items:{type:'OBJECT', properties:{index:{type:'INTEGER'}, valid:{type:'BOOLEAN'}, reason:{type:'STRING'}}, required:['index','valid','reason']}
-        });
+        }, config);
         let finalVerification = null;
         try { finalVerification = Array.isArray(finalRaw) ? finalRaw : mtWordWebExtractJsonValue(finalRaw); } catch (e) {}
         if (!Array.isArray(finalVerification) || finalVerification.length !== finalPayload.length) return null;
@@ -5090,21 +5152,21 @@ ${JSON.stringify(finalPayload)}`;
         return candidates.map(x => ({ english:x.english, korean:x.korean, literal_korean:'' }));
     }
 
-    async function mtWordWebGenerateLiteralForOne(item) {
-        const englishChunks = await mtWordWebGenerateEnglishChunksForOne(item);
+    async function mtWordWebGenerateLiteralForOne(item, config = null) {
+        const englishChunks = await mtWordWebGenerateEnglishChunksForOne(item, config);
         if (!englishChunks) return null;
-        const koreanChunks = await mtWordWebGenerateKoreanChunksForOne(item, englishChunks);
+        const koreanChunks = await mtWordWebGenerateKoreanChunksForOne(item, englishChunks, config);
         if (!koreanChunks) return null;
         const literal = koreanChunks.map(chunk => `[${chunk}]`).join(' ');
         if (!mtWordWebIsKoreanChunkList(literal)) return null;
         return { englishChunks, literal };
     }
 
-    async function mtWordWebGenerateLiteralForItems(items) {
+    async function mtWordWebGenerateLiteralForItems(items, config = null) {
         const results = new Array(items.length).fill(null);
         for (let i = 0; i < items.length; i++) {
             try {
-                results[i] = await mtWordWebGenerateLiteralForOne(items[i]);
+                results[i] = await mtWordWebGenerateLiteralForOne(items[i], config);
             } catch (e) {
                 console.warn(`[워드웹회화] ${i + 1}번 직독직해 생성 예외:`, e);
                 results[i] = null;
@@ -5113,12 +5175,12 @@ ${JSON.stringify(finalPayload)}`;
         return results;
     }
 
-    async function mtWordWebRepairLiteralOne(item) {
-        const result = await mtWordWebGenerateLiteralForOne(item);
+    async function mtWordWebRepairLiteralOne(item, config = null) {
+        const result = await mtWordWebGenerateLiteralForOne(item, config);
         return result ? result.literal : null;
     }
 
-    async function mtWordWebRepairExistingLiteralColumns(state) {
+    async function mtWordWebRepairExistingLiteralColumns(state, config = null) {
         const pattern = mtWordWebGetPattern(state);
         const engIdx = pattern.engCol - 1;
         const mainKorIdx = pattern.mainKorCol - 1;
@@ -5134,14 +5196,14 @@ ${JSON.stringify(finalPayload)}`;
 
         for (let startIdx = 0; startIdx < bad.length; startIdx += 6) {
             const batch = bad.slice(startIdx, startIdx + 6);
-            const literals = await mtWordWebGenerateLiteralForItems(batch);
+            const literals = await mtWordWebGenerateLiteralForItems(batch, config);
             if (literals) {
                 batch.forEach((item, n) => {
                     if (literals[n]) state.outputRows[item.idx][subKorIdx] = literals[n];
                 });
             } else {
                 for (const item of batch) {
-                    const literal = await mtWordWebRepairLiteralOne(item);
+                    const literal = await mtWordWebRepairLiteralOne(item, config);
                     if (literal) state.outputRows[item.idx][subKorIdx] = literal;
                 }
             }
@@ -5186,6 +5248,7 @@ Rules:
 Example:
 {"english":"Please stretch your arms carefully.","korean":"팔을 조심스럽게 스트레칭 하세요."}`;
 
+            const wordWebAiConfig = mtGetWordWebAiConfig();
             let rawDialogue = await fetchGemini(dialoguePrompt, {
                 type:'ARRAY', minItems:6, maxItems:6,
                 items:{
@@ -5193,7 +5256,7 @@ Example:
                     properties:{english:{type:'STRING'}, korean:{type:'STRING'}},
                     required:['english','korean']
                 }
-            });
+            }, wordWebAiConfig);
             if (!rawDialogue) throw new Error('영어/한국어 기본 문장 생성에 실패했습니다.');
 
             let resultList = Array.isArray(rawDialogue) ? rawDialogue : mtWordWebExtractJsonValue(rawDialogue);
@@ -5211,14 +5274,14 @@ Example:
             }
 
             // 2단계: B열 자연번역의 의미 일치성 검증/재생성
-            const validatedTranslations = await mtWordWebValidateNaturalTranslations(resultList);
+            const validatedTranslations = await mtWordWebValidateNaturalTranslations(resultList, wordWebAiConfig);
             if (!validatedTranslations) {
                 throw new Error('자연스러운 한국어 번역 검증에 실패했습니다. 다음 자동 실행에서 다시 시도합니다.');
             }
             resultList = validatedTranslations;
 
             // 3단계: 검증을 통과한 영어+B열만 사용하여 C열 직독직해 생성
-            const literalResults = await mtWordWebGenerateLiteralForItems(resultList);
+            const literalResults = await mtWordWebGenerateLiteralForItems(resultList, wordWebAiConfig);
             literalResults.forEach((result, idx) => {
                 if (result?.literal) resultList[idx].literal_korean = result.literal;
             });
@@ -5228,7 +5291,7 @@ Example:
                 if (mtWordWebIsKoreanChunkList(resultList[idx].literal_korean)) continue;
                 let repaired = null;
                 for (let attempt = 1; attempt <= 5 && !repaired; attempt++) {
-                    repaired = await mtWordWebRepairLiteralOne(resultList[idx]);
+                    repaired = await mtWordWebRepairLiteralOne(resultList[idx], wordWebAiConfig);
                 }
                 if (repaired) resultList[idx].literal_korean = repaired;
             }
