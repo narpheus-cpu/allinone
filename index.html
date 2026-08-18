@@ -1577,10 +1577,10 @@
 
 <script>
     // ============================================================================
-    // ★ 최근 코드 업데이트 시각: 20260818212800
+    // ★ 최근 코드 업데이트 시각: 20260818220430
     // ★ ※ 코드를 직접 수정할 때마다 위 시간값도 변경하세요.
     // ============================================================================
-    const APP_BUILD_TIMESTAMP = '20260818212800';
+    const APP_BUILD_TIMESTAMP = '20260818220430';
     
         /* ========================================== */
     /* [신규 기능] AI 도움 프롬프트 통합 템플릿 관리   */
@@ -4056,13 +4056,22 @@ Rules:
             const saved = JSON.parse(localStorage.getItem(MT_SLOT9_STORAGE_KEY) || 'null');
             if (saved && Array.isArray(saved.sourceRows) && Array.isArray(saved.outputRows)) {
                 const normalized = mtSlot9NormalizeSerials(saved);
+
+                // 과거 버전 데이터에는 원본 잠금값이 없을 수 있으므로 최초 1회 현재 A열을 기준으로 잠급니다.
+                if (!Array.isArray(normalized.state.sourceRowsLock)) {
+                    mtSlot9CreateSourceLock(normalized.state);
+                    normalized.changed = true;
+                } else {
+                    mtSlot9ProtectSourceRows(normalized.state);
+                }
+
                 if (normalized.changed) {
                     localStorage.setItem(MT_SLOT9_STORAGE_KEY, JSON.stringify(normalized.state));
                 }
                 return normalized.state;
             }
         } catch(e) {}
-        return { fileName:'', sourceRows:[], nextSourceIndex:0, outputRows:[], nextRun:null, lastRun:null, lastError:'', starredSerials:[], lastSession:null, pattern:mtSlot9GetDefaultPattern() };
+        return { fileName:'', sourceRows:[], sourceRowsLock:[], nextSourceIndex:0, outputRows:[], nextRun:null, lastRun:null, lastError:'', starredSerials:[], lastSession:null, pattern:mtSlot9GetDefaultPattern() };
     }
 
     function mtSlot9NormalizeSerials(state) {
@@ -4095,7 +4104,33 @@ Rules:
         return { changed, state };
     }
 
-    function mtSlot9SaveState(state){ localStorage.setItem(MT_SLOT9_STORAGE_KEY, JSON.stringify(state)); }
+
+    function mtSlot9CreateSourceLock(state) {
+        if (!state) return;
+        const source = Array.isArray(state.sourceRows) ? state.sourceRows.map(v => String(v ?? '')) : [];
+        state.sourceRows = source.slice();
+        state.sourceRowsLock = source.slice();
+    }
+
+    function mtSlot9ProtectSourceRows(state) {
+        if (!state) return;
+        const locked = Array.isArray(state.sourceRowsLock) ? state.sourceRowsLock.map(v => String(v ?? '')) : null;
+        if (!locked) {
+            mtSlot9CreateSourceLock(state);
+            return;
+        }
+
+        const current = Array.isArray(state.sourceRows) ? state.sourceRows.map(v => String(v ?? '')) : [];
+        if (JSON.stringify(current) !== JSON.stringify(locked)) {
+            // AI/생성 루틴이 원본을 건드렸다면 저장 전에 즉시 원본으로 복원합니다.
+            state.sourceRows = locked.slice();
+        }
+    }
+
+    function mtSlot9SaveState(state){
+        mtSlot9ProtectSourceRows(state);
+        localStorage.setItem(MT_SLOT9_STORAGE_KEY, JSON.stringify(state));
+    }
     function mtSlot9GetPattern(state=mtSlot9GetState()){ return {...mtSlot9GetDefaultPattern(), ...(state.pattern||{})}; }
     function mtSlot9GetStarredCount(state=mtSlot9GetState()){ const set=new Set((state.starredSerials||[]).map(String)); const idx=mtSlot9GetPattern(state).serialCol-1; return (state.outputRows||[]).filter(r=>set.has(String((r||[])[idx]||'').trim())).length; }
     function mtSlot9BuildSlotData(state=mtSlot9GetState()){
@@ -4120,7 +4155,7 @@ Rules:
     function mtSlot9TriggerUpload(){ mtActiveSlotIndex='slot9'; const input=document.getElementById('mtFileUpload'); if(input){input.value='';input.click();} }
     async function mtSlot9HandleFile(file){
         try{ const data=new Uint8Array(await file.arrayBuffer()); const wb=XLSX.read(data,{type:'array'}); const sh=wb.Sheets[wb.SheetNames[0]]; const rows=XLSX.utils.sheet_to_json(sh,{header:1,defval:''}); const sourceRows=rows.map(r=>String((r||[])[0]??'').trim()).filter(x=>x && !/^한국어|^번역|^문장$/i.test(x)); if(!sourceRows.length) throw new Error('첫 번째 시트 A열에서 한국어 문장을 찾지 못했습니다.'); const prev=mtSlot9GetState(); const displayFileName = String(file.name || '').replace(/\.[^/.]+$/, '').trim() || '슬롯 9';
-        const st={...prev,fileName:displayFileName,sourceRows,nextSourceIndex:0,outputRows:[],nextRun:Date.now()+MT_SLOT9_INTERVAL_MS,lastRun:null,lastError:'',lastSession:null,starredSerials:[],pattern:prev.pattern||mtSlot9GetDefaultPattern()}; mtSlot9SaveState(st); mtSlot9StartAutoTrigger(true); mtInitSlots(); alert('[슬롯9] A열 한국어 문장 등록이 완료되었습니다.'); }catch(e){ console.error(e); alert('슬롯9 파일 등록 중 오류: '+(e.message||e)); }
+        const st={...prev,fileName:displayFileName,sourceRows:sourceRows.slice(),sourceRowsLock:sourceRows.slice(),nextSourceIndex:0,outputRows:[],nextRun:Date.now()+MT_SLOT9_INTERVAL_MS,lastRun:null,lastError:'',lastSession:null,starredSerials:[],pattern:prev.pattern||mtSlot9GetDefaultPattern()}; mtSlot9SaveState(st); mtSlot9StartAutoTrigger(true); mtInitSlots(); alert('[슬롯9] A열 한국어 문장 등록이 완료되었습니다.'); }catch(e){ console.error(e); alert('슬롯9 파일 등록 중 오류: '+(e.message||e)); }
     }
     async function mtSlot9GenerateEnglishBatch(koreanItems){
         const prompt=`You are an expert English teacher. For each Korean sentence, create ONE faithful, natural everyday English sentence at CEFR A2 level. Preserve meaning exactly. Return ONLY a JSON array with exactly ${koreanItems.length} objects: [{"index":0,"english":"..."}]. Do not add greetings, names, time expressions, or unrelated content. DATA=${JSON.stringify(koreanItems.map((k,i)=>({index:i,korean:k})))}`;
@@ -4129,11 +4164,34 @@ Rules:
     async function mtSlot9GenerateSix(){
         if(mtSlot9Busy) return; const st=mtSlot9GetState(); if(!st.fileName||!st.sourceRows.length||st.nextSourceIndex>=st.sourceRows.length) return; mtSlot9Busy=true; st.lastError=''; mtSlot9SaveState(st); mtSlot9RenderStatus();
         try{
-            const batch=st.sourceRows.slice(st.nextSourceIndex,st.nextSourceIndex+6); const english=await mtSlot9GenerateEnglishBatch(batch); if(!english) throw new Error('영어 문장 생성에 실패했습니다.'); const items=batch.map((kor,i)=>({english:english[i],korean:kor,literal_korean:''}));
+            mtSlot9ProtectSourceRows(st);
+            const batch=st.sourceRows.slice(st.nextSourceIndex,st.nextSourceIndex+6).map(v=>String(v ?? ''));
+            const sourceSnapshot=st.sourceRows.slice();
+            const english=await mtSlot9GenerateEnglishBatch(batch.map(v=>String(v)));
+            if(!english) throw new Error('영어 문장 생성에 실패했습니다.');
+            const items=batch.map((kor,i)=>({english:english[i],korean:String(kor),literal_korean:''}));
             const validated=await mtWordWebValidateNaturalTranslations(items.map(x=>({english:x.english,korean:x.korean})).map(x=>({english:x.english,korean:x.korean}))); if(!validated) throw new Error('영어와 한국어의 의미 일치 검증에 실패했습니다.');
             const literals=await mtWordWebGenerateLiteralForItems(validated); if(!literals||literals.some(x=>!x?.literal)) throw new Error('보조문장 직독직해 생성에 실패했습니다.');
             const p=mtSlot9GetPattern(st); const serialStart=(st.outputRows||[]).length+1;
-            literals.forEach((lit,i)=>{const row=[]; const width=Math.max(p.sourceKorCol,p.engCol,p.mainKorCol,p.subKorCol,p.serialCol); for(let c=0;c<width;c++)row[c]=''; row[p.sourceKorCol-1]=batch[i]; row[p.engCol-1]=validated[i].english; row[p.mainKorCol-1]=validated[i].korean; row[p.subKorCol-1]=lit.literal; row[p.serialCol-1]=String(serialStart+i); st.outputRows.push(row);}); st.nextSourceIndex+=batch.length; st.lastRun=Date.now(); st.nextRun=Date.now()+MT_SLOT9_INTERVAL_MS; st.lastError=''; mtSlot9SaveState(st); mtSlot9RenderStatus(`${batch.length}문장 생성 완료`); mtInitSlots();
+            literals.forEach((lit,i)=>{
+                const row=[];
+                const width=Math.max(p.sourceKorCol,p.engCol,p.mainKorCol,p.subKorCol,p.serialCol);
+                for(let c=0;c<width;c++)row[c]='';
+
+                // 중요: 슬롯9의 A열(sourceRows)은 사용자 원문이므로 AI가 만든 validated.korean을
+                // A열에 쓰지 않습니다. A열은 처음 업로드한 batch 원문만 기록합니다.
+                row[p.sourceKorCol-1]=String(sourceSnapshot[st.nextSourceIndex+i] ?? batch[i] ?? '');
+                row[p.engCol-1]=validated[i].english;
+                row[p.mainKorCol-1]=validated[i].korean;
+                row[p.subKorCol-1]=lit.literal;
+                row[p.serialCol-1]=String(serialStart+i);
+                st.outputRows.push(row);
+            });
+
+            // AI 호출 전후로 원본이 변하지 않았는지 확인합니다.
+            st.sourceRows=sourceSnapshot.slice();
+            st.sourceRowsLock=sourceSnapshot.slice();
+            st.nextSourceIndex+=batch.length; st.lastRun=Date.now(); st.nextRun=Date.now()+MT_SLOT9_INTERVAL_MS; st.lastError=''; mtSlot9SaveState(st); mtSlot9RenderStatus(`${batch.length}문장 생성 완료`); mtInitSlots();
         }catch(e){ st.lastRun=Date.now(); st.nextRun=Date.now()+MT_SLOT9_INTERVAL_MS; st.lastError=String(e.message||e).substring(0,220); mtSlot9SaveState(st); mtSlot9RenderStatus(); } finally{mtSlot9Busy=false;}
     }
     function mtSlot9StartAutoTrigger(reset=false){ if(mtSlot9TimerId)clearTimeout(mtSlot9TimerId); const st=mtSlot9GetState(); if(!st.fileName||st.nextSourceIndex>=st.sourceRows.length)return; if(reset||!st.nextRun){st.nextRun=Date.now()+MT_SLOT9_INTERVAL_MS;mtSlot9SaveState(st);} mtSlot9TimerId=setTimeout(async()=>{await mtSlot9GenerateSix();mtSlot9StartAutoTrigger(false);},Math.max(1000,Number(st.nextRun)-Date.now())); mtSlot9RenderStatus(); }
@@ -4141,7 +4199,19 @@ Rules:
     function mtSetSlot9PatternInputs(){const st=mtSlot9GetState(),p=mtSlot9GetPattern(st); ['SourceKorCol','EngCol','MainKorCol','SubKorCol','SerialCol'].forEach(k=>{const el=document.getElementById('mtSlot9'+k); if(el)el.value=p[k.charAt(0).toLowerCase()+k.slice(1)];});}
     function mtOpenSlot9PatternEditor(){mtSetSlot9PatternInputs();document.getElementById('mtSlot9PatternModal').style.display='flex';}
     function mtCloseSlot9PatternEditor(){document.getElementById('mtSlot9PatternModal').style.display='none';}
-    function mtSaveSlot9Pattern(){const st=mtSlot9GetState(); st.pattern={sourceKorCol:Math.max(1,Number(document.getElementById('mtSlot9SourceKorCol').value)||1),engCol:Math.max(1,Number(document.getElementById('mtSlot9EngCol').value)||2),mainKorCol:Math.max(1,Number(document.getElementById('mtSlot9MainKorCol').value)||3),subKorCol:Math.max(1,Number(document.getElementById('mtSlot9SubKorCol').value)||4),serialCol:Math.max(1,Number(document.getElementById('mtSlot9SerialCol').value)||5)};mtSlot9SaveState(st);mtCloseSlot9PatternEditor();mtInitSlots();}
+    function mtSaveSlot9Pattern(){
+        const st=mtSlot9GetState();
+        st.pattern={
+            sourceKorCol:1,
+            engCol:Math.max(1,Number(document.getElementById('mtSlot9EngCol').value)||2),
+            mainKorCol:Math.max(1,Number(document.getElementById('mtSlot9MainKorCol').value)||3),
+            subKorCol:Math.max(1,Number(document.getElementById('mtSlot9SubKorCol').value)||4),
+            serialCol:Math.max(1,Number(document.getElementById('mtSlot9SerialCol').value)||5)
+        };
+        const sourceInput=document.getElementById('mtSlot9SourceKorCol');
+        if(sourceInput) sourceInput.value='1';
+        mtSlot9SaveState(st);mtCloseSlot9PatternEditor();mtInitSlots();
+    }
     function mtOpenSlot9ListEditor(){mtSlot9ListPage=1;document.getElementById('mtSlot9ListEditModal').style.display='flex';mtRenderSlot9ListEditor();}
     function mtCloseSlot9ListEditor(){document.getElementById('mtSlot9ListEditModal').style.display='none';}
     function mtRenderSlot9ListEditor(){
