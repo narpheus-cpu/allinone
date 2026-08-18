@@ -1577,10 +1577,10 @@
 
 <script>
     // ============================================================================
-    // ★ 최근 코드 업데이트 시각: 20260818204530
+    // ★ 최근 코드 업데이트 시각: 20260818205930
     // ★ ※ 코드를 직접 수정할 때마다 위 시간값도 변경하세요.
     // ============================================================================
-    const APP_BUILD_TIMESTAMP = '20260818204530';
+    const APP_BUILD_TIMESTAMP = '20260818205930';
     
         /* ========================================== */
     /* [신규 기능] AI 도움 프롬프트 통합 템플릿 관리   */
@@ -4068,9 +4068,13 @@ Rules:
         el.innerHTML=mtSlot9Busy?'<span style="color:#1d4ed8;font-weight:700;">생성 중…</span>':(st.lastError?`<span style="color:#dc2626;">최근 오류: ${mtEscapeHTML(st.lastError)}</span>`:(extra?`<span style="color:#0f766e;font-weight:700;">${mtEscapeHTML(extra)}</span>`:''));
     }
     function mtRenderSlot9Slot(div){
-        const st=mtSlot9GetState(); const words=mtSlot9BuildSlotData(st).words; const star=mtSlot9GetStarredCount(st);
+        const st=mtSlot9GetState();
+        const words=mtSlot9BuildSlotData(st).words;
+        const star=mtSlot9GetStarredCount(st);
+        const sourceCount=Array.isArray(st.sourceRows)?st.sourceRows.length:0;
+        const pending=Math.max(0, sourceCount-Number(st.nextSourceIndex||0));
         div.className='mt-slot mt-wordweb-slot '+(st.fileName?'has-data':'');
-        div.innerHTML=`<div class="mt-slot-title">슬롯 9</div><div class="mt-slot-desc" style="line-height:1.5;">카드 수: ${words.length}개<br><span style="color:#d97706;font-weight:600;">★표기카드수: ${star}개</span></div><div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:center;align-items:center;">${st.fileName?`<button class="btn-download" style="padding:5px 10px;font-size:11px;" onclick="mtSlot9DownloadClick(event)">내보내기</button>`:'<button class="btn-download" disabled style="padding:5px 10px;font-size:11px;">내보내기</button>'}${st.fileName?`<button class="mt-btn-delete" onclick="mtDeleteSlot(event,'slot9')">삭제</button>`:'<button class="mt-btn-delete" disabled>삭제</button>'}</div><div id="mtSlot9Status" class="mt-wordweb-status"></div>`;
+        div.innerHTML=`<div class="mt-slot-title">슬롯 9</div><div class="mt-slot-desc" style="line-height:1.5;">카드 수: ${words.length}개<br><span style="color:#d97706;font-weight:600;">★표기카드수: ${star}개</span>${st.fileName?`<br><span style="color:#6b7280;font-size:11px;">원본 A열: ${sourceCount}개${pending?` · 생성 대기: ${pending}개`:''}</span>`:''}</div><div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:center;align-items:center;">${st.fileName?`<button class="btn-download" style="padding:5px 10px;font-size:11px;" onclick="mtSlot9DownloadClick(event)">내보내기</button>`:'<button class="btn-download" disabled style="padding:5px 10px;font-size:11px;">내보내기</button>'}${st.fileName?`<button class="mt-btn-delete" onclick="mtDeleteSlot(event,'slot9')">삭제</button>`:'<button class="mt-btn-delete" disabled>삭제</button>'}</div><div id="mtSlot9Status" class="mt-wordweb-status"></div>`;
         div.onclick=()=>{ if(!st.fileName){ mtSlot9TriggerUpload(); return;} mtPromptAction('slot9',mtSlot9BuildSlotData(st)); };
         mtSlot9RenderStatus();
     }
@@ -4100,7 +4104,41 @@ Rules:
     function mtSaveSlot9Pattern(){const st=mtSlot9GetState(); st.pattern={sourceKorCol:Math.max(1,Number(document.getElementById('mtSlot9SourceKorCol').value)||1),engCol:Math.max(1,Number(document.getElementById('mtSlot9EngCol').value)||2),mainKorCol:Math.max(1,Number(document.getElementById('mtSlot9MainKorCol').value)||3),subKorCol:Math.max(1,Number(document.getElementById('mtSlot9SubKorCol').value)||4),serialCol:Math.max(1,Number(document.getElementById('mtSlot9SerialCol').value)||5)};mtSlot9SaveState(st);mtCloseSlot9PatternEditor();mtInitSlots();}
     function mtOpenSlot9ListEditor(){mtSlot9ListPage=1;document.getElementById('mtSlot9ListEditModal').style.display='flex';mtRenderSlot9ListEditor();}
     function mtCloseSlot9ListEditor(){document.getElementById('mtSlot9ListEditModal').style.display='none';}
-    function mtRenderSlot9ListEditor(){const st=mtSlot9GetState(),p=mtSlot9GetPattern(st),body=document.getElementById('mtSlot9ListEditBody');if(!body)return; const total=st.outputRows.length,totalPages=Math.max(1,Math.ceil(total/MT_SLOT9_LIST_PAGE_SIZE));mtSlot9ListPage=Math.max(1,Math.min(totalPages,mtSlot9ListPage));const start=(mtSlot9ListPage-1)*MT_SLOT9_LIST_PAGE_SIZE;const page=st.outputRows.slice(start,start+MT_SLOT9_LIST_PAGE_SIZE);body.innerHTML='';page.forEach((r,pi)=>{const idx=start+pi;const el=document.createElement('div');el.className='mt-list-edit-row';el.dataset.index=idx;el.innerHTML=`<div class="mt-list-edit-num">${idx+1}</div><div class="mt-wordweb-item-content"><div class="mt-list-edit-label">영어</div><div class="mt-list-edit-text">${mtEscapeHTML(String(r[p.engCol-1]||''))}</div><div class="mt-list-edit-label" style="margin-top:6px;">보조문장</div><div class="mt-list-edit-text">${mtEscapeHTML(String(r[p.subKorCol-1]||''))}</div><div class="mt-list-edit-label" style="margin-top:6px;">주문장</div><div class="mt-list-edit-text">${mtEscapeHTML(String(r[p.mainKorCol-1]||''))}</div></div><div><button class="btn-excel" style="width:32px;height:32px;padding:0;font-size:16px;" onclick="mtToggleSlot9RowEdit(${idx})">✎</button></div>`;body.appendChild(el);});document.getElementById('mtSlot9ListPageInput').value=mtSlot9ListPage;document.getElementById('mtSlot9ListPageInfo').innerText=`/ ${totalPages} 페이지 (총 ${total}개)`;}
+    function mtRenderSlot9ListEditor(){
+        const st=mtSlot9GetState(),p=mtSlot9GetPattern(st),body=document.getElementById('mtSlot9ListEditBody');
+        if(!body)return;
+        const generated=Array.isArray(st.outputRows)?st.outputRows:[];
+        const source=Array.isArray(st.sourceRows)?st.sourceRows:[];
+        const useSourceOnly=generated.length===0 && source.length>0;
+        const total=useSourceOnly?source.length:generated.length;
+        const totalPages=Math.max(1,Math.ceil(total/MT_SLOT9_LIST_PAGE_SIZE));
+        mtSlot9ListPage=Math.max(1,Math.min(totalPages,mtSlot9ListPage));
+        const start=(mtSlot9ListPage-1)*MT_SLOT9_LIST_PAGE_SIZE;
+        body.innerHTML='';
+        if(useSourceOnly){
+            source.slice(start,start+MT_SLOT9_LIST_PAGE_SIZE).forEach((kor,pi)=>{
+                const idx=start+pi;
+                const el=document.createElement('div');
+                el.className='mt-list-edit-row';
+                el.dataset.sourceOnly='true';
+                el.innerHTML=`<div class="mt-list-edit-num">${idx+1}</div><div class="mt-wordweb-item-content"><div class="mt-list-edit-label">한국어 원문</div><div class="mt-list-edit-text">${mtEscapeHTML(String(kor||''))}</div><div style="margin-top:8px;color:#6b7280;font-size:11px;">아직 영어/직독직해가 생성되지 않았습니다. 5분 자동생성 후 이 목록에 결과가 표시됩니다.</div></div>`;
+                body.appendChild(el);
+            });
+        }else{
+            generated.slice(start,start+MT_SLOT9_LIST_PAGE_SIZE).forEach((r,pi)=>{
+                const idx=start+pi;
+                const el=document.createElement('div');
+                el.className='mt-list-edit-row';
+                el.dataset.index=idx;
+                el.innerHTML=`<div class="mt-list-edit-num">${idx+1}</div><div class="mt-wordweb-item-content"><div class="mt-list-edit-label">영어</div><div class="mt-list-edit-text">${mtEscapeHTML(String(r[p.engCol-1]||''))}</div><div class="mt-list-edit-label" style="margin-top:6px;">보조문장</div><div class="mt-list-edit-text">${mtEscapeHTML(String(r[p.subKorCol-1]||''))}</div><div class="mt-list-edit-label" style="margin-top:6px;">주문장</div><div class="mt-list-edit-text">${mtEscapeHTML(String(r[p.mainKorCol-1]||''))}</div></div><div><button class="btn-excel" style="width:32px;height:32px;padding:0;font-size:16px;" onclick="mtToggleSlot9RowEdit(${idx})">✎</button></div>`;
+                body.appendChild(el);
+            });
+        }
+        const input=document.getElementById('mtSlot9ListPageInput');
+        const info=document.getElementById('mtSlot9ListPageInfo');
+        if(input) input.value=mtSlot9ListPage;
+        if(info) info.innerText=`/ ${totalPages} 페이지 (총 ${total}개${useSourceOnly?' · 원본 A열':''})`;
+    }
     function mtToggleSlot9RowEdit(index){const st=mtSlot9GetState(),p=mtSlot9GetPattern(st),r=st.outputRows[index],el=document.querySelector(`#mtSlot9ListEditBody .mt-list-edit-row[data-index="${index}"]`);if(!r||!el)return;const editing=el.dataset.editing==='true';if(editing){const e=el.querySelector('[data-field="eng"]').value.trim(),k=el.querySelector('[data-field="kor"]').value.trim(),l=el.querySelector('[data-field="sub"]').value.trim();if(!e||!k||!mtWordWebIsKoreanChunkList(l))return alert('영어/주문장을 입력하고 보조문장은 한국어 청크 형식으로 입력하세요.');r[p.engCol-1]=e;r[p.mainKorCol-1]=k;r[p.subKorCol-1]=l;mtSlot9SaveState(st);mtRenderSlot9ListEditor();mtInitSlots();return;}el.dataset.editing='true';el.querySelector('.mt-wordweb-item-content').innerHTML=`<div class="mt-list-edit-label">영어</div><textarea data-field="eng" style="width:100%;box-sizing:border-box;">${mtEscapeHTML(String(r[p.engCol-1]||''))}</textarea><div class="mt-list-edit-label">보조문장</div><textarea data-field="sub" style="width:100%;box-sizing:border-box;">${mtEscapeHTML(String(r[p.subKorCol-1]||''))}</textarea><div class="mt-list-edit-label">주문장</div><textarea data-field="kor" style="width:100%;box-sizing:border-box;">${mtEscapeHTML(String(r[p.mainKorCol-1]||''))}</textarea>`;el.querySelector('button').textContent='✓';}
     function mtSlot9ListChangePage(d){mtSlot9ListPage=Math.max(1,mtSlot9ListPage+d);mtRenderSlot9ListEditor();}
     function mtSlot9ListJumpPage(v){mtSlot9ListPage=Math.max(1,Number(v)||1);mtRenderSlot9ListEditor();}
