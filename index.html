@@ -1577,10 +1577,10 @@
 
 <script>
     // ============================================================================
-    // ★ 최근 코드 업데이트 시각: 20260818205930
+    // ★ 최근 코드 업데이트 시각: 202608182102
     // ★ ※ 코드를 직접 수정할 때마다 위 시간값도 변경하세요.
     // ============================================================================
-    const APP_BUILD_TIMESTAMP = '20260818205930';
+    const APP_BUILD_TIMESTAMP = '202608182102';
     
         /* ========================================== */
     /* [신규 기능] AI 도움 프롬프트 통합 템플릿 관리   */
@@ -4074,13 +4074,14 @@ Rules:
         const sourceCount=Array.isArray(st.sourceRows)?st.sourceRows.length:0;
         const pending=Math.max(0, sourceCount-Number(st.nextSourceIndex||0));
         div.className='mt-slot mt-wordweb-slot '+(st.fileName?'has-data':'');
-        div.innerHTML=`<div class="mt-slot-title">슬롯 9</div><div class="mt-slot-desc" style="line-height:1.5;">카드 수: ${words.length}개<br><span style="color:#d97706;font-weight:600;">★표기카드수: ${star}개</span>${st.fileName?`<br><span style="color:#6b7280;font-size:11px;">원본 A열: ${sourceCount}개${pending?` · 생성 대기: ${pending}개`:''}</span>`:''}</div><div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:center;align-items:center;">${st.fileName?`<button class="btn-download" style="padding:5px 10px;font-size:11px;" onclick="mtSlot9DownloadClick(event)">내보내기</button>`:'<button class="btn-download" disabled style="padding:5px 10px;font-size:11px;">내보내기</button>'}${st.fileName?`<button class="mt-btn-delete" onclick="mtDeleteSlot(event,'slot9')">삭제</button>`:'<button class="mt-btn-delete" disabled>삭제</button>'}</div><div id="mtSlot9Status" class="mt-wordweb-status"></div>`;
+        div.innerHTML=`<div class="mt-slot-title">${mtEscapeHTML(st.fileName || '슬롯 9')}</div><div class="mt-slot-desc" style="line-height:1.5;">카드 수: ${words.length}개<br><span style="color:#d97706;font-weight:600;">★표기카드수: ${star}개</span>${st.fileName?`<br><span style="color:#6b7280;font-size:11px;">원본 A열: ${sourceCount}개${pending?` · 생성 대기: ${pending}개`:''}</span>`:''}</div><div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:center;align-items:center;">${st.fileName?`<button class="btn-download" style="padding:5px 10px;font-size:11px;" onclick="mtSlot9DownloadClick(event)">내보내기</button>`:'<button class="btn-download" disabled style="padding:5px 10px;font-size:11px;">내보내기</button>'}${st.fileName?`<button class="mt-btn-delete" onclick="mtDeleteSlot(event,'slot9')">삭제</button>`:'<button class="mt-btn-delete" disabled>삭제</button>'}</div><div id="mtSlot9Status" class="mt-wordweb-status"></div>`;
         div.onclick=()=>{ if(!st.fileName){ mtSlot9TriggerUpload(); return;} mtPromptAction('slot9',mtSlot9BuildSlotData(st)); };
         mtSlot9RenderStatus();
     }
     function mtSlot9TriggerUpload(){ mtActiveSlotIndex='slot9'; const input=document.getElementById('mtFileUpload'); if(input){input.value='';input.click();} }
     async function mtSlot9HandleFile(file){
-        try{ const data=new Uint8Array(await file.arrayBuffer()); const wb=XLSX.read(data,{type:'array'}); const sh=wb.Sheets[wb.SheetNames[0]]; const rows=XLSX.utils.sheet_to_json(sh,{header:1,defval:''}); const sourceRows=rows.map(r=>String((r||[])[0]??'').trim()).filter(x=>x && !/^한국어|^번역|^문장$/i.test(x)); if(!sourceRows.length) throw new Error('첫 번째 시트 A열에서 한국어 문장을 찾지 못했습니다.'); const prev=mtSlot9GetState(); const st={...prev,fileName:file.name,sourceRows,nextSourceIndex:0,outputRows:[],nextRun:Date.now()+MT_SLOT9_INTERVAL_MS,lastRun:null,lastError:'',lastSession:null,starredSerials:[],pattern:prev.pattern||mtSlot9GetDefaultPattern()}; mtSlot9SaveState(st); mtSlot9StartAutoTrigger(true); mtInitSlots(); alert('[슬롯9] A열 한국어 문장 등록이 완료되었습니다.'); }catch(e){ console.error(e); alert('슬롯9 파일 등록 중 오류: '+(e.message||e)); }
+        try{ const data=new Uint8Array(await file.arrayBuffer()); const wb=XLSX.read(data,{type:'array'}); const sh=wb.Sheets[wb.SheetNames[0]]; const rows=XLSX.utils.sheet_to_json(sh,{header:1,defval:''}); const sourceRows=rows.map(r=>String((r||[])[0]??'').trim()).filter(x=>x && !/^한국어|^번역|^문장$/i.test(x)); if(!sourceRows.length) throw new Error('첫 번째 시트 A열에서 한국어 문장을 찾지 못했습니다.'); const prev=mtSlot9GetState(); const displayFileName = String(file.name || '').replace(/\.[^/.]+$/, '').trim() || '슬롯 9';
+        const st={...prev,fileName:displayFileName,sourceRows,nextSourceIndex:0,outputRows:[],nextRun:Date.now()+MT_SLOT9_INTERVAL_MS,lastRun:null,lastError:'',lastSession:null,starredSerials:[],pattern:prev.pattern||mtSlot9GetDefaultPattern()}; mtSlot9SaveState(st); mtSlot9StartAutoTrigger(true); mtInitSlots(); alert('[슬롯9] A열 한국어 문장 등록이 완료되었습니다.'); }catch(e){ console.error(e); alert('슬롯9 파일 등록 중 오류: '+(e.message||e)); }
     }
     async function mtSlot9GenerateEnglishBatch(koreanItems){
         const prompt=`You are an expert English teacher. For each Korean sentence, create ONE faithful, natural everyday English sentence at CEFR A2 level. Preserve meaning exactly. Return ONLY a JSON array with exactly ${koreanItems.length} objects: [{"index":0,"english":"..."}]. Do not add greetings, names, time expressions, or unrelated content. DATA=${JSON.stringify(koreanItems.map((k,i)=>({index:i,korean:k})))}`;
