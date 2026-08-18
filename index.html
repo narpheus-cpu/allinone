@@ -1577,10 +1577,10 @@
 
 <script>
     // ============================================================================
-    // ★ 최근 코드 업데이트 시각: 202608190151
+    // ★ 최근 코드 업데이트 시각: 20260819023120
     // ★ ※ 코드를 직접 수정할 때마다 위 시간값도 변경하세요.
     // ============================================================================
-    const APP_BUILD_TIMESTAMP = '202608190151';
+    const APP_BUILD_TIMESTAMP = '20260819023120';
     
         /* ========================================== */
     /* [신규 기능] AI 도움 프롬프트 통합 템플릿 관리   */
@@ -4183,6 +4183,7 @@ Rules:
         try {
             const saved = JSON.parse(localStorage.getItem(MT_SLOT9_STORAGE_KEY) || 'null');
             if (saved && Array.isArray(saved.sourceRows) && Array.isArray(saved.outputRows)) {
+                if (!Array.isArray(saved.retryRows)) saved.retryRows = [];
                 const normalized = mtSlot9NormalizeSerials(saved);
 
                 // 과거 버전 데이터에는 원본 잠금값이 없을 수 있으므로 최초 1회 현재 A열을 기준으로 잠급니다.
@@ -4199,7 +4200,7 @@ Rules:
                 return normalized.state;
             }
         } catch(e) {}
-        return { fileName:'', sourceRows:[], sourceRowsLock:[], nextSourceIndex:0, outputRows:[], nextRun:null, lastRun:null, lastError:'', starredSerials:[], lastSession:null, pattern:mtSlot9GetDefaultPattern() };
+        return { fileName:'', sourceRows:[], sourceRowsLock:[], retryRows:[], nextSourceIndex:0, outputRows:[], nextRun:null, lastRun:null, lastError:'', starredSerials:[], lastSession:null, pattern:mtSlot9GetDefaultPattern() };
     }
 
     function mtSlot9NormalizeSerials(state) {
@@ -4281,56 +4282,271 @@ Rules:
     function mtSlot9TriggerUpload(){ mtActiveSlotIndex='slot9'; const input=document.getElementById('mtFileUpload'); if(input){input.value='';input.click();} }
     async function mtSlot9HandleFile(file){
         try{ const data=new Uint8Array(await file.arrayBuffer()); const wb=XLSX.read(data,{type:'array'}); const sh=wb.Sheets[wb.SheetNames[0]]; const rows=XLSX.utils.sheet_to_json(sh,{header:1,defval:''}); const sourceRows=rows.map(r=>String((r||[])[0]??'').trim()).filter(x=>x && !/^한국어|^번역|^문장$/i.test(x)); if(!sourceRows.length) throw new Error('첫 번째 시트 A열에서 한국어 문장을 찾지 못했습니다.'); const prev=mtSlot9GetState(); const displayFileName = String(file.name || '').replace(/\.[^/.]+$/, '').trim() || '슬롯 9';
-        const st={...prev,fileName:displayFileName,sourceRows:sourceRows.slice(),sourceRowsLock:sourceRows.slice(),nextSourceIndex:0,outputRows:[],nextRun:Date.now()+MT_SLOT9_INTERVAL_MS,lastRun:null,lastError:'',lastSession:null,starredSerials:[],pattern:prev.pattern||mtSlot9GetDefaultPattern()}; mtSlot9SaveState(st); mtSlot9StartAutoTrigger(true); mtInitSlots(); alert('[슬롯9] A열 한국어 문장 등록이 완료되었습니다.'); }catch(e){ console.error(e); alert('슬롯9 파일 등록 중 오류: '+(e.message||e)); }
+        const st={...prev,fileName:displayFileName,sourceRows:sourceRows.slice(),sourceRowsLock:sourceRows.slice(),retryRows:[],nextSourceIndex:0,outputRows:[],nextRun:Date.now()+MT_SLOT9_INTERVAL_MS,lastRun:null,lastError:'',lastSession:null,starredSerials:[],pattern:prev.pattern||mtSlot9GetDefaultPattern()}; mtSlot9SaveState(st); mtSlot9StartAutoTrigger(true); mtInitSlots(); alert('[슬롯9] A열 한국어 문장 등록이 완료되었습니다.'); }catch(e){ console.error(e); alert('슬롯9 파일 등록 중 오류: '+(e.message||e)); }
     }
     async function mtSlot9GenerateEnglishBatch(koreanItems){
         const prompt=`You are an expert English teacher. For each Korean sentence, create ONE faithful, natural everyday English sentence at CEFR A2 level. Preserve meaning exactly. Return ONLY a JSON array with exactly ${koreanItems.length} objects: [{"index":0,"english":"..."}]. Do not add greetings, names, time expressions, or unrelated content. DATA=${JSON.stringify(koreanItems.map((k,i)=>({index:i,korean:k})))}`;
         const raw=await fetchGemini(prompt,{type:'ARRAY',minItems:koreanItems.length,maxItems:koreanItems.length,items:{type:'OBJECT',properties:{index:{type:'INTEGER'},english:{type:'STRING'}},required:['index','english']}},mtGetSlot9AiConfig()); if(!raw) return null; const arr=Array.isArray(raw)?raw:mtWordWebExtractJsonValue(raw); if(!Array.isArray(arr)||arr.length!==koreanItems.length)return null; return arr.sort((a,b)=>Number(a.index)-Number(b.index)).map(x=>String(x.english||'').trim());
     }
     async function mtSlot9GenerateSix(){
-        if(mtSlot9Busy) return;
-        const st=mtSlot9GetState();
-        if(!st.fileName || !st.sourceRows.length || st.nextSourceIndex>=st.sourceRows.length) return;
-        mtSlot9Busy=true;
-        st.lastError='';
+        if (mtSlot9Busy) return;
+
+        const st = mtSlot9GetState();
+        const retryRows = Array.isArray(st.retryRows) ? st.retryRows : [];
+        const canUseRetry = retryRows.length > 0;
+        const canUseFresh = Array.isArray(st.sourceRows) && st.nextSourceIndex < st.sourceRows.length;
+        if (!st.fileName || (!canUseRetry && !canUseFresh)) return;
+
+        mtSlot9Busy = true;
+        st.lastError = '';
         mtSlot9SaveState(st);
         mtSlot9RenderStatus();
-        try{
-            mtSlot9ProtectSourceRows(st);
-            const batch=st.sourceRows.slice(st.nextSourceIndex,st.nextSourceIndex+6).map(v=>String(v ?? ''));
-            const sourceSnapshot=st.sourceRows.slice();
-            const english=await mtSlot9GenerateEnglishBatch(batch.map(v=>String(v)));
-            if(!english) throw new Error('영어 문장 생성에 실패했습니다.');
-            const items=batch.map((kor,i)=>({english:english[i],korean:String(kor),literal_korean:''}));
-            const slot9AiConfig = mtGetSlot9AiConfig();
-            const validated=await mtWordWebValidateNaturalTranslations(items.map(x=>({english:x.english,korean:x.korean})), slot9AiConfig); if(!validated) throw new Error('영어와 한국어의 의미 일치 검증에 실패했습니다.');
-            const literals=await mtWordWebGenerateLiteralForItems(validated, slot9AiConfig); if(!literals||literals.some(x=>!x?.literal)) throw new Error('보조문장 직독직해 생성에 실패했습니다.');
-            const p=mtSlot9GetPattern(st); const serialStart=(st.outputRows||[]).length+1;
-            literals.forEach((lit,i)=>{
-                const row=[];
-                const width=Math.max(p.sourceKorCol,p.engCol,p.mainKorCol,p.subKorCol,p.serialCol);
-                for(let c=0;c<width;c++)row[c]='';
 
-                // 중요: 슬롯9의 A열(sourceRows)은 사용자 원문이므로 AI가 만든 validated.korean을
-                // A열에 쓰지 않습니다. A열은 처음 업로드한 batch 원문만 기록합니다.
-                row[p.sourceKorCol-1]=String(sourceSnapshot[st.nextSourceIndex+i] ?? batch[i] ?? '');
-                row[p.engCol-1]=validated[i].english;
-                row[p.mainKorCol-1]=validated[i].korean;
-                row[p.subKorCol-1]=lit.literal;
-                row[p.serialCol-1]=String(serialStart+i);
-                st.outputRows.push(row);
+        try {
+            const aiConfig = mtGetSlot9AiConfig();
+            const freshStart = Number(st.nextSourceIndex || 0);
+            const freshBatch = canUseRetry ? [] : st.sourceRows
+                .slice(freshStart, freshStart + 6)
+                .map(v => String(v ?? '').trim())
+                .filter(Boolean);
+
+            const retryBatch = canUseRetry ? retryRows.slice(0, 6).map(x => ({
+                sourceIndex: Number(x.sourceIndex),
+                korean: String(x.korean ?? '').trim()
+            })) : [];
+
+            const batch = canUseRetry
+                ? retryBatch.map(x => x.korean)
+                : freshBatch;
+
+            if (!batch.length) throw new Error('처리할 A열 원문이 없습니다.');
+
+            const prompt = `
+You are an expert English-learning content generator.
+
+For each ORIGINAL Korean sentence, produce exactly one faithful A2 English sentence,
+one natural Korean translation, and one Korean direct-reading translation following the
+English phrase order.
+
+HARD RULES:
+1. ORIGINAL Korean is immutable. Copy it exactly into source_korean.
+2. Do not add greetings, names, dates, time expressions, farewells, or unrelated content.
+3. English must preserve the exact meaning of the original Korean.
+4. korean must be one natural Korean sentence matching the English meaning.
+5. literal_korean must be Korean-only bracket chunks in English phrase order.
+6. Use square brackets around every literal chunk.
+7. Return ONLY a JSON array with exactly ${batch.length} objects.
+
+Required keys:
+source_korean, english, korean, literal_korean
+
+Example:
+[
+  {
+    "source_korean":"팔을 조심스럽게 스트레칭 하세요.",
+    "english":"Please stretch your arms carefully.",
+    "korean":"팔을 조심스럽게 스트레칭 하세요.",
+    "literal_korean":"[제발] [스트레칭하세요] [당신의 팔들을] [조심스럽게]"
+  }
+]
+
+ORIGINAL KOREAN SENTENCES:
+${JSON.stringify(batch)}
+            `.trim();
+
+            const raw = await fetchGemini(
+                prompt,
+                {
+                    type:'ARRAY', minItems:batch.length, maxItems:batch.length,
+                    items:{
+                        type:'OBJECT',
+                        properties:{
+                            source_korean:{type:'STRING'},
+                            english:{type:'STRING'},
+                            korean:{type:'STRING'},
+                            literal_korean:{type:'STRING'}
+                        },
+                        required:['source_korean','english','korean','literal_korean']
+                    }
+                },
+                aiConfig
+            );
+
+            if (!raw) throw new Error('AI 응답을 받지 못했습니다.');
+
+            let resultList = Array.isArray(raw) ? raw : mtWordWebExtractJsonValue(raw);
+            if (!Array.isArray(resultList) || resultList.length !== batch.length) {
+                throw new Error(`AI 응답 문장 수가 ${batch.length}개가 아닙니다.`);
+            }
+
+            const normalize = s => String(s ?? '').normalize('NFC').replace(/\s+/g,' ').trim();
+            const isKoreanOnlyChunkList = literal => {
+                const s = String(literal || '').trim();
+                const chunks = s.match(/\[[^\[\]]+\]/g) || [];
+                if (!s || chunks.length < 2 || chunks.length > 8) return false;
+                if (s.replace(/\[[^\[\]]+\]/g,'').trim() !== '') return false;
+                return chunks.every(c => {
+                    const inside = c.slice(1,-1).trim();
+                    return inside && /[가-힣]/.test(inside) && !/[A-Za-z]/.test(inside);
+                });
+            };
+            const looksSuspiciousKorean = (eng, kor) => {
+                const e = normalize(eng), k = normalize(kor);
+                if (!e || !k || k.length < 2 || !/[가-힣]/.test(k)) return true;
+                if (/[A-Za-z]{3,}/.test(k)) return true;
+                if (e.toLowerCase() === k.toLowerCase()) return true;
+                const parts = k.split(/\s+/).filter(Boolean);
+                for (let span=1; span<=3; span++) {
+                    for (let j=0; j+span*3<=parts.length; j++) {
+                        const a=parts.slice(j,j+span).join(' '), b=parts.slice(j+span,j+span*2).join(' '), c=parts.slice(j+span*2,j+span*3).join(' ');
+                        if (a && a===b && b===c) return true;
+                    }
+                }
+                const maxLen = Math.max(120, e.replace(/\s+/g,'').length * 5 + 50);
+                return k.replace(/\s+/g,'').length > maxLen;
+            };
+            const validRow = (item, expectedSource) => {
+                if (normalize(item?.source_korean) !== normalize(expectedSource)) return false;
+                const eng = normalize(item?.english), kor = normalize(item?.korean), lit = String(item?.literal_korean || '').trim();
+                if (eng.length < 2 || kor.length < 2) return false;
+                if (looksSuspiciousKorean(eng, kor)) return false;
+                if (!isKoreanOnlyChunkList(lit)) return false;
+                return true;
+            };
+
+            // 초기 배열을 원문 순서에 맞추고 각 행을 로컬 검증
+            resultList = resultList.map((x, i) => ({
+                source_korean:String(x?.source_korean ?? ''),
+                english:String(x?.english ?? '').trim(),
+                korean:String(x?.korean ?? '').trim(),
+                literal_korean:String(x?.literal_korean ?? '').trim(),
+                batchPos:i
+            }));
+
+            const failed = [];
+            resultList.forEach((item, i) => {
+                if (!validRow(item, batch[i])) failed.push({ index:i, sourceKorean:batch[i], reason:'로컬 검증 실패' });
             });
 
-            // AI 호출 전후로 원본이 변하지 않았는지 확인합니다.
-            st.sourceRows=sourceSnapshot.slice();
-            st.sourceRowsLock=sourceSnapshot.slice();
-            st.nextSourceIndex+=batch.length; st.lastRun=Date.now(); st.nextRun=Date.now()+MT_SLOT9_INTERVAL_MS; st.lastError=''; mtSlot9SaveState(st); mtSlot9RenderStatus(`${batch.length}문장 생성 완료`); mtInitSlots();
-        }catch(e){ st.lastRun=Date.now(); st.nextRun=Date.now()+MT_SLOT9_INTERVAL_MS; st.lastError=String(e.message||e).substring(0,220); mtSlot9SaveState(st); mtSlot9RenderStatus(); } finally{mtSlot9Busy=false;}
+            // 실패 행만 개별 재시도: 검증용 AI 호출을 별도로 수행하지 않습니다.
+            async function repairOne(sourceKorean, reason) {
+                const repairPrompt = `
+Repair exactly ONE row.
+
+ORIGINAL KOREAN (must be copied exactly):
+${JSON.stringify(sourceKorean)}
+
+Issue:
+${JSON.stringify(reason)}
+
+Return ONLY JSON object:
+{"source_korean":"...","english":"...","korean":"...","literal_korean":"[...] [...]"}
+
+Rules:
+- Faithful CEFR A2 English.
+- Natural Korean matching the English meaning.
+- literal_korean must be Korean-only bracket chunks in the exact English phrase order.
+- Do not add unrelated content.
+                `.trim();
+
+                for (let attempt=0; attempt<2; attempt++) {
+                    const repairedRaw = await fetchGemini(
+                        repairPrompt,
+                        {
+                            type:'OBJECT',
+                            properties:{
+                                source_korean:{type:'STRING'},
+                                english:{type:'STRING'},
+                                korean:{type:'STRING'},
+                                literal_korean:{type:'STRING'}
+                            },
+                            required:['source_korean','english','korean','literal_korean']
+                        },
+                        aiConfig
+                    );
+                    if (!repairedRaw) continue;
+                    try {
+                        const obj = Array.isArray(repairedRaw)
+                            ? repairedRaw[0]
+                            : (typeof repairedRaw === 'object' ? repairedRaw : mtWordWebExtractJsonValue(repairedRaw));
+                        if (validRow(obj, sourceKorean)) return {
+                            source_korean:normalize(obj.source_korean),
+                            english:normalize(obj.english),
+                            korean:normalize(obj.korean),
+                            literal_korean:String(obj.literal_korean).trim()
+                        };
+                    } catch(e) {}
+                }
+                return null;
+            }
+
+            for (const f of failed) {
+                const repaired = await repairOne(f.sourceKorean, f.reason);
+                if (repaired) resultList[f.index] = {...repaired, batchPos:f.index};
+            }
+
+            const unresolved = [];
+            resultList.forEach((item, i) => {
+                if (!validRow(item, batch[i])) unresolved.push(i);
+            });
+
+            const successful = resultList
+                .map((item,i) => validRow(item,batch[i]) ? {item, batchIndex:i} : null)
+                .filter(Boolean);
+
+            // 성공 행은 즉시 저장하고, 실패 행만 retryRows로 남깁니다.
+            const p = mtSlot9GetPattern(st);
+            let serialStart = (st.outputRows || []).length + 1;
+            for (const s of successful) {
+                const row=[];
+                const width=Math.max(p.sourceKorCol,p.engCol,p.mainKorCol,p.subKorCol,p.serialCol);
+                for(let c=0;c<width;c++) row[c]='';
+                const sourceIndex = canUseRetry ? retryBatch[s.batchIndex].sourceIndex : freshStart + s.batchIndex;
+                row[p.sourceKorCol-1] = String(st.sourceRows[sourceIndex] ?? batch[s.batchIndex]);
+                row[p.engCol-1] = s.item.english;
+                row[p.mainKorCol-1] = s.item.korean;
+                row[p.subKorCol-1] = s.item.literal_korean;
+                row[p.serialCol-1] = String(serialStart++);
+                st.outputRows.push(row);
+            }
+
+            // 새 배치였다면 이미 시도한 6개를 nextSourceIndex에서 소비합니다.
+            // 실패한 행만 정확한 원본 인덱스를 보존해 다음 실행에서 재시도합니다.
+            if (!canUseRetry) st.nextSourceIndex = freshStart + batch.length;
+            else st.retryRows = retryRows.slice(batch.length);
+
+            const newFailed = unresolved.map(i => ({
+                sourceIndex: canUseRetry ? retryBatch[i].sourceIndex : freshStart + i,
+                korean: batch[i]
+            }));
+            st.retryRows = (Array.isArray(st.retryRows) ? st.retryRows : []).concat(newFailed);
+
+            st.lastRun=Date.now();
+            st.nextRun=Date.now()+MT_SLOT9_INTERVAL_MS;
+            st.lastError = unresolved.length
+                ? `${successful.length}개 저장, ${unresolved.length}개는 다음 자동 실행에서 재시도합니다.`
+                : '';
+            st.sourceRows = st.sourceRows.slice();
+            st.sourceRowsLock = st.sourceRows.slice();
+            mtSlot9SaveState(st);
+            mtSlot9RenderStatus(unresolved.length ? st.lastError : `${successful.length}문장 생성 완료`);
+            mtInitSlots();
+
+        } catch (e) {
+            st.lastRun=Date.now();
+            st.nextRun=Date.now()+MT_SLOT9_INTERVAL_MS;
+            st.lastError=String(e?.message || e).substring(0,220);
+            mtSlot9SaveState(st);
+            mtSlot9RenderStatus();
+            console.error('[슬롯9]', e);
+        } finally {
+            mtSlot9Busy=false;
+        }
     }
     function mtSlot9StartAutoTrigger(reset=false){
         if(mtSlot9TimerId) clearTimeout(mtSlot9TimerId);
         const st=mtSlot9GetState();
-        if(!st.fileName || !Array.isArray(st.sourceRows) || st.nextSourceIndex>=st.sourceRows.length){ mtSlot9TimerId=null; return; }
+        if(!st.fileName || !Array.isArray(st.sourceRows) || ((st.nextSourceIndex>=st.sourceRows.length) && (!Array.isArray(st.retryRows) || !st.retryRows.length))){ mtSlot9TimerId=null; return; }
         if(reset || !st.nextRun){ st.nextRun=Date.now()+MT_SLOT9_INTERVAL_MS; mtSlot9SaveState(st); }
         const delay=Math.max(1000, Number(st.nextRun)-Date.now());
         mtSlot9TimerId=setTimeout(async()=>{
