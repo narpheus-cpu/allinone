@@ -1063,9 +1063,9 @@
                     <button class="btn-excel" type="button" onclick="mtCloseStatsModal()">닫기</button>
                 </div>
                 <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px;">
-                    <button id="mtStatsTabWeek" class="btn-primary" type="button" onclick="mtRenderStatsDetail('week')" style="padding:7px 12px;">주별</button>
-                    <button id="mtStatsTabMonth" class="btn-excel" type="button" onclick="mtRenderStatsDetail('month')" style="padding:7px 12px;">월별</button>
-                    <button id="mtStatsTabYear" class="btn-excel" type="button" onclick="mtRenderStatsDetail('year')" style="padding:7px 12px;">연도별</button>
+                    <button id="mtStatsTabWeek" class="btn-primary" type="button" onclick="mtRenderStatsDetail('week')" style="padding:7px 12px;">주간</button>
+                    <button id="mtStatsTabMonth" class="btn-excel" type="button" onclick="mtRenderStatsDetail('month')" style="padding:7px 12px;">월간</button>
+                    <button id="mtStatsTabYear" class="btn-excel" type="button" onclick="mtRenderStatsDetail('year')" style="padding:7px 12px;">연간</button>
                 </div>
                 <div id="mtStatsDetailContent"></div>
             </div>
@@ -1543,7 +1543,7 @@
     // ★ 최근 코드 업데이트 시각: 20260818025800
     // ★ ※ 코드를 직접 수정할 때마다 위 시간값도 변경하세요.
     // ============================================================================
-    const APP_BUILD_TIMESTAMP = '20260818025800';
+    const APP_BUILD_TIMESTAMP = '20260818102300';
     
         /* ========================================== */
     /* [신규 기능] AI 도움 프롬프트 통합 템플릿 관리   */
@@ -5494,8 +5494,23 @@ Example:
                 detail = dailyKeys.map(k => { const s=g.days[k] || {cards:0,words:0}; return `${mtFormatDateKey(k)}: ${s.cards||0}장/${s.words||0}단어`; }).join('<br>');
             } else if (type === 'month') {
                 label = key.replace('-', '년 ') + '월';
-                const dailyKeys = Object.keys(g.days).sort();
-                detail = dailyKeys.map(k => { const s=g.days[k]||{cards:0,words:0}; return `${Number(k.slice(8))}일: ${s.cards||0}장/${s.words||0}단어`; }).join('<br>');
+                // 월간에서는 일별이 아니라 주별 내역을 보여줍니다.
+                // 해당 월에 포함되는 날짜만 합산하므로 월 경계에 걸친 주도 월별 수치와 일치합니다.
+                const weekly = {};
+                Object.keys(g.days).sort().forEach(k => {
+                    const wk = mtGetWeekKeyFromDateKey(k);
+                    if (!weekly[wk]) weekly[wk] = {cards:0, words:0};
+                    weekly[wk].cards += Number(g.days[k]?.cards || 0);
+                    weekly[wk].words += Number(g.days[k]?.words || 0);
+                });
+                detail = Object.keys(weekly).sort().map((wk, idx) => {
+                    const ws = weekly[wk];
+                    const start = mtParseDateKey(wk);
+                    const end = new Date(start.getTime());
+                    end.setUTCDate(end.getUTCDate() + 6);
+                    const endKey = mtGetKoreaDateKeyFromUtc(end);
+                    return `${idx + 1}주차 (${mtFormatDateKey(wk)} ~ ${mtFormatDateKey(endKey)}): ${ws.cards||0}장/${ws.words||0}단어`;
+                }).join('<br>');
             } else {
                 label = `${key}년`;
                 const monthGroups = {};
@@ -5507,8 +5522,8 @@ Example:
         const headers = type === 'week'
             ? ['주간','열어본 카드','없앤 단어','카드당 단어','일별 내역']
             : type === 'month'
-            ? ['월','열어본 카드','없앤 단어','카드당 단어','일별 내역']
-            : ['연도','열어본 카드','없앤 단어','카드당 단어','월별 내역'];
+            ? ['월간','열어본 카드','없앤 단어','카드당 단어','주별 내역']
+            : ['연간','열어본 카드','없앤 단어','카드당 단어','월별 내역'];
         content.innerHTML = mtStatsTableHtml(headers, rows) + `<div class="mt-stats-subtle">※ 힌트로 공개된 단어는 ‘없앤 단어’에 포함되지 않습니다. 카드 수는 Enter로 정답 처리되어 다음 카드로 넘어간 경우에만 증가합니다.</div>`;
     }
 
@@ -6635,12 +6650,12 @@ Example:
 
 
     /* ========================================== */
-    /* [실행] 통합 앱  초기화 로직                 */
+    /* [실행] 통합 앱 초기화 로직                 */
     /* ========================================== */
     function mtSetAppUpdateTimestamp() {
         const el = document.getElementById('appUpdateTimestamp');
         if (!el) return;
-        el.textContent = APP_BUILD_TIMESTAMP;
+        el.textContent = String(APP_BUILD_TIMESTAMP).slice(0, 12);
     }
 
     (async function initApp() {
