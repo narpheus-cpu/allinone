@@ -1577,10 +1577,10 @@
 
 <script>
     // ============================================================================
-    // ★ 최근 코드 업데이트 시각: 20260818224230
+    // ★ 최근 코드 업데이트 시각: 20260818224500
     // ★ ※ 코드를 직접 수정할 때마다 위 시간값도 변경하세요.
     // ============================================================================
-    const APP_BUILD_TIMESTAMP = '20260818224230';
+    const APP_BUILD_TIMESTAMP = '20260818224500';
     
         /* ========================================== */
     /* [신규 기능] AI 도움 프롬프트 통합 템플릿 관리   */
@@ -4146,7 +4146,7 @@ Rules:
         const words=mtSlot9BuildSlotData(st).words;
         const star=mtSlot9GetStarredCount(st);
         div.className='mt-slot mt-wordweb-slot '+(st.fileName?'has-data':'');
-        div.innerHTML=`<div class="mt-slot-title">${mtEscapeHTML(st.fileName || '슬롯 9')}</div><div class="mt-slot-desc" style="line-height:1.5;">카드 수: ${words.length}개<br><span style="color:#d97706;font-weight:600;">★표기카드수: ${star}개</span></div><div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:center;align-items:center;">${st.fileName?`<button class="btn-download" style="padding:5px 10px;font-size:11px;" onclick="mtSlot9DownloadClick(event)">내보내기</button>`:'<button class="btn-download" disabled style="padding:5px 10px;font-size:11px;">내보내기</button>'}${st.fileName?`<button class="mt-btn-delete" onclick="mtDeleteSlot(event,'slot9')">삭제</button>`:'<button class="mt-btn-delete" disabled>삭제</button>'}</div><div id="mtSlot9Status" class="mt-wordweb-status"></div>`;
+        div.innerHTML=`<div class="mt-slot-title">${mtEscapeHTML(st.fileName || '슬롯 9')} (자동생성)</div><div class="mt-slot-desc" style="line-height:1.5;">카드 수: ${words.length}개<br><span style="color:#d97706;font-weight:600;">★표기카드수: ${star}개</span></div><div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:center;align-items:center;">${st.fileName?`<button class="btn-download" style="padding:5px 10px;font-size:11px;" onclick="mtSlot9DownloadClick(event)">내보내기</button>`:'<button class="btn-download" disabled style="padding:5px 10px;font-size:11px;">내보내기</button>'}${st.fileName?`<button class="mt-btn-delete" onclick="mtDeleteSlot(event,'slot9')">삭제</button>`:'<button class="mt-btn-delete" disabled>삭제</button>'}</div><div id="mtSlot9Status" class="mt-wordweb-status"></div>`;
         div.onclick=()=>{ if(!st.fileName){ mtSlot9TriggerUpload(); return;} mtPromptAction('slot9',mtSlot9BuildSlotData(st)); };
         mtSlot9RenderStatus();
     }
@@ -4307,7 +4307,7 @@ Rules:
 
         div.className = 'mt-slot mt-wordweb-slot ' + (state.fileName ? 'has-data' : '');
         div.innerHTML = `
-            <div class="mt-slot-title">워드웹회화</div>
+            <div class="mt-slot-title">워드웹회화 (자동생성)</div>
             <div class="mt-slot-desc" style="line-height:1.5;">
                 카드 수: ${cardCount}개<br>
                 <span style="color:#d97706; font-weight:600;">★표기카드수: ${starredCount}개</span>
