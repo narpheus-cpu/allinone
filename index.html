@@ -1577,10 +1577,10 @@
 
 <script>
     // ============================================================================
-    // ★ 최근 코드 업데이트 시각: 20260818221610
+    // ★ 최근 코드 업데이트 시각: 202608182217
     // ★ ※ 코드를 직접 수정할 때마다 위 시간값도 변경하세요.
     // ============================================================================
-    const APP_BUILD_TIMESTAMP = '20260818221610';
+    const APP_BUILD_TIMESTAMP = '202608182217';
     
         /* ========================================== */
     /* [신규 기능] AI 도움 프롬프트 통합 템플릿 관리   */
@@ -4230,6 +4230,7 @@ Rules:
                 const idx=start+pi;
                 const el=document.createElement('div');
                 el.className='mt-list-edit-row';
+                el.style.gridTemplateColumns='28px 44px minmax(0,1fr) 44px';
                 el.dataset.sourceOnly='true';
                 el.innerHTML=`<div class="mt-list-edit-num">${idx+1}</div><div class="mt-wordweb-item-content"><div class="mt-list-edit-label">한국어 원문</div><div class="mt-list-edit-text">${mtEscapeHTML(String(kor||''))}</div><div style="margin-top:8px;color:#6b7280;font-size:11px;">아직 영어/직독직해가 생성되지 않았습니다. 5분 자동생성 후 이 목록에 결과가 표시됩니다.</div></div>`;
                 body.appendChild(el);
@@ -4239,6 +4240,7 @@ Rules:
                 const idx=start+pi;
                 const el=document.createElement('div');
                 el.className='mt-list-edit-row';
+                el.style.gridTemplateColumns='28px 44px minmax(0,1fr) 44px';
                 el.dataset.index=idx;
                 el.innerHTML=`<div class="mt-list-edit-num">${idx+1}</div><div class="mt-wordweb-item-content"><div class="mt-list-edit-label">영어</div><div class="mt-list-edit-text">${mtEscapeHTML(String(r[p.engCol-1]||''))}</div><div class="mt-list-edit-label" style="margin-top:6px;">보조문장</div><div class="mt-list-edit-text">${mtEscapeHTML(String(r[p.subKorCol-1]||''))}</div><div class="mt-list-edit-label" style="margin-top:6px;">주문장</div><div class="mt-list-edit-text">${mtEscapeHTML(String(r[p.mainKorCol-1]||''))}</div></div><div><button class="btn-excel" style="width:32px;height:32px;padding:0;font-size:16px;" onclick="mtToggleSlot9RowEdit(${idx})">✎</button></div>`;
                 body.appendChild(el);
@@ -4249,7 +4251,7 @@ Rules:
         if(input) input.value=mtSlot9ListPage;
         if(info) info.innerText=`/ ${totalPages} 페이지 (총 ${total}개${useSourceOnly?' · 원본 A열':''})`;
     }
-    function mtToggleSlot9RowEdit(index){const st=mtSlot9GetState(),p=mtSlot9GetPattern(st),r=st.outputRows[index],el=document.querySelector(`#mtSlot9ListEditBody .mt-list-edit-row[data-index="${index}"]`);if(!r||!el)return;const editing=el.dataset.editing==='true';if(editing){const e=el.querySelector('[data-field="eng"]').value.trim(),k=el.querySelector('[data-field="kor"]').value.trim(),l=el.querySelector('[data-field="sub"]').value.trim();if(!e||!k||!mtWordWebIsKoreanChunkList(l))return alert('영어/주문장을 입력하고 보조문장은 한국어 청크 형식으로 입력하세요.');r[p.engCol-1]=e;r[p.mainKorCol-1]=k;r[p.subKorCol-1]=l;mtSlot9SaveState(st);mtRenderSlot9ListEditor();mtInitSlots();return;}el.dataset.editing='true';el.querySelector('.mt-wordweb-item-content').innerHTML=`<div class="mt-list-edit-label">영어</div><textarea data-field="eng" style="width:100%;box-sizing:border-box;">${mtEscapeHTML(String(r[p.engCol-1]||''))}</textarea><div class="mt-list-edit-label">보조문장</div><textarea data-field="sub" style="width:100%;box-sizing:border-box;">${mtEscapeHTML(String(r[p.subKorCol-1]||''))}</textarea><div class="mt-list-edit-label">주문장</div><textarea data-field="kor" style="width:100%;box-sizing:border-box;">${mtEscapeHTML(String(r[p.mainKorCol-1]||''))}</textarea>`;el.querySelector('button').textContent='✓';}
+    function mtToggleSlot9RowEdit(index){const st=mtSlot9GetState(),p=mtSlot9GetPattern(st),r=st.outputRows[index],el=document.querySelector(`#mtSlot9ListEditBody .mt-list-edit-row[data-index="${index}"]`);if(!r||!el)return;const editing=el.dataset.editing==='true';if(editing){const e=el.querySelector('[data-field="eng"]').value.trim(),k=el.querySelector('[data-field="kor"]').value.trim(),l=el.querySelector('[data-field="sub"]').value.trim();if(!e||!k||!mtWordWebIsKoreanChunkList(l))return alert('영어/주문장을 입력하고 보조문장은 한국어 청크 형식으로 입력하세요.');r[p.engCol-1]=e;r[p.mainKorCol-1]=k;r[p.subKorCol-1]=l;mtSlot9SaveState(st);mtRenderSlot9ListEditor();mtInitSlots();return;}el.dataset.editing='true';el.querySelector('.mt-wordweb-item-content').innerHTML=`<div class="mt-list-edit-label">영어</div><textarea data-field="eng" rows="2" style="width:100%;box-sizing:border-box;padding:7px 9px;border:1px solid var(--border-color);border-radius:6px;font-size:12px;line-height:1.45;resize:vertical;">${mtEscapeHTML(String(r[p.engCol-1]||''))}</textarea><div class="mt-list-edit-label" style="margin-top:7px;">보조문장</div><textarea data-field="sub" rows="2" style="width:100%;box-sizing:border-box;padding:7px 9px;border:1px solid var(--border-color);border-radius:6px;font-size:12px;line-height:1.45;resize:vertical;">${mtEscapeHTML(String(r[p.subKorCol-1]||''))}</textarea><div class="mt-list-edit-label" style="margin-top:7px;">주문장</div><textarea data-field="kor" rows="3" style="width:100%;box-sizing:border-box;padding:7px 9px;border:1px solid var(--border-color);border-radius:6px;font-size:12px;line-height:1.45;resize:vertical;">${mtEscapeHTML(String(r[p.mainKorCol-1]||''))}</textarea>`;el.querySelector('button').textContent='✓';}
     function mtSlot9ListChangePage(d){mtSlot9ListPage=Math.max(1,mtSlot9ListPage+d);mtRenderSlot9ListEditor();}
     function mtSlot9ListJumpPage(v){mtSlot9ListPage=Math.max(1,Number(v)||1);mtRenderSlot9ListEditor();}
 
