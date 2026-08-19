@@ -2448,7 +2448,25 @@
     function mtGetGeneratorErrorLogs(slotKey) {
         try {
             const raw = JSON.parse(localStorage.getItem(mtGeneratorLogKey(slotKey)) || '[]');
-            return Array.isArray(raw) ? raw : [];
+            let logs = Array.isArray(raw) ? raw : [];
+            // 구버전 슬롯9 오류로그 저장소도 함께 읽어 기존 기록을 잃지 않습니다.
+            if (String(slotKey) === 'slot9') {
+                try {
+                    const legacy = JSON.parse(localStorage.getItem('mt_slot9_error_log_v1') || '[]');
+                    if (Array.isArray(legacy) && legacy.length) {
+                        const seen = new Set(logs.map(x => JSON.stringify([x?.timestampKST || '', x?.model || '', x?.errorMessage || ''])));
+                        for (const item of legacy) {
+                            const sig = JSON.stringify([item?.timestampKST || '', item?.model || '', item?.errorMessage || '']);
+                            if (!seen.has(sig)) {
+                                logs.push({...item, slotKey:'slot9', slotLabel:item?.slotLabel || '슬롯9'});
+                                seen.add(sig);
+                            }
+                        }
+                        logs.sort((a,b) => String(a.timestampKST||'').localeCompare(String(b.timestampKST||'')));
+                    }
+                } catch (_) {}
+            }
+            return logs;
         } catch (_) { return []; }
     }
     function mtRecordGeneratorErrorLog(slotKey, detail = {}) {
@@ -2494,18 +2512,32 @@
         if (!logs.length) {
             let fallback = null;
             try {
-                if (slotKey === 'slot9') fallback = mtSlot9GetState()?.lastDiagnostic || null;
-                else if (slotKey === 'wordweb') fallback = mtWordWebGetState()?.lastDiagnostic || null;
-                else if (/^typed_\d+$/.test(String(slotKey))) fallback = mtGetTypedState(Number(String(slotKey).slice(6)))?.lastDiagnostic || null;
+                if (slotKey === 'slot9') {
+                    const st = mtSlot9GetState();
+                    fallback = st?.lastDiagnostic || null;
+                    if (!fallback && st?.lastError) fallback = {seq:1,timestampKST:mtGetSeoulTimestamp(),slotKey:'slot9',slotLabel:slotLabel||'슬롯9',model:'',httpStatus:null,finishReason:'',promptFeedback:null,contentParts:null,responseObject:null,errorMessage:String(st.lastError)};
+                } else if (slotKey === 'wordweb') {
+                    const st = mtWordWebGetState();
+                    fallback = st?.lastDiagnostic || null;
+                    if (!fallback && st?.lastError) fallback = {seq:1,timestampKST:mtGetSeoulTimestamp(),slotKey:'wordweb',slotLabel:slotLabel||'참조형 슬롯10',model:'',httpStatus:null,finishReason:'',promptFeedback:null,contentParts:null,responseObject:null,errorMessage:String(st.lastError)};
+                } else if (/^typed_\d+$/.test(String(slotKey))) {
+                    const idx = Number(String(slotKey).slice(6));
+                    const st = mtGetTypedState(idx);
+                    fallback = st?.lastDiagnostic || null;
+                    if (!fallback && st?.lastError) fallback = {seq:1,timestampKST:mtGetSeoulTimestamp(),slotKey:String(slotKey),slotLabel:slotLabel||`슬롯 ${idx+1}`,model:'',httpStatus:null,finishReason:'',promptFeedback:null,contentParts:null,responseObject:null,errorMessage:String(st.lastError)};
+                }
             } catch (_) {}
-            if (fallback) {
-                logs = [fallback];
-            }
+            if (fallback) logs = [fallback];
         }
         if (!logs.length) {
             alert('저장된 오류 로그가 없습니다.\n\n오류가 발생한 뒤 [오류로그]를 눌러 주세요.');
             return;
         }
+        try {
+            const normalized = logs.slice(-500).map((item, idx) => ({...item, seq:idx+1, slotKey:item.slotKey||String(slotKey), slotLabel:item.slotLabel||String(slotLabel||slotKey)}));
+            localStorage.setItem(mtGeneratorLogKey(slotKey), JSON.stringify(normalized));
+            logs = normalized;
+        } catch (_) {}
         const text = [
             `[마스킹타이핑] ${slotLabel || slotKey} 오류 로그`,
             `생성시각(KST): ${mtGetSeoulTimestamp()}`,
