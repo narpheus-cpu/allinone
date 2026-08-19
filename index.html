@@ -2549,8 +2549,9 @@
             }
         }
 
+        config.lastError = lastError || '사용 가능한 모델이 없습니다.';
         if (!config.silent) {
-            alert(`AI 응답 생성 실패:\n${lastError || '사용 가능한 모델이 없습니다.'}`);
+            alert(`AI 응답 생성 실패:\n${config.lastError}`);
         }
         return null;
     }
@@ -2561,8 +2562,8 @@
     // ==========================================
     const MT_SLOT9_API_KEY_STORAGE_KEY = 'word_slot_9_api_key';
     const MT_WORDWEB_API_KEY_STORAGE_KEY = 'word_slot_wordweb_api_key';
-    const MT_SLOT9_PREFERRED_MODELS = ['gemini-3.6-flash','gemini-3.6-pro'];
-    const MT_WORDWEB_PREFERRED_MODELS = ['gemini-3.6-flash','gemini-3.6-pro'];
+    const MT_SLOT9_PREFERRED_MODELS = ['gemini-3.6-flash'];
+    const MT_WORDWEB_PREFERRED_MODELS = ['gemini-3.6-flash'];
     const mtSlot9BlacklistedModels = new Set();
     const mtWordWebBlacklistedModels = new Set();
 
@@ -2591,6 +2592,7 @@
             models: MT_SLOT9_PREFERRED_MODELS,
             discoverModels: true,
             blacklistSet: mtSlot9BlacklistedModels,
+            lastError: '',
             silent: true,
             requestTimeoutMs: 45000,
             listTimeoutMs: 12000,
@@ -4927,7 +4929,7 @@ ${JSON.stringify(batch)}
                 aiConfig
             );
 
-            if (!raw) throw new Error('AI 응답을 받지 못했습니다.');
+            if (!raw) throw new Error('AI 요청 실패: ' + (aiConfig && aiConfig.lastError ? aiConfig.lastError : 'API 응답을 받지 못했습니다.'));
 
             let resultList = Array.isArray(raw) ? raw : mtWordWebExtractJsonValue(raw);
             if (!Array.isArray(resultList) || resultList.length !== batch.length) {
