@@ -2864,7 +2864,7 @@
         const s9 = document.getElementById('mtSlot9ApiKeyInput'); if (s9) s9.value = mtGetSlotApiKey('slot9');
         const ww = document.getElementById('mtWordWebApiKeyInput'); if (ww) ww.value = mtGetSlotApiKey('wordweb');
     }
-    function mtGetSlot9AiConfig() {
+function mtGetSlot9AiConfig() {
         return {
             apiKey: mtGetSlotApiKey('slot9'),
             models: MT_SLOT9_PREFERRED_MODELS,
@@ -2872,7 +2872,7 @@
             blacklistSet: mtSlot9BlacklistedModels,
             lastError: '',
             silent: true,
-            requestTimeoutMs: 45000,
+            requestTimeoutMs: 90000,
             listTimeoutMs: 12000,
             maxModelAttempts: 5,
             missingKeyMessage: '메인 API 키 또는 슬롯9 전용 API 키를 먼저 입력해 주세요.'
@@ -2885,7 +2885,7 @@
             discoverModels: false,
             blacklistSet: mtWordWebBlacklistedModels,
             silent: true,
-            requestTimeoutMs: 45000,
+            requestTimeoutMs: 90000,
             listTimeoutMs: 12000,
             maxModelAttempts: 5,
             missingKeyMessage: '메인 API 키 또는 워드웹회화 전용 API 키를 먼저 입력해 주세요.'
