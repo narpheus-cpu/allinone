@@ -2444,29 +2444,12 @@
 
     // 생성형 슬롯 공통 AI 오류 로그
     const MT_GENERATOR_ERROR_LOG_PREFIX = 'mt_generator_error_log_v2_';
+    const MT_GENERATOR_ERROR_LOG_MAX = 10;
     function mtGeneratorLogKey(slotKey) { return MT_GENERATOR_ERROR_LOG_PREFIX + String(slotKey); }
     function mtGetGeneratorErrorLogs(slotKey) {
         try {
             const raw = JSON.parse(localStorage.getItem(mtGeneratorLogKey(slotKey)) || '[]');
-            let logs = Array.isArray(raw) ? raw : [];
-            // 구버전 슬롯9 오류로그 저장소도 함께 읽어 기존 기록을 잃지 않습니다.
-            if (String(slotKey) === 'slot9') {
-                try {
-                    const legacy = JSON.parse(localStorage.getItem('mt_slot9_error_log_v1') || '[]');
-                    if (Array.isArray(legacy) && legacy.length) {
-                        const seen = new Set(logs.map(x => JSON.stringify([x?.timestampKST || '', x?.model || '', x?.errorMessage || ''])));
-                        for (const item of legacy) {
-                            const sig = JSON.stringify([item?.timestampKST || '', item?.model || '', item?.errorMessage || '']);
-                            if (!seen.has(sig)) {
-                                logs.push({...item, slotKey:'slot9', slotLabel:item?.slotLabel || '슬롯9'});
-                                seen.add(sig);
-                            }
-                        }
-                        logs.sort((a,b) => String(a.timestampKST||'').localeCompare(String(b.timestampKST||'')));
-                    }
-                } catch (_) {}
-            }
-            return logs;
+            return Array.isArray(raw) ? raw.slice(-MT_GENERATOR_ERROR_LOG_MAX) : [];
         } catch (_) { return []; }
     }
     function mtRecordGeneratorErrorLog(slotKey, detail = {}) {
@@ -2479,7 +2462,7 @@
                 ...detail
             };
             logs.push(entry);
-            const kept = logs.slice(-500);
+            const kept = logs.slice(-MT_GENERATOR_ERROR_LOG_MAX);
             kept.forEach((item, idx) => { item.seq = idx + 1; });
             localStorage.setItem(mtGeneratorLogKey(slotKey), JSON.stringify(kept));
             return kept[kept.length - 1] || entry;
@@ -2507,37 +2490,23 @@
     }
     function mtDownloadGeneratorErrorLog(event, slotKey, slotLabel) {
         if (event) event.stopPropagation();
-        let logs = mtGetGeneratorErrorLogs(slotKey).slice().sort((a,b) => Number(a.seq||0) - Number(b.seq||0));
+        let logs = mtGetGeneratorErrorLogs(slotKey).slice(-MT_GENERATOR_ERROR_LOG_MAX).sort((a,b) => Number(a.seq||0) - Number(b.seq||0));
         // 저장소에 기록이 누락된 경우에도 현재 슬롯 상태의 마지막 진단을 복구해서 로그에 포함합니다.
         if (!logs.length) {
             let fallback = null;
             try {
-                if (slotKey === 'slot9') {
-                    const st = mtSlot9GetState();
-                    fallback = st?.lastDiagnostic || null;
-                    if (!fallback && st?.lastError) fallback = {seq:1,timestampKST:mtGetSeoulTimestamp(),slotKey:'slot9',slotLabel:slotLabel||'슬롯9',model:'',httpStatus:null,finishReason:'',promptFeedback:null,contentParts:null,responseObject:null,errorMessage:String(st.lastError)};
-                } else if (slotKey === 'wordweb') {
-                    const st = mtWordWebGetState();
-                    fallback = st?.lastDiagnostic || null;
-                    if (!fallback && st?.lastError) fallback = {seq:1,timestampKST:mtGetSeoulTimestamp(),slotKey:'wordweb',slotLabel:slotLabel||'참조형 슬롯10',model:'',httpStatus:null,finishReason:'',promptFeedback:null,contentParts:null,responseObject:null,errorMessage:String(st.lastError)};
-                } else if (/^typed_\d+$/.test(String(slotKey))) {
-                    const idx = Number(String(slotKey).slice(6));
-                    const st = mtGetTypedState(idx);
-                    fallback = st?.lastDiagnostic || null;
-                    if (!fallback && st?.lastError) fallback = {seq:1,timestampKST:mtGetSeoulTimestamp(),slotKey:String(slotKey),slotLabel:slotLabel||`슬롯 ${idx+1}`,model:'',httpStatus:null,finishReason:'',promptFeedback:null,contentParts:null,responseObject:null,errorMessage:String(st.lastError)};
-                }
+                if (slotKey === 'slot9') fallback = mtSlot9GetState()?.lastDiagnostic || null;
+                else if (slotKey === 'wordweb') fallback = mtWordWebGetState()?.lastDiagnostic || null;
+                else if (/^typed_\d+$/.test(String(slotKey))) fallback = mtGetTypedState(Number(String(slotKey).slice(6)))?.lastDiagnostic || null;
             } catch (_) {}
-            if (fallback) logs = [fallback];
+            if (fallback) {
+                logs = [fallback];
+            }
         }
         if (!logs.length) {
             alert('저장된 오류 로그가 없습니다.\n\n오류가 발생한 뒤 [오류로그]를 눌러 주세요.');
             return;
         }
-        try {
-            const normalized = logs.slice(-500).map((item, idx) => ({...item, seq:idx+1, slotKey:item.slotKey||String(slotKey), slotLabel:item.slotLabel||String(slotLabel||slotKey)}));
-            localStorage.setItem(mtGeneratorLogKey(slotKey), JSON.stringify(normalized));
-            logs = normalized;
-        } catch (_) {}
         const text = [
             `[마스킹타이핑] ${slotLabel || slotKey} 오류 로그`,
             `생성시각(KST): ${mtGetSeoulTimestamp()}`,
@@ -2602,6 +2571,7 @@
 
     // 슬롯9 AI 오류 진단 로그
     const MT_SLOT9_ERROR_LOG_KEY = 'mt_slot9_error_log_v1';
+    const MT_SLOT9_ERROR_LOG_MAX = 10;
     function mtGetSeoulTimestamp() {
         return new Intl.DateTimeFormat('sv-SE', {
             timeZone: 'Asia/Seoul', year:'numeric', month:'2-digit', day:'2-digit',
@@ -2619,7 +2589,7 @@
             };
             arr.push(entry);
             // 과도한 누적을 방지하되 최근 기록은 충분히 보존합니다.
-            const kept = arr.slice(-300);
+            const kept = arr.slice(-MT_GENERATOR_ERROR_LOG_MAX);
             kept.forEach((item, idx) => { item.seq = idx + 1; });
             localStorage.setItem(MT_SLOT9_ERROR_LOG_KEY, JSON.stringify(kept));
             return entry;
@@ -2650,6 +2620,7 @@
         if (event) event.stopPropagation();
         let logs = [];
         try { logs = JSON.parse(localStorage.getItem(MT_SLOT9_ERROR_LOG_KEY) || '[]'); } catch (e) {}
+        if (Array.isArray(logs)) logs = logs.slice(-MT_SLOT9_ERROR_LOG_MAX);
         if (!Array.isArray(logs) || !logs.length) {
             alert('저장된 슬롯9 오류 로그가 없습니다.');
             return;
@@ -2712,12 +2683,8 @@
             return null;
         }
 
-        // 사용자께서 제공한 최신 안정화 코드의 방향을 반영합니다.
-        // - 텍스트 생성에 적합한 안정형 Flash 계열만 사용
-        // - 이미지/TTS/Live/실험/preview 모델은 후보에서 제외
-        // - API 모델 목록 자동 탐색으로 임의의 모델이 추가되지 않음
-        // 텍스트 생성 슬롯은 텍스트 출력이 공식 지원되는 안정형 Flash 계열만 사용합니다.
-        // 모델 자동 탐색으로 이미지/TTS/Live/실험/preview 모델이 섞이는 것을 방지합니다.
+        // 텍스트 생성형 슬롯은 텍스트 생성용 안정형 Flash 모델만 사용합니다.
+        // 자동 모델 탐색은 사용하지 않으며, 이 목록 밖의 모델은 절대 호출하지 않습니다.
         const TEXT_GENERATION_MODELS = [
             'gemini-3.6-flash',
             'gemini-3.5-flash',
@@ -2728,29 +2695,52 @@
             ? config.models.map(String).map(s => s.trim()).filter(Boolean)
             : ['gemini-3.6-flash'];
 
-        const blacklistSet = config.blacklistSet instanceof Set ? config.blacklistSet : blacklistedModels;
-        // 사용자가 지정한 모델도 반드시 허용 목록 안에서만 사용합니다.
+        // blacklistSet은 '영구 제외'가 아니라 404/지원하지 않는 모델 같은 확정적 실패에만 사용합니다.
+        const hardBlacklist = config.blacklistSet instanceof Set ? config.blacklistSet : blacklistedModels;
         const allowedPreferred = preferredModels.filter(m => TEXT_GENERATION_MODELS.includes(m));
-        let candidateModels = Array.from(new Set([
+        const baseModels = Array.from(new Set([
             ...allowedPreferred,
             ...TEXT_GENERATION_MODELS
-        ])).filter(m => !blacklistSet.has(m));
+        ]));
 
-        candidateModels = candidateModels.filter(m => !blacklistSet.has(m));
-        const maxAttempts = Math.max(1, Math.min(Number(config.maxModelAttempts || 5), candidateModels.length || 1));
+        // 한 번의 요청에서만 적용되는 실패 기록입니다. 일시적 오류 때문에 다음 생성까지 모델을 죽이지 않습니다.
+        const requestFailedModels = new Set();
+        const emptyResponseRetries = new Map();
+        const maxAttempts = Math.max(1, Number(config.maxModelAttempts || baseModels.length * 2));
         let attempts = 0;
         let lastError = '';
+        let lastDiagnostic = null;
 
-        for (const model of candidateModels) {
-            if (attempts >= maxAttempts) break;
-            if (blacklistSet.has(model)) continue;
+        const recordDiagnostic = (detail) => {
+            lastDiagnostic = detail;
+            if (typeof config.diagnosticHandler === 'function') config.diagnosticHandler(detail);
+        };
+
+        const classifyHttpFailure = (status, message) => {
+            if (status === 404) return 'hard';
+            // 400은 모델 자체가 아니라 요청/schema 문제일 수 있으므로 모델을 영구 제외하지 않습니다.
+            if (status === 429) return 'temporary';
+            if (status >= 500) return 'temporary';
+            if (status === 408) return 'temporary';
+            return 'request';
+        };
+
+        const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+        while (attempts < maxAttempts) {
+            // 선호 모델부터 시도하되, 이번 요청에서 실패한 모델은 다음 모델로 이동합니다.
+            const model = baseModels.find(m => !hardBlacklist.has(m) && !requestFailedModels.has(m));
+            if (!model) break;
             attempts++;
 
             const generateUrl = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
             try {
                 const reqBody = {
                     contents: [{ parts: [{ text: String(promptText || '') }] }],
-                    generationConfig: { temperature: 0.7, maxOutputTokens: Number(config.maxOutputTokens || 4096) }
+                    generationConfig: {
+                        temperature: 0.7,
+                        maxOutputTokens: Number(config.maxOutputTokens || 4096)
+                    }
                 };
                 if (responseSchema) {
                     reqBody.generationConfig.responseMimeType = 'application/json';
@@ -2773,40 +2763,66 @@
                         ? contentParts.map(part => String(part?.text || '')).join('').trim()
                         : '';
 
-                    if (finishReason === 'MAX_TOKENS') {
-                        const message = `${model} 모델 응답이 길이 제한으로 잘렸습니다.`;
-                        if (typeof config.diagnosticHandler === 'function') config.diagnosticHandler({ model, httpStatus:res.status, finishReason, promptFeedback, contentParts, responseObject:data, errorMessage:message });
-                        blacklistSet.add(model);
-                        lastError = message;
-                        continue;
-                    }
                     if (responseText) return responseText;
 
+                    // 빈 응답은 모델의 영구적인 고장이 아닐 수 있습니다.
+                    // 같은 모델을 이 요청에서 딱 한 번만 재시도한 뒤 다음 모델로 넘어갑니다.
+                    const emptyCount = Number(emptyResponseRetries.get(model) || 0);
                     const emptyMessage = `[${model}] 응답 본문이 비어 있습니다.`;
-                    if (typeof config.diagnosticHandler === 'function') config.diagnosticHandler({ model, httpStatus:res.status, finishReason, promptFeedback, contentParts, responseObject:data, errorMessage:emptyMessage });
-                    blacklistSet.add(model);
+                    recordDiagnostic({ model, httpStatus:res.status, finishReason, promptFeedback, contentParts, responseObject:data, errorMessage:emptyMessage });
                     lastError = emptyMessage;
+
+                    if (emptyCount < 1) {
+                        emptyResponseRetries.set(model, emptyCount + 1);
+                        await sleep(250);
+                        continue;
+                    }
+                    requestFailedModels.add(model);
                     continue;
                 }
 
                 const errJson = await res.json().catch(() => ({}));
                 const message = String(errJson?.error?.message || `HTTP ${res.status}`).trim();
-                if (typeof config.diagnosticHandler === 'function') config.diagnosticHandler({ model, httpStatus:res.status, finishReason:'', promptFeedback:errJson?.error?.details || null, contentParts:null, responseObject:errJson, errorMessage:message });
+                const failureType = classifyHttpFailure(res.status, message);
+                recordDiagnostic({
+                    model,
+                    httpStatus: res.status,
+                    finishReason: '',
+                    promptFeedback: errJson?.error?.details || errJson?.error || null,
+                    contentParts: null,
+                    responseObject: errJson,
+                    errorMessage: message
+                });
                 lastError = `[${model}] ${message}`;
 
-                // 지원하지 않는 모델/요청은 즉시 blacklist하고 다음 모델로 넘어갑니다.
-                blacklistSet.add(model);
+                if (failureType === 'hard') {
+                    // 404처럼 모델 자체가 존재하지 않거나 명백히 지원되지 않는 경우에만 영구 제외합니다.
+                    hardBlacklist.add(model);
+                }
+                // 429/5xx/408/400 등은 모델을 영구 blacklist하지 않습니다.
+                // 현재 요청에서는 다음 허용 모델로 넘어갑니다.
+                requestFailedModels.add(model);
+                continue;
             } catch (err) {
                 const message = err?.name === 'AbortError' ? 'API 요청 시간이 초과되었습니다.' : String(err?.message || err);
-                if (typeof config.diagnosticHandler === 'function') config.diagnosticHandler({ model, httpStatus:null, finishReason:'', promptFeedback:null, contentParts:null, responseObject:null, errorMessage:message });
+                recordDiagnostic({
+                    model,
+                    httpStatus: null,
+                    finishReason: '',
+                    promptFeedback: null,
+                    contentParts: null,
+                    responseObject: null,
+                    errorMessage: message
+                });
                 lastError = `[${model}] ${message}`;
-                blacklistSet.add(model);
+                // 네트워크/타임아웃은 일시적 오류로 취급하고 영구 blacklist하지 않습니다.
+                requestFailedModels.add(model);
+                continue;
             }
         }
 
-        config.lastError = lastError || '사용 가능한 모델이 없습니다.';
-        // 모든 후보가 소진되거나 이미 blacklist된 경우에도 최소 1건의 진단 로그를 남깁니다.
-        if (typeof config.diagnosticHandler === 'function' && !lastError) {
+        config.lastError = lastError || '이번 요청에서 사용할 수 있는 텍스트 생성 모델의 응답을 받지 못했습니다.';
+        if (typeof config.diagnosticHandler === 'function' && !lastDiagnostic) {
             config.diagnosticHandler({
                 model: '', httpStatus: null, finishReason: '', promptFeedback: null,
                 contentParts: null, responseObject: null,
@@ -2818,7 +2834,6 @@
         }
         return null;
     }
-
 
     // ==========================================
     // 슬롯별 Gemini API 설정
