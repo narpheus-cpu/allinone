@@ -2004,10 +2004,10 @@
 
 <script>
     // ============================================================================
-    // ★ 최근 코드 업데이트 시각: 202608191502
+    // ★ 최근 코드 업데이트 시각: 202608200128
     // ★ ※ 코드를 직접 수정할 때마다 위 시간값도 변경하세요.
     // ============================================================================
-    const APP_BUILD_TIMESTAMP = '202608191502';
+    const APP_BUILD_TIMESTAMP = '202608200128';
     
         /* ========================================== */
     /* [신규 기능] AI 도움 프롬프트 통합 템플릿 관리   */
@@ -2671,238 +2671,200 @@
         }
     }
 
+ const GEMINI_MODEL_COOLDOWN_UNTIL = new Map();
+
     async function fetchGemini(promptText, responseSchema = null, config = null) {
         config = config || {};
         const apiKey = String(config.apiKey || localStorage.getItem('gemini_api_key') || '').trim();
-        const emitDiagnostic = (detail) => {
-            if (typeof config.diagnosticHandler === 'function') {
-                try { config.diagnosticHandler(detail); } catch (e) { console.warn('diagnosticHandler failed:', e); }
-            }
-        };
-
         if (!apiKey) {
             const missingMessage = config.missingKeyMessage || '상단 API 키 설정 메뉴에서 Gemini API Key를 먼저 입력하고 저장해 주세요!';
-            emitDiagnostic({
-                model:'', httpStatus:null, finishReason:'', promptFeedback:null,
-                contentParts:null, responseObject:null, errorMessage:missingMessage,
-                failureType:'config'
-            });
+            if (typeof config.diagnosticHandler === 'function') {
+                config.diagnosticHandler({ model:'', httpStatus:null, finishReason:'', promptFeedback:null, contentParts:null, responseObject:null, errorMessage:missingMessage });
+            }
             if (!config.silent) alert(missingMessage);
             return null;
         }
 
-        // 텍스트 생성 슬롯에서 실제로 허용할 모델만 명시합니다.
-        // API의 모델 목록을 자동 탐색하여 이미지/TTS/Live/실험 모델이 섞이지 않도록 합니다.
         const TEXT_GENERATION_MODELS = [
             'gemini-3.6-flash',
             'gemini-3.5-flash',
             'gemini-3.5-flash-lite',
             'gemini-3.1-flash-lite'
         ];
-
         const preferredModels = Array.isArray(config.models) && config.models.length
             ? config.models.map(String).map(s => s.trim()).filter(Boolean)
             : ['gemini-3.6-flash'];
 
         const hardBlacklist = config.blacklistSet instanceof Set ? config.blacklistSet : blacklistedModels;
         const allowedPreferred = preferredModels.filter(m => TEXT_GENERATION_MODELS.includes(m));
-        const baseModels = Array.from(new Set([
-            ...allowedPreferred,
-            ...TEXT_GENERATION_MODELS
-        ]));
+        const baseModels = Array.from(new Set([...allowedPreferred, ...TEXT_GENERATION_MODELS]));
 
-        // 이번 요청에서만 실패한 모델을 따로 관리합니다.
-        // 이전 코드처럼 실패한 모델을 hardBlacklist에 넣어 다음 생성까지 막지 않습니다.
         const requestFailedModels = new Set();
         const emptyResponseRetries = new Map();
-        const maxAttempts = Math.max(1, Math.min(
-            Number(config.maxModelAttempts || baseModels.length),
-            baseModels.length
-        ));
+        const maxAttempts = Math.max(1, Math.min(Number(config.maxModelAttempts || baseModels.length), baseModels.length));
         let attempts = 0;
         let lastError = '';
         let lastDiagnostic = null;
-        let terminalFailure = false;
+        const attemptHistory = [];
 
+        const recordDiagnostic = (detail) => { lastDiagnostic = detail; };
         const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-        const makeDebugDump = () => [
-            '',
-            '[디버그 상태 덤프]',
-            `- 기본 후보 모델: [${baseModels.join(', ')}]`,
-            `- 영구 차단(hardBlacklist): [${Array.from(hardBlacklist).join(', ')}]`,
-            `- 이번 요청 실패(requestFailedModels): [${Array.from(requestFailedModels).join(', ')}]`,
-            `- 시도 횟수: ${attempts}/${maxAttempts}`
-        ].join('\n');
-
-        const emitFailure = (detail) => {
-            lastDiagnostic = detail;
-            emitDiagnostic({ ...detail, errorMessage: `${detail.errorMessage || ''}${makeDebugDump()}` });
+        const extractQuotaInfo = (errJson) => {
+            const details = Array.isArray(errJson?.error?.details) ? errJson.error.details : [];
+            let quotaId = '', quotaMetric = '', quotaModel = '', retryDelaySec = 0;
+            for (const item of details) {
+                if (item?.['@type']?.includes('QuotaFailure')) {
+                    const v = Array.isArray(item.violations) ? (item.violations[0] || {}) : {};
+                    quotaId = String(v.quotaId || '');
+                    quotaMetric = String(v.quotaMetric || '');
+                    quotaModel = String(v.quotaDimensions?.model || '');
+                }
+                if (item?.['@type']?.includes('RetryInfo')) {
+                    const m = String(item.retryDelay || '').match(/(\d+(?:\.\d+)?)s/i);
+                    if (m) retryDelaySec = Number(m[1]) || 0;
+                }
+            }
+            return { quotaId, quotaMetric, quotaModel, retryDelaySec };
         };
-
-        // HTTP 오류의 의미를 구분합니다.
-        // hard(404)만 영구 차단하고, 일시 오류는 이번 요청에서만 제외합니다.
-        const classifyHttpFailure = (status) => {
-            if (status === 404) return 'hard';
-            if (status === 401 || status === 403) return 'auth';
-            if (status === 429 || status === 408 || status >= 500) return 'temporary';
-            if (status >= 400) return 'request';
-            return 'unknown';
+        const isDailyQuota = (quotaId, quotaMetric) => /PerDay/i.test(`${quotaId} ${quotaMetric}`);
+        const cooldownKey = (model) => `${apiKey}::${model}`;
+        const getCooldownUntil = (model) => Number(GEMINI_MODEL_COOLDOWN_UNTIL.get(cooldownKey(model)) || 0);
+        const setCooldown = (model, until) => GEMINI_MODEL_COOLDOWN_UNTIL.set(cooldownKey(model), Number(until) || 0);
+        const formatCooldown = (until) => {
+            const remainSec = Math.max(0, Math.ceil((until - Date.now()) / 1000));
+            if (remainSec <= 0) return '';
+            if (remainSec < 60) return `${remainSec}초`;
+            const min = Math.floor(remainSec / 60), sec = remainSec % 60;
+            return sec ? `${min}분 ${sec}초` : `${min}분`;
         };
-
-        // Gemini가 생성 자체를 정책상 차단한 경우는 모델 교체로 해결할 문제가 아닙니다.
-        // 같은 입력을 다른 모델에 반복해서 보내지 않고 즉시 중단합니다.
-        const isPolicyBlocked = (finishReason) => [
-            'PROHIBITED_CONTENT',
-            'SAFETY',
-            'BLOCKLIST',
-            'SPII',
-            'RECITATION'
-        ].includes(String(finishReason || '').toUpperCase());
+        const buildAttemptHistoryText = () => {
+            if (!attemptHistory.length) return '';
+            return '\n\n[이번 요청 시도 내역]\n' + attemptHistory.map((x, i) =>
+                `${i + 1}. ${x.model} | HTTP=${x.httpStatus ?? '없음'} | finishReason=${x.finishReason || '없음'} | type=${x.type} | ${x.message}`
+            ).join('\n');
+        };
 
         while (attempts < maxAttempts) {
-            const model = baseModels.find(m => !hardBlacklist.has(m) && !requestFailedModels.has(m));
-            if (!model) break;
-            attempts++;
-
-            // 최신 API 형식: v1 + x-goog-api-key 헤더.
-            const generateUrl = `https://generativelanguage.googleapis.com/v1/models/${encodeURIComponent(model)}:generateContent`;
-            const reqBody = {
-                contents: [{ parts: [{ text: String(promptText || '') }] }],
-                generationConfig: {
-                    maxOutputTokens: Number(config.maxOutputTokens || 4096)
-                }
-            };
-            if (responseSchema) {
-                reqBody.generationConfig.responseMimeType = 'application/json';
-                reqBody.generationConfig.responseSchema = responseSchema;
+            const now = Date.now();
+            const eligibleModels = baseModels.filter(model =>
+                !hardBlacklist.has(model) &&
+                !requestFailedModels.has(model) &&
+                getCooldownUntil(model) <= now
+            );
+            const model = eligibleModels[0];
+            if (!model) {
+                const quotaModels = baseModels.filter(m => getCooldownUntil(m) > now && !hardBlacklist.has(m));
+                const quotaRemain = quotaModels.map(m => `${m}: ${formatCooldown(getCooldownUntil(m))}`).join(', ');
+                lastError = quotaModels.length
+                    ? `Gemini API 사용량 한도로 인해 현재 사용할 수 있는 모델이 없습니다.${quotaRemain ? ` (${quotaRemain})` : ''}`
+                    : (lastError || '현재 요청에서 사용할 수 있는 텍스트 생성 모델이 없습니다.');
+                break;
             }
-
+            attempts++;
+            const generateUrl = `https://generativelanguage.googleapis.com/v1/models/${encodeURIComponent(model)}:generateContent`;
             try {
+                const reqBody = {
+                    contents: [{ role: 'user', parts: [{ text: String(promptText || '') }] }],
+                    generationConfig: { maxOutputTokens: Number(config.maxOutputTokens || 4096) }
+                };
+                if (responseSchema) {
+                    reqBody.generationConfig.responseMimeType = 'application/json';
+                    reqBody.generationConfig.responseSchema = responseSchema;
+                }
                 const res = await mtFetchWithTimeout(generateUrl, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'x-goog-api-key': apiKey
-                    },
+                    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
                     body: JSON.stringify(reqBody)
                 }, Number(config.requestTimeoutMs || 45000));
 
-                const data = await res.json().catch(() => ({}));
-
                 if (res.ok) {
-                    const candidate = data?.candidates?.[0] || null;
-                    const finishReason = String(candidate?.finishReason || '').trim();
-                    const promptFeedback = data?.promptFeedback ?? null;
+                    const data = await res.json().catch(() => ({}));
+                    const candidate = data.candidates?.[0] || null;
+                    const finishReason = String(candidate?.finishReason || '');
+                    const promptFeedback = data.promptFeedback ?? null;
                     const contentParts = candidate?.content?.parts ?? null;
                     const responseText = Array.isArray(contentParts)
-                        ? contentParts
-                            .map(part => typeof part?.text === 'string' ? part.text : '')
-                            .join('')
-                            .trim()
-                        : (typeof data?.text === 'string' ? data.text.trim() : '');
+                        ? contentParts.map(part => String(part?.text || '')).join('').trim()
+                        : String(data?.text || '').trim();
 
-                    // 정책 차단은 모델 문제가 아니라 현재 입력/출력의 차단입니다.
-                    if (isPolicyBlocked(finishReason)) {
-                        const message = `[${model}] AI 생성이 콘텐츠 정책에 의해 차단되었습니다. (finishReason: ${finishReason})`;
-                        terminalFailure = true;
+                    if (['PROHIBITED_CONTENT','SAFETY','BLOCKLIST','SPII','RECITATION'].includes(finishReason)) {
+                        const message = `[${model}] ${finishReason}로 인해 생성 결과가 차단되었습니다.`;
+                        attemptHistory.push({model,httpStatus:res.status,finishReason,type:'content_block',message});
+                        recordDiagnostic({ model, httpStatus:res.status, finishReason, promptFeedback, contentParts, responseObject:data, errorMessage:message });
                         lastError = message;
-                        emitFailure({
-                            model, httpStatus: res.status, finishReason, promptFeedback,
-                            contentParts, responseObject: data, errorMessage: message,
-                            failureType: 'policy'
-                        });
                         break;
                     }
-
                     if (responseText) return responseText;
 
-                    // 정상 HTTP 응답인데 본문이 없으면 모델 자체를 blacklist하지 않습니다.
-                    // 같은 모델은 한 번만 재시도한 뒤, 그래도 실패하면 다음 모델로 이동합니다.
                     const emptyCount = Number(emptyResponseRetries.get(model) || 0);
                     const emptyMessage = `[${model}] 응답 본문이 비어 있습니다.`;
+                    attemptHistory.push({model,httpStatus:res.status,finishReason,type:'empty_response',message:emptyMessage});
+                    recordDiagnostic({ model, httpStatus:res.status, finishReason, promptFeedback, contentParts, responseObject:data, errorMessage:emptyMessage });
                     lastError = emptyMessage;
-                    emitFailure({
-                        model, httpStatus: res.status, finishReason, promptFeedback,
-                        contentParts, responseObject: data, errorMessage: emptyMessage,
-                        failureType: 'empty_response'
-                    });
-
                     if (emptyCount < 1) {
                         emptyResponseRetries.set(model, emptyCount + 1);
-                        await sleep(300);
+                        await sleep(500);
                         continue;
                     }
                     requestFailedModels.add(model);
                     continue;
                 }
 
-                const message = String(data?.error?.message || `HTTP ${res.status}`).trim();
-                const failureType = classifyHttpFailure(res.status);
+                const errJson = await res.json().catch(() => ({}));
+                const message = String(errJson?.error?.message || `HTTP ${res.status}`).trim();
+                const quotaInfo = extractQuotaInfo(errJson);
+                const isQuota429 = res.status === 429 && (/RESOURCE_EXHAUSTED/i.test(String(errJson?.error?.status || '')) || Boolean(quotaInfo.quotaId || quotaInfo.quotaMetric));
+
+                if (isQuota429) {
+                    const cooldownMs = isDailyQuota(quotaInfo.quotaId, quotaInfo.quotaMetric)
+                        ? 24 * 60 * 60 * 1000
+                        : Math.max(30, quotaInfo.retryDelaySec || 30) * 1000;
+                    setCooldown(model, Date.now() + cooldownMs);
+                    requestFailedModels.add(model);
+                    const quotaMessage = `${message}${quotaInfo.quotaId ? ` [quotaId=${quotaInfo.quotaId}]` : ''}${quotaInfo.retryDelaySec ? ` [retryDelay=${quotaInfo.retryDelaySec}s]` : ''}`;
+                    attemptHistory.push({model,httpStatus:res.status,finishReason:'',type:'quota',message:quotaMessage});
+                    recordDiagnostic({ model, httpStatus:res.status, finishReason:'', promptFeedback:errJson?.error?.details || errJson?.error || null, contentParts:null, responseObject:errJson, errorMessage:quotaMessage });
+                    lastError = isDailyQuota(quotaInfo.quotaId, quotaInfo.quotaMetric)
+                        ? `[${model}] 일일 Gemini API quota를 초과했습니다.`
+                        : `[${model}] Gemini API quota를 초과했습니다.`;
+                    continue;
+                }
+
+                attemptHistory.push({model,httpStatus:res.status,finishReason:'',type:'http_error',message});
+                recordDiagnostic({ model, httpStatus:res.status, finishReason:'', promptFeedback:errJson?.error?.details || errJson?.error || null, contentParts:null, responseObject:errJson, errorMessage:message });
                 lastError = `[${model}] ${message}`;
-
-                if (failureType === 'auth') {
-                    terminalFailure = true;
-                    emitFailure({
-                        model, httpStatus: res.status, finishReason:'',
-                        promptFeedback: data?.error?.details || data?.error || null,
-                        contentParts:null, responseObject:data,
-                        errorMessage:lastError, failureType
-                    });
-                    break;
-                }
-
-                if (failureType === 'hard') {
-                    // 404만 모델 자체의 영구 차단으로 처리합니다.
-                    hardBlacklist.add(model);
-                }
-
+                if (res.status === 404) hardBlacklist.add(model);
                 requestFailedModels.add(model);
-                emitFailure({
-                    model, httpStatus: res.status, finishReason:'',
-                    promptFeedback: data?.error?.details || data?.error || null,
-                    contentParts:null, responseObject:data,
-                    errorMessage:lastError, failureType
-                });
-                continue;
             } catch (err) {
-                const message = err?.name === 'AbortError'
-                    ? 'API 요청 시간이 초과되었습니다.'
-                    : String(err?.message || err);
+                const message = err?.name === 'AbortError' ? 'API 요청 시간이 초과되었습니다.' : String(err?.message || err);
+                attemptHistory.push({model,httpStatus:null,finishReason:'',type:'network_error',message});
+                recordDiagnostic({ model, httpStatus:null, finishReason:'', promptFeedback:null, contentParts:null, responseObject:null, errorMessage:message });
                 lastError = `[${model}] ${message}`;
                 requestFailedModels.add(model);
-                emitFailure({
-                    model, httpStatus:null, finishReason:'', promptFeedback:null,
-                    contentParts:null, responseObject:null,
-                    errorMessage:lastError,
-                    failureType: err?.name === 'AbortError' ? 'timeout' : 'network'
-                });
-                continue;
             }
         }
 
-        if (!lastError) {
-            lastError = hardBlacklist.size && baseModels.every(m => hardBlacklist.has(m))
-                ? '사용 가능한 텍스트 생성 모델이 없습니다. 모든 후보가 영구 차단(404) 상태입니다.'
-                : '텍스트 생성 모델의 응답을 받지 못했습니다.';
-        }
+        const debugDump = [
+            '',
+            '[디버그 상태 덤프]',
+            `- 기본 후보 모델: [${baseModels.join(', ')}]`,
+            `- 영구 차단(hardBlacklist): [${Array.from(hardBlacklist).join(', ')}]`,
+            `- 이번 요청 실패(requestFailedModels): [${Array.from(requestFailedModels).join(', ')}]`,
+            `- 현재 quota cooldown 모델: [${baseModels.filter(m => getCooldownUntil(m) > Date.now()).map(m => `${m}(${formatCooldown(getCooldownUntil(m))})`).join(', ')}]`,
+            `- 시도 횟수: ${attempts}/${maxAttempts}`,
+            buildAttemptHistoryText()
+        ].join('\n');
+        config.lastError = (lastError || '텍스트 생성 모델의 응답을 받지 못했습니다.') + debugDump;
 
-        const debugDump = makeDebugDump();
-        config.lastError = `${lastError}${debugDump}`;
-
-        // 위에서 각 실패를 즉시 기록했으므로 여기서는 아무 오류도 기록하지 않았을 때만 보조 로그를 남깁니다.
-        if (!lastDiagnostic && typeof config.diagnosticHandler === 'function') {
-            config.diagnosticHandler({
-                model: '', httpStatus: null, finishReason: '', promptFeedback: null,
-                contentParts: null, responseObject: null,
-                errorMessage: config.lastError,
-                failureType: terminalFailure ? 'terminal' : 'exhausted'
-            });
+        if (typeof config.diagnosticHandler === 'function') {
+            if (lastDiagnostic) {
+                config.diagnosticHandler({ ...lastDiagnostic, errorMessage: `${lastDiagnostic.errorMessage || ''}${debugDump}` });
+            } else {
+                config.diagnosticHandler({ model:'', httpStatus:null, finishReason:'', promptFeedback:null, contentParts:null, responseObject:null, errorMessage:config.lastError });
+            }
         }
-
-        if (!config.silent) {
-            alert(`AI 응답 생성 실패:\n${config.lastError}`);
-        }
+        if (!config.silent) alert(`AI 응답 생성 실패:\n${config.lastError}`);
         return null;
     }
 
