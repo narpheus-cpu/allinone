@@ -2669,33 +2669,28 @@
         }
 
         // 사용자께서 제공한 최신 안정화 코드의 방향을 반영합니다.
-        // - 최신 우선 모델을 먼저 시도
-        // - 모델 목록에서 generateContent를 지원하지 않는 모델은 제외
-        // - 1.5/2.0/2.5 계열은 제외
-        // - 모델 목록 조회가 실패해도 기본 후보로 계속 시도
+        // - 텍스트 생성에 적합한 안정형 Flash 계열만 사용
+        // - 이미지/TTS/Live/실험/preview 모델은 후보에서 제외
+        // - API 모델 목록 자동 탐색으로 임의의 모델이 추가되지 않음
+        // 텍스트 생성 슬롯은 텍스트 출력이 공식 지원되는 안정형 Flash 계열만 사용합니다.
+        // 모델 자동 탐색으로 이미지/TTS/Live/실험/preview 모델이 섞이는 것을 방지합니다.
+        const TEXT_GENERATION_MODELS = [
+            'gemini-3.6-flash',
+            'gemini-3.5-flash',
+            'gemini-3.5-flash-lite',
+            'gemini-3.1-flash-lite'
+        ];
         const preferredModels = Array.isArray(config.models) && config.models.length
             ? config.models.map(String).map(s => s.trim()).filter(Boolean)
-            : ['gemini-3.6-flash', 'gemini-3.6-pro'];
+            : ['gemini-3.6-flash'];
 
         const blacklistSet = config.blacklistSet instanceof Set ? config.blacklistSet : blacklistedModels;
-        let candidateModels = Array.from(new Set(preferredModels));
-
-        try {
-            const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`;
-            const listRes = await mtFetchWithTimeout(listUrl, { method: 'GET' }, Number(config.listTimeoutMs || 12000));
-            if (listRes && listRes.ok) {
-                const listData = await listRes.json();
-                const fetchedModels = (listData.models || [])
-                    .filter(m => m.supportedGenerationMethods && m.supportedGenerationMethods.includes('generateContent'))
-                    .map(m => m.name.replace('models/', ''))
-                    .filter(m => !m.includes('1.5') && !m.includes('2.0') && !m.includes('2.5'));
-                if (fetchedModels.length > 0) {
-                    candidateModels = Array.from(new Set([...preferredModels, ...fetchedModels]));
-                }
-            }
-        } catch (e) {
-            // 모델 목록 조회 실패는 전체 실패가 아닙니다. 기본 후보로 바로 생성 요청을 계속합니다.
-        }
+        // 사용자가 지정한 모델도 반드시 허용 목록 안에서만 사용합니다.
+        const allowedPreferred = preferredModels.filter(m => TEXT_GENERATION_MODELS.includes(m));
+        const candidateModels = Array.from(new Set([
+            ...allowedPreferred,
+            ...TEXT_GENERATION_MODELS
+        ])).filter(m => !blacklistSet.has(m));
 
         candidateModels = candidateModels.filter(m => !blacklistSet.has(m));
         const maxAttempts = Math.max(1, Math.min(Number(config.maxModelAttempts || 5), candidateModels.length || 1));
@@ -2806,7 +2801,7 @@
         return {
             apiKey: mtGetSlotApiKey('slot9'),
             models: MT_SLOT9_PREFERRED_MODELS,
-            discoverModels: true,
+            discoverModels: false,
             blacklistSet: mtSlot9BlacklistedModels,
             lastError: '',
             silent: true,
@@ -2820,7 +2815,7 @@
         return {
             apiKey: mtGetSlotApiKey('wordweb'),
             models: MT_WORDWEB_PREFERRED_MODELS,
-            discoverModels: true,
+            discoverModels: false,
             blacklistSet: mtWordWebBlacklistedModels,
             silent: true,
             requestTimeoutMs: 45000,
