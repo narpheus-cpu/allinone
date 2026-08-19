@@ -2004,10 +2004,10 @@
 
 <script>
     // ============================================================================
-    // ★ 최근 코드 업데이트 시각: 202608191431
+    // ★ 최근 코드 업데이트 시각: 202608191440
     // ★ ※ 코드를 직접 수정할 때마다 위 시간값도 변경하세요.
     // ============================================================================
-    const APP_BUILD_TIMESTAMP = '202608191431';
+    const APP_BUILD_TIMESTAMP = '202608191440';
     
         /* ========================================== */
     /* [신규 기능] AI 도움 프롬프트 통합 템플릿 관리   */
@@ -4787,67 +4787,57 @@ Rules:
         mtSlot9RenderStatus();
     }
     function mtSlot9TriggerUpload(){ mtActiveSlotIndex='slot9'; const input=document.getElementById('mtFileUpload'); if(input){input.value='';input.click();} }
+    function mtSlot9FindSourceSheet(workbook) {
+        if (workbook.SheetNames.includes('원본')) return '원본';
+        for (const name of workbook.SheetNames) {
+            const rows = XLSX.utils.sheet_to_json(workbook.Sheets[name], {header:1, defval:''});
+            if (rows.some(r => { const v=String((r||[])[0] ?? '').trim(); return v && !/^한국어|^번역|^문장$/i.test(v); })) return name;
+        }
+        return workbook.SheetNames[0] || null;
+    }
+    function mtSlot9GetResumeIndex(sourceRows, outputRows, pattern) {
+        if (!Array.isArray(sourceRows) || !sourceRows.length || !Array.isArray(outputRows) || !outputRows.length) return 0;
+        const sourceIdx = Math.max(0, Number(pattern.sourceKorCol || 1) - 1);
+        const mainKorIdx = Math.max(0, Number(pattern.mainKorCol || 3) - 1);
+        const counts = new Map();
+        outputRows.forEach(row => {
+            if (!Array.isArray(row)) return;
+            const key = String(row[sourceIdx] ?? row[mainKorIdx] ?? '').trim();
+            if (key) counts.set(key, (counts.get(key) || 0) + 1);
+        });
+        let cursor = 0;
+        while (cursor < sourceRows.length) {
+            const key = String(sourceRows[cursor] ?? '').trim();
+            const n = counts.get(key) || 0;
+            if (!n) break;
+            counts.set(key, n - 1);
+            cursor++;
+        }
+        return cursor;
+    }
     async function mtSlot9HandleFile(file){
         try {
             const data = new Uint8Array(await file.arrayBuffer());
-            const wb = XLSX.read(data, { type: 'array' });
+            const wb = XLSX.read(data,{type:'array'});
             const prev = mtSlot9GetState();
             const pattern = mtSlot9GetPattern(prev);
-
-            // 슬롯9 내보내기 파일은 [원본]과 [생성결과] 두 시트를 함께 보존합니다.
-            // [생성결과]가 있으면 그 내용을 outputRows로 그대로 복원해야 카드가 유지됩니다.
-            const sourceSheetName = wb.SheetNames.includes('원본') ? '원본' : wb.SheetNames[0];
-            const outputSheetName = wb.SheetNames.includes('생성결과') ? '생성결과' : null;
-
-            const sourceRowsRaw = sourceSheetName && wb.Sheets[sourceSheetName]
-                ? XLSX.utils.sheet_to_json(wb.Sheets[sourceSheetName], { header: 1, defval: '' })
-                : [];
-            const sourceRows = sourceRowsRaw
-                .map(r => String((r || [])[0] ?? '').trim())
-                .filter(x => x && !/^한국어|^번역|^문장$/i.test(x));
-
-            let outputRows = [];
-            if (outputSheetName) {
-                outputRows = XLSX.utils.sheet_to_json(wb.Sheets[outputSheetName], { header: 1, defval: '' })
-                    .map(row => Array.isArray(row) ? row.map(v => (v === null || v === undefined ? '' : v)) : [])
-                    .filter(row => row.some(v => String(v ?? '').trim() !== ''));
-            }
-
-            if (!sourceRows.length && !outputRows.length) {
-                throw new Error('슬롯9 파일에서 불러올 문장을 찾지 못했습니다.');
-            }
-
-            const displayFileName = String(file.name || '').replace(/\.[^/\.]+$/, '').trim() || '슬롯 9';
-            const generatedCount = outputRows.length;
-            const nextSourceIndex = sourceRows.length > 0
-                ? Math.min(generatedCount, sourceRows.length)
-                : generatedCount;
-
-            const st = {
-                ...prev,
-                fileName: displayFileName,
-                sourceRows: sourceRows.slice(),
-                sourceRowsLock: sourceRows.slice(),
-                retryRows: [],
-                nextSourceIndex,
-                outputRows,
-                nextRun: Date.now() + MT_SLOT9_INTERVAL_MS,
-                lastRun: generatedCount > 0 ? Date.now() : null,
-                lastError: '',
-                lastSession: null,
-                starredSerials: [],
-                pattern
-            };
-
+            const sourceSheetName = mtSlot9FindSourceSheet(wb);
+            const sourceRowsRaw = sourceSheetName && wb.Sheets[sourceSheetName] ? XLSX.utils.sheet_to_json(wb.Sheets[sourceSheetName],{header:1,defval:''}) : [];
+            const sourceRows = sourceRowsRaw.map(r=>String((r||[])[0]??'').trim()).filter(x=>x && !/^한국어|^번역|^문장$/i.test(x));
+            const hasOutputSheet = wb.SheetNames.includes('생성결과');
+            let outputRows = hasOutputSheet ? XLSX.utils.sheet_to_json(wb.Sheets['생성결과'],{header:1,defval:''}) : [];
+            outputRows = outputRows.map(row=>Array.isArray(row)?row.map(v=>v==null?'':v):[]).filter(row=>row.some(v=>String(v??'').trim()!=='')).filter((row,idx)=>!(idx===0 && /^(한국어|영어|문장|번호|일련번호|source)/i.test(String(row[0]??'').trim())));
+            if (!sourceRows.length && !outputRows.length) throw new Error('엑셀 파일에서 한국어 원본 문장이나 기존 생성결과를 찾지 못했습니다.');
+            const displayFileName=String(file.name||'').replace(/\.[^\/.]+$/,'').trim()||'슬롯 9';
+            const resumeIndex=mtSlot9GetResumeIndex(sourceRows,outputRows,pattern);
+            const remaining=Math.max(0,sourceRows.length-resumeIndex);
+            const st={...prev,fileName:displayFileName,sourceRows:sourceRows.slice(),sourceRowsLock:sourceRows.slice(),retryRows:[],nextSourceIndex:resumeIndex,outputRows,nextRun:Date.now()+MT_SLOT9_INTERVAL_MS,lastRun:outputRows.length?Date.now():null,lastError:'',lastSession:null,starredSerials:Array.isArray(prev.starredSerials)?prev.starredSerials.slice():[],pattern};
             mtSlot9SaveState(st);
-            // 생성결과에 없는 원본이 남아 있으면 자동 생성을 이어갑니다.
-            mtSlot9StartAutoTrigger(false);
+            mtSlot9StartAutoTrigger(true);
             mtInitSlots();
-            alert(`[슬롯9] ${generatedCount}개의 생성 카드를 불러왔습니다. 카드 수: ${mtSlot9BuildSlotData(st).words.length}개`);
-        } catch (e) {
-            console.error(e);
-            alert('슬롯9 파일 불러오기 중 오류: ' + (e.message || e));
-        }
+            if(outputRows.length) alert(`[슬롯9] 기존 생성결과 ${outputRows.length}개를 복원했습니다.${remaining>0?` 이어서 ${remaining}개를 생성합니다.`:' 모든 원본의 생성이 완료되어 추가 생성은 없습니다.'}`);
+            else alert(`[슬롯9] 원본 ${sourceRows.length}개를 등록했습니다. 자동 생성을 시작합니다.`);
+        } catch(e){ console.error(e); alert('슬롯9 파일 불러오기 중 오류: '+(e.message||e)); }
     }
     async function mtSlot9GenerateEnglishBatch(koreanItems){
         const prompt=`You are an expert English teacher. For each Korean sentence, create ONE faithful, natural everyday English sentence at CEFR A2 level. Preserve meaning exactly. Return ONLY a JSON array with exactly ${koreanItems.length} objects: [{"index":0,"english":"..."}]. Do not add greetings, names, time expressions, or unrelated content. DATA=${JSON.stringify(koreanItems.map((k,i)=>({index:i,korean:k})))}`;
@@ -5349,57 +5339,27 @@ Rules:
 
     async function mtWordWebHandleFile(file) {
         try {
-            const data = new Uint8Array(await file.arrayBuffer());
-            const workbook = XLSX.read(data, { type: 'array' });
-            const priorState = mtWordWebGetState();
-            const pattern = mtWordWebGetPattern(priorState);
-            // 참조형 신규 파일은 [차례] 시트만 있어도 등록할 수 있습니다.
-            // 기존 내보내기 파일에 [시트1]이 있으면 기존 생성결과를 그대로 복원합니다.
-            if (!workbook.SheetNames.includes(pattern.topicSheet)) {
-                alert(`참조형 파일에는 [${pattern.topicSheet}] 시트가 반드시 있어야 합니다.`);
-                return;
-            }
-            const topicRows = XLSX.utils.sheet_to_json(workbook.Sheets[pattern.topicSheet], { header: 1, defval: '' });
-            const outputRows = workbook.SheetNames.includes(pattern.outputSheet)
-                ? XLSX.utils.sheet_to_json(workbook.Sheets[pattern.outputSheet], { header: 1, defval: '' })
-                : [];
-            const topics = topicRows.map((row, idx) => ({
-                rowNumber: idx + 1,
-                topic: Array.from({length: pattern.topicColCount}, (_, n) => String((row || [])[pattern.topicStartCol - 1 + n] ?? '').trim()).filter(Boolean).join(' - ')
-            })).filter(x => x.topic);
-            if (!topics.length) {
-                alert('[차례] 시트의 A~C열에서 사용할 주제를 찾지 못했습니다.');
-                return;
-            }
-
-            const previousState = mtWordWebGetState();
-            const state = {
-                fileName: file.name,
-                topicRows: topicRows.map(mtWordWebNormalizeRow),
-                topics,
-                outputRows: outputRows.map(mtWordWebNormalizeRow),
-                lastRun: null,
-                nextRun: Date.now() + MT_WORDWEB_INTERVAL_MS,
-                totalGenerated: 0,
-                lastError: '',
-                lastSession: null,
-                starredSerials: previousState.starredSerials || [],
-                pattern
-            };
-
-            state.outputRows = mtWordWebApplyPatternToRows(state.outputRows, state.pattern);
-            await mtWordWebRepairExistingLiteralColumns(state, mtGetWordWebAiConfig());
-            state.nextRun = Date.now() + MT_WORDWEB_INTERVAL_MS;
+            const data=new Uint8Array(await file.arrayBuffer());
+            const workbook=XLSX.read(data,{type:'array'});
+            const priorState=mtWordWebGetState();
+            const pattern=mtWordWebGetPattern(priorState);
+            if(!workbook.SheetNames.includes(pattern.topicSheet)){ alert(`참조형 파일에는 [${pattern.topicSheet}] 시트가 반드시 있어야 합니다.`); return; }
+            const topicRows=XLSX.utils.sheet_to_json(workbook.Sheets[pattern.topicSheet],{header:1,defval:''});
+            const hasOutputSheet=workbook.SheetNames.includes(pattern.outputSheet);
+            let outputRows=hasOutputSheet?XLSX.utils.sheet_to_json(workbook.Sheets[pattern.outputSheet],{header:1,defval:''}):[];
+            outputRows=outputRows.map(mtWordWebNormalizeRow).filter(row=>row.some(v=>String(v??'').trim()!==''));
+            const topics=topicRows.map((row,idx)=>({rowNumber:idx+1,topic:Array.from({length:pattern.topicColCount},(_,n)=>String((row||[])[pattern.topicStartCol-1+n]??'').trim()).filter(Boolean).join(' - ')})).filter(x=>x.topic);
+            if(!topics.length){ alert(`[${pattern.topicSheet}] 시트에 사용할 주제가 없습니다. A~C열 등에 하나 이상의 주제를 입력해 주세요.`); return; }
+            const state={...priorState,fileName:file.name,topicRows:topicRows.map(mtWordWebNormalizeRow),topics,outputRows,lastRun:outputRows.length?Date.now():null,nextRun:Date.now()+MT_WORDWEB_INTERVAL_MS,totalGenerated:0,lastError:'',lastSession:null,starredSerials:Array.isArray(priorState.starredSerials)?priorState.starredSerials.slice():[],pattern};
+            state.outputRows=mtWordWebApplyPatternToRows(state.outputRows,state.pattern);
+            await mtWordWebRepairExistingLiteralColumns(state,mtGetWordWebAiConfig());
+            state.nextRun=Date.now()+MT_WORDWEB_INTERVAL_MS;
             mtWordWebSaveState(state);
             mtWordWebStartAutoTrigger(true);
             mtInitSlots();
-            alert(workbook.SheetNames.includes(pattern.outputSheet)
-                ? '[참조형] 차례와 기존 생성결과를 불러왔습니다.'
-                : `[참조형] 차례 시트 등록이 완료되었습니다. [${pattern.outputSheet}] 시트는 생성 결과가 쌓일 때 자동으로 만들어집니다.`);
-        } catch (error) {
-            console.error(error);
-            alert('엑셀 파일을 읽는 중 오류가 발생했습니다.');
-        }
+            if(hasOutputSheet&&outputRows.length) alert(`[참조형] [${pattern.topicSheet}]와 기존 [${pattern.outputSheet}] 생성결과 ${outputRows.length}개를 복원했습니다. 기존 결과는 유지하고 새 생성은 이어서 진행합니다.`);
+            else alert(`[참조형] [${pattern.topicSheet}] 등록이 완료되었습니다. 생성결과는 [${pattern.outputSheet}]에 누적됩니다.`);
+        }catch(error){ console.error(error); alert('참조형 엑셀 파일을 읽는 중 오류가 발생했습니다: '+String(error?.message||error)); }
     }
 
     function mtWordWebGetDefaultPattern() {
