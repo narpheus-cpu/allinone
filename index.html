@@ -2489,9 +2489,21 @@
     }
     function mtDownloadGeneratorErrorLog(event, slotKey, slotLabel) {
         if (event) event.stopPropagation();
-        const logs = mtGetGeneratorErrorLogs(slotKey).slice().sort((a,b) => Number(a.seq||0) - Number(b.seq||0));
+        let logs = mtGetGeneratorErrorLogs(slotKey).slice().sort((a,b) => Number(a.seq||0) - Number(b.seq||0));
+        // 저장소에 기록이 누락된 경우에도 현재 슬롯 상태의 마지막 진단을 복구해서 로그에 포함합니다.
         if (!logs.length) {
-            alert('저장된 오류 로그가 없습니다.');
+            let fallback = null;
+            try {
+                if (slotKey === 'slot9') fallback = mtSlot9GetState()?.lastDiagnostic || null;
+                else if (slotKey === 'wordweb') fallback = mtWordWebGetState()?.lastDiagnostic || null;
+                else if (/^typed_\d+$/.test(String(slotKey))) fallback = mtGetTypedState(Number(String(slotKey).slice(6)))?.lastDiagnostic || null;
+            } catch (_) {}
+            if (fallback) {
+                logs = [fallback];
+            }
+        }
+        if (!logs.length) {
+            alert('저장된 오류 로그가 없습니다.\n\n오류가 발생한 뒤 [오류로그]를 눌러 주세요.');
             return;
         }
         const text = [
@@ -2687,7 +2699,7 @@
         const blacklistSet = config.blacklistSet instanceof Set ? config.blacklistSet : blacklistedModels;
         // 사용자가 지정한 모델도 반드시 허용 목록 안에서만 사용합니다.
         const allowedPreferred = preferredModels.filter(m => TEXT_GENERATION_MODELS.includes(m));
-        const candidateModels = Array.from(new Set([
+        let candidateModels = Array.from(new Set([
             ...allowedPreferred,
             ...TEXT_GENERATION_MODELS
         ])).filter(m => !blacklistSet.has(m));
@@ -2761,6 +2773,14 @@
         }
 
         config.lastError = lastError || '사용 가능한 모델이 없습니다.';
+        // 모든 후보가 소진되거나 이미 blacklist된 경우에도 최소 1건의 진단 로그를 남깁니다.
+        if (typeof config.diagnosticHandler === 'function' && !lastError) {
+            config.diagnosticHandler({
+                model: '', httpStatus: null, finishReason: '', promptFeedback: null,
+                contentParts: null, responseObject: null,
+                errorMessage: config.lastError
+            });
+        }
         if (!config.silent) {
             alert(`AI 응답 생성 실패:\n${config.lastError}`);
         }
