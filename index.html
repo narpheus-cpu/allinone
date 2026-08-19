@@ -1909,10 +1909,10 @@
 
 <script>
     // ============================================================================
-    // ★ 최근 코드 업데이트 시각: 202608191248
+    // ★ 최근 코드 업데이트 시각: 20260819023120
     // ★ ※ 코드를 직접 수정할 때마다 위 시간값도 변경하세요.
     // ============================================================================
-    const APP_BUILD_TIMESTAMP = '202608191248';
+    const APP_BUILD_TIMESTAMP = '202608190359';
     
         /* ========================================== */
     /* [신규 기능] AI 도움 프롬프트 통합 템플릿 관리   */
@@ -2107,16 +2107,14 @@
                 const val = localStorage.getItem('word_slot_' + i);
                 if (val) mtBackupData[i] = val;
             }
+            const generatorSlotData = localStorage.getItem('word_slot_11');
+            if (generatorSlotData) mtBackupData['11'] = generatorSlotData;
             const slot9Data = localStorage.getItem(MT_SLOT9_STORAGE_KEY);
             if (slot9Data) mtBackupData['slot9_conversation'] = slot9Data;
             const wordWebData = localStorage.getItem(MT_WORDWEB_STORAGE_KEY);
             if (wordWebData) mtBackupData['wordweb_conversation'] = wordWebData;
             const starSess = localStorage.getItem('word_slot_star_session');
             if (starSess) mtBackupData['star_session'] = starSess;
-            const naverSlot = localStorage.getItem('word_slot_naver_english_conversation');
-            if (naverSlot) mtBackupData['naver_english_conversation'] = naverSlot;
-            const naverPattern = localStorage.getItem('word_slot_naver_english_conversation_pattern');
-            if (naverPattern) mtBackupData['naver_english_conversation_pattern'] = naverPattern;
             const wordWebSlot = localStorage.getItem(MT_WORDWEB_STORAGE_KEY);
             if (wordWebSlot) mtBackupData['wordweb_conversation'] = wordWebSlot;
             const slot9ApiKey = localStorage.getItem(MT_SLOT9_API_KEY_STORAGE_KEY);
@@ -2176,20 +2174,17 @@
                     else localStorage.removeItem('word_slot_' + i);
                 }
 
+                if (Object.prototype.hasOwnProperty.call(parsed.mtBackupData, '11')) {
+                    if (parsed.mtBackupData['11']) localStorage.setItem('word_slot_11', parsed.mtBackupData['11']);
+                    else localStorage.removeItem('word_slot_11');
+                }
+
                 if (Object.prototype.hasOwnProperty.call(parsed.mtBackupData, 'slot9_conversation')) {
                     if (parsed.mtBackupData['slot9_conversation']) localStorage.setItem(MT_SLOT9_STORAGE_KEY, parsed.mtBackupData['slot9_conversation']);
                     else localStorage.removeItem(MT_SLOT9_STORAGE_KEY);
                 }
                 if(parsed.mtBackupData['star_session']) {
                     localStorage.setItem('word_slot_star_session', parsed.mtBackupData['star_session']);
-                }
-                if(parsed.mtBackupData['naver_english_conversation']) {
-                    localStorage.setItem('word_slot_naver_english_conversation', parsed.mtBackupData['naver_english_conversation']);
-                } else {
-                    localStorage.removeItem('word_slot_naver_english_conversation');
-                }
-                if(parsed.mtBackupData['naver_english_conversation_pattern']) {
-                    localStorage.setItem('word_slot_naver_english_conversation_pattern', parsed.mtBackupData['naver_english_conversation_pattern']);
                 }
                 if (parsed.mtBackupData['wordweb_conversation']) {
                     localStorage.setItem(MT_WORDWEB_STORAGE_KEY, parsed.mtBackupData['wordweb_conversation']);
@@ -4149,10 +4144,10 @@ Rules:
         ];
 
         const wb = XLSX.utils.book_new();
-        const sheetName = slotIndex === 'naver' ? '네이버영어회화' : '단어장';
+        const sheetName = '단어장';
         XLSX.utils.book_append_sheet(wb, ws, sheetName);
 
-        const fallbackName = slotIndex === 'naver' ? '네이버영어회화' : `슬롯_${slotIndex}`;
+        const fallbackName = `슬롯_${slotIndex}`;
         const safeName = String(parsed.name || fallbackName).replace(/[\\/:*?"<>|]/g, '').trim() || fallbackName;
         XLSX.writeFile(wb, `[마스킹타이핑]_요약_${safeName}.xlsx`);
     }
@@ -4174,8 +4169,17 @@ Rules:
         // 워드웹회화
         const ww=mtWordWebGetState(), p=mtWordWebGetPattern(ww), ss=new Set((ww.starredSerials||[]).map(String));
         (ww.outputRows||[]).forEach((r,idx)=>{ const serial=String(r[p.serialCol-1]||'').trim(); if(serial&&ss.has(serial)) all.push({kor:String(r[p.mainKorCol-1]||''),eng:String(r[p.engCol-1]||''),starred:true,originalIndex:idx,sourceSlot:'wordweb',sourceIndex:idx}); });
-        // 네이버영어회화
-        try { const n=JSON.parse(localStorage.getItem(MT_NAVER_STORAGE_KEY)||'null'); (n?.words||[]).forEach((w,idx)=>{if(w?.starred)all.push({kor:w.kor,eng:w.eng,starred:true,originalIndex:idx,sourceSlot:'naver',sourceIndex:idx});}); } catch(e) {}
+        // 생성형 슬롯(11)
+        const raw11 = localStorage.getItem('word_slot_11');
+        if (raw11) {
+            try {
+                const parsed11 = JSON.parse(raw11);
+                const words11 = Array.isArray(parsed11) ? parsed11 : parsed11.words;
+                (words11 || []).forEach((w, idx) => {
+                    if (w?.starred) all.push({kor:w.kor,eng:w.eng,starred:true,originalIndex:idx,sourceSlot:11,sourceIndex:idx});
+                });
+            } catch(e) {}
+        }
         return all;
     }
 
@@ -4271,44 +4275,49 @@ Rules:
                 mtPromptAction('star', starSlotData);
             }
         };
-        // 네이버영어회화 스페셜 슬롯 — 모아보기 슬롯과 위치를 서로 교체
-
-        let naverSlot = { name: '네이버영어회화', words: [], lastSession: null, isSpecialSlot: true };
-        const naverRaw = localStorage.getItem(MT_NAVER_STORAGE_KEY);
-        if (naverRaw) {
-            try { naverSlot = JSON.parse(naverRaw); } catch (e) {}
+        // 네이버영어회화 전용 슬롯을 제거하고, 같은 위치를 생성형 슬롯(11)으로 사용
+        const generatorDiv = document.createElement('div');
+        const rawGenerator = localStorage.getItem('word_slot_11');
+        let generatorData = null;
+        if (rawGenerator) {
+            try {
+                const parsedGenerator = JSON.parse(rawGenerator);
+                generatorData = Array.isArray(parsedGenerator)
+                    ? { name: '생성형 슬롯', words: parsedGenerator }
+                    : parsedGenerator;
+            } catch (e) {}
         }
-        const naverWords = Array.isArray(naverSlot.words) ? naverSlot.words : [];
-        const naverStarredCount = naverWords.filter(w => w.starred).length;
 
-        // 별 모음의 카드 수는 모든 슬롯을 포함
-        const starCountNode = starDiv.querySelector('.mt-slot-desc');
-        if (starCountNode) {
-            starCountNode.innerHTML = `
-                카드 수: ${allStarredWords.length}개<br>
-                <span style="color: #d97706; font-weight: 600;">(모든 슬롯의 ★ 자동 수집)</span>
+        if (generatorData && Array.isArray(generatorData.words) && generatorData.words.length > 0) {
+            const generatorStarred = generatorData.words.filter(w => w?.starred).length;
+            generatorDiv.className = 'mt-slot has-data';
+            generatorDiv.innerHTML = `
+                <div class="mt-slot-title">${mtEscapeHTML(generatorData.name || '생성형 슬롯')}</div>
+                <span class="mt-slot-meta-badge">생성형 학습 슬롯</span>
+                <div class="mt-slot-stat-row">
+                    <div><div class="mt-slot-count">${generatorData.words.length}</div><div class="mt-slot-count-label">카드</div></div>
+                    <div class="mt-slot-star-count">★ ${generatorStarred}</div>
+                </div>
+                <div class="mt-slot-desc">생성형 학습 카드와 ★ 표시 상태가 함께 저장됩니다.</div>
+                <div class="mt-slot-actions-row">
+                    <button class="btn-download" style="padding: 5px 10px;" onclick="mtExportSlot(event, 11)">내보내기</button>
+                    <button class="mt-btn-delete" onclick="mtDeleteSlot(event, 11)">삭제</button>
+                </div>
             `;
+            generatorDiv.onclick = () => mtPromptAction(11, generatorData);
+        } else {
+            generatorDiv.className = 'mt-slot';
+            generatorDiv.innerHTML = `
+                <div class="mt-slot-title">생성형 슬롯</div>
+                <span class="mt-slot-meta-badge">빈 생성형 슬롯</span>
+                <div class="mt-slot-desc">파일을 불러오면 생성형 학습 카드로 등록됩니다.</div>
+                <div class="mt-slot-empty">클릭하여 파일 추가</div>
+            `;
+            generatorDiv.onclick = () => mtTriggerUpload(11);
         }
-        starSlotData.words = allStarredWords;
+        grid.appendChild(generatorDiv);
 
-        let naverDiv = document.createElement('div');
-        naverDiv.className = 'mt-slot has-data mt-special-slot';
-        naverDiv.innerHTML = `
-            <div class="mt-slot-title" style="color:#0f766e;">네이버영어회화</div>
-            <div class="mt-slot-desc" style="line-height:1.5;">
-                카드 수: ${naverWords.length}개<br>
-                <span style="color:#0f766e; font-weight:600;">★표기카드수: ${naverStarredCount}개</span>
-                <span class="mt-special-badge">실시간 누적 슬롯</span>
-            </div>
-            <div style="display:flex; gap:5px; flex-wrap:wrap; justify-content:center;">
-                ${naverWords.length ? `<button class="btn-download" style="padding:5px 10px; border-radius:4px; font-size:11px; font-weight:600;" onclick="mtExportSlot(event, 'naver')">내보내기</button>` : ''}
-                ${naverWords.length ? `<button class="mt-btn-delete" onclick="mtDeleteSlot(event, 'naver')">전체 삭제</button>` : ''}
-            </div>
-        `;
-        naverDiv.onclick = () => mtPromptAction('naver', naverSlot);
-        grid.appendChild(naverDiv);
-
-        // ★ 모아보기 슬롯을 네이버영어회화 다음에 배치
+        // ★ 모아보기 슬롯
         grid.appendChild(starDiv);
     }
 
@@ -4317,17 +4326,10 @@ Rules:
         mtOriginalSlotData = slotData;
 
         document.getElementById('mtActionSlotTitle').innerText = slotData.name;
-        const naverActionArea = document.getElementById('mtNaverActionArea');
-        const naverPastePanel = document.getElementById('mtNaverPastePanel');
-        const naverPatternPanel = document.getElementById('mtNaverPatternPanel');
         const wordWebActionArea = document.getElementById('mtWordWebActionArea');
         const slot9ActionArea = document.getElementById('mtSlot9ActionArea');
-        if (naverActionArea) naverActionArea.style.display = slotIndex === 'naver' ? 'block' : 'none';
         if (wordWebActionArea) wordWebActionArea.style.display = slotIndex === 'wordweb' ? 'block' : 'none';
         if (slot9ActionArea) slot9ActionArea.style.display = slotIndex === 'slot9' ? 'block' : 'none';
-        if (naverPastePanel) naverPastePanel.classList.remove('open');
-        if (naverPatternPanel) naverPatternPanel.classList.remove('open');
-        if (slotIndex === 'naver') mtSetNaverPatternInputs();
         if (slotIndex === 'wordweb') mtSetWordWebPatternInputs();
         if (slotIndex === 'slot9') mtSetSlot9PatternInputs();
 
