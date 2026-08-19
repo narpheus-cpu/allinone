@@ -2671,24 +2671,35 @@
         }
     }
 
- async function fetchGemini(promptText, responseSchema = null, config = null) {
+    async function fetchGemini(promptText, responseSchema = null, config = null) {
         config = config || {};
         const apiKey = String(config.apiKey || localStorage.getItem('gemini_api_key') || '').trim();
+        const emitDiagnostic = (detail) => {
+            if (typeof config.diagnosticHandler === 'function') {
+                try { config.diagnosticHandler(detail); } catch (e) { console.warn('diagnosticHandler failed:', e); }
+            }
+        };
+
         if (!apiKey) {
             const missingMessage = config.missingKeyMessage || '상단 API 키 설정 메뉴에서 Gemini API Key를 먼저 입력하고 저장해 주세요!';
-            if (typeof config.diagnosticHandler === 'function') {
-                config.diagnosticHandler({ model:'', httpStatus:null, finishReason:'', promptFeedback:null, contentParts:null, responseObject:null, errorMessage:missingMessage });
-            }
+            emitDiagnostic({
+                model:'', httpStatus:null, finishReason:'', promptFeedback:null,
+                contentParts:null, responseObject:null, errorMessage:missingMessage,
+                failureType:'config'
+            });
             if (!config.silent) alert(missingMessage);
             return null;
         }
 
+        // 텍스트 생성 슬롯에서 실제로 허용할 모델만 명시합니다.
+        // API의 모델 목록을 자동 탐색하여 이미지/TTS/Live/실험 모델이 섞이지 않도록 합니다.
         const TEXT_GENERATION_MODELS = [
             'gemini-3.6-flash',
             'gemini-3.5-flash',
             'gemini-3.5-flash-lite',
             'gemini-3.1-flash-lite'
         ];
+
         const preferredModels = Array.isArray(config.models) && config.models.length
             ? config.models.map(String).map(s => s.trim()).filter(Boolean)
             : ['gemini-3.6-flash'];
@@ -2700,133 +2711,193 @@
             ...TEXT_GENERATION_MODELS
         ]));
 
+        // 이번 요청에서만 실패한 모델을 따로 관리합니다.
+        // 이전 코드처럼 실패한 모델을 hardBlacklist에 넣어 다음 생성까지 막지 않습니다.
         const requestFailedModels = new Set();
         const emptyResponseRetries = new Map();
-        const maxAttempts = Math.max(1, Number(config.maxModelAttempts || baseModels.length * 2));
+        const maxAttempts = Math.max(1, Math.min(
+            Number(config.maxModelAttempts || baseModels.length),
+            baseModels.length
+        ));
         let attempts = 0;
         let lastError = '';
         let lastDiagnostic = null;
-
-        const recordDiagnostic = (detail) => {
-            lastDiagnostic = detail;
-        };
-
-        const classifyHttpFailure = (status, message) => {
-            if (status === 404) return 'hard';
-            if (status === 429) return 'temporary';
-            if (status >= 500) return 'temporary';
-            if (status === 408) return 'temporary';
-            return 'request';
-        };
+        let terminalFailure = false;
 
         const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+        const makeDebugDump = () => [
+            '',
+            '[디버그 상태 덤프]',
+            `- 기본 후보 모델: [${baseModels.join(', ')}]`,
+            `- 영구 차단(hardBlacklist): [${Array.from(hardBlacklist).join(', ')}]`,
+            `- 이번 요청 실패(requestFailedModels): [${Array.from(requestFailedModels).join(', ')}]`,
+            `- 시도 횟수: ${attempts}/${maxAttempts}`
+        ].join('\n');
+
+        const emitFailure = (detail) => {
+            lastDiagnostic = detail;
+            emitDiagnostic({ ...detail, errorMessage: `${detail.errorMessage || ''}${makeDebugDump()}` });
+        };
+
+        // HTTP 오류의 의미를 구분합니다.
+        // hard(404)만 영구 차단하고, 일시 오류는 이번 요청에서만 제외합니다.
+        const classifyHttpFailure = (status) => {
+            if (status === 404) return 'hard';
+            if (status === 401 || status === 403) return 'auth';
+            if (status === 429 || status === 408 || status >= 500) return 'temporary';
+            if (status >= 400) return 'request';
+            return 'unknown';
+        };
+
+        // Gemini가 생성 자체를 정책상 차단한 경우는 모델 교체로 해결할 문제가 아닙니다.
+        // 같은 입력을 다른 모델에 반복해서 보내지 않고 즉시 중단합니다.
+        const isPolicyBlocked = (finishReason) => [
+            'PROHIBITED_CONTENT',
+            'SAFETY',
+            'BLOCKLIST',
+            'SPII',
+            'RECITATION'
+        ].includes(String(finishReason || '').toUpperCase());
+
         while (attempts < maxAttempts) {
             const model = baseModels.find(m => !hardBlacklist.has(m) && !requestFailedModels.has(m));
-            if (!model) {
-                if (!lastError) lastError = '사용 가능한 후보 모델이 없습니다.';
-                break;
-            }
+            if (!model) break;
             attempts++;
 
-            const generateUrl = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
-            try {
-                // [해결 1] 문제가 되던 temperature 파라미터 완전 삭제
-                const reqBody = {
-                    contents: [{ parts: [{ text: String(promptText || '') }] }],
-                    generationConfig: {
-                        maxOutputTokens: Number(config.maxOutputTokens || 4096)
-                    }
-                };
-                if (responseSchema) {
-                    reqBody.generationConfig.responseMimeType = 'application/json';
-                    reqBody.generationConfig.responseSchema = responseSchema;
+            // 최신 API 형식: v1 + x-goog-api-key 헤더.
+            const generateUrl = `https://generativelanguage.googleapis.com/v1/models/${encodeURIComponent(model)}:generateContent`;
+            const reqBody = {
+                contents: [{ parts: [{ text: String(promptText || '') }] }],
+                generationConfig: {
+                    maxOutputTokens: Number(config.maxOutputTokens || 4096)
                 }
+            };
+            if (responseSchema) {
+                reqBody.generationConfig.responseMimeType = 'application/json';
+                reqBody.generationConfig.responseSchema = responseSchema;
+            }
 
+            try {
                 const res = await mtFetchWithTimeout(generateUrl, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-goog-api-key': apiKey
+                    },
                     body: JSON.stringify(reqBody)
                 }, Number(config.requestTimeoutMs || 45000));
 
+                const data = await res.json().catch(() => ({}));
+
                 if (res.ok) {
-                    const data = await res.json().catch(() => ({}));
-                    const candidate = data.candidates?.[0];
-                    const finishReason = candidate?.finishReason || '';
-                    const promptFeedback = data.promptFeedback ?? null;
+                    const candidate = data?.candidates?.[0] || null;
+                    const finishReason = String(candidate?.finishReason || '').trim();
+                    const promptFeedback = data?.promptFeedback ?? null;
                     const contentParts = candidate?.content?.parts ?? null;
                     const responseText = Array.isArray(contentParts)
-                        ? contentParts.map(part => String(part?.text || '')).join('').trim()
-                        : '';
+                        ? contentParts
+                            .map(part => typeof part?.text === 'string' ? part.text : '')
+                            .join('')
+                            .trim()
+                        : (typeof data?.text === 'string' ? data.text.trim() : '');
+
+                    // 정책 차단은 모델 문제가 아니라 현재 입력/출력의 차단입니다.
+                    if (isPolicyBlocked(finishReason)) {
+                        const message = `[${model}] AI 생성이 콘텐츠 정책에 의해 차단되었습니다. (finishReason: ${finishReason})`;
+                        terminalFailure = true;
+                        lastError = message;
+                        emitFailure({
+                            model, httpStatus: res.status, finishReason, promptFeedback,
+                            contentParts, responseObject: data, errorMessage: message,
+                            failureType: 'policy'
+                        });
+                        break;
+                    }
 
                     if (responseText) return responseText;
 
+                    // 정상 HTTP 응답인데 본문이 없으면 모델 자체를 blacklist하지 않습니다.
+                    // 같은 모델은 한 번만 재시도한 뒤, 그래도 실패하면 다음 모델로 이동합니다.
                     const emptyCount = Number(emptyResponseRetries.get(model) || 0);
                     const emptyMessage = `[${model}] 응답 본문이 비어 있습니다.`;
-                    recordDiagnostic({ model, httpStatus:res.status, finishReason, promptFeedback, contentParts, responseObject:data, errorMessage:emptyMessage });
                     lastError = emptyMessage;
+                    emitFailure({
+                        model, httpStatus: res.status, finishReason, promptFeedback,
+                        contentParts, responseObject: data, errorMessage: emptyMessage,
+                        failureType: 'empty_response'
+                    });
 
                     if (emptyCount < 1) {
                         emptyResponseRetries.set(model, emptyCount + 1);
-                        await sleep(250);
+                        await sleep(300);
                         continue;
                     }
                     requestFailedModels.add(model);
                     continue;
                 }
 
-                const errJson = await res.json().catch(() => ({}));
-                const message = String(errJson?.error?.message || `HTTP ${res.status}`).trim();
-                const failureType = classifyHttpFailure(res.status, message);
-                recordDiagnostic({
-                    model,
-                    httpStatus: res.status,
-                    finishReason: '',
-                    promptFeedback: errJson?.error?.details || errJson?.error || null,
-                    contentParts: null,
-                    responseObject: errJson,
-                    errorMessage: message
-                });
+                const message = String(data?.error?.message || `HTTP ${res.status}`).trim();
+                const failureType = classifyHttpFailure(res.status);
                 lastError = `[${model}] ${message}`;
 
+                if (failureType === 'auth') {
+                    terminalFailure = true;
+                    emitFailure({
+                        model, httpStatus: res.status, finishReason:'',
+                        promptFeedback: data?.error?.details || data?.error || null,
+                        contentParts:null, responseObject:data,
+                        errorMessage:lastError, failureType
+                    });
+                    break;
+                }
+
                 if (failureType === 'hard') {
+                    // 404만 모델 자체의 영구 차단으로 처리합니다.
                     hardBlacklist.add(model);
                 }
+
                 requestFailedModels.add(model);
+                emitFailure({
+                    model, httpStatus: res.status, finishReason:'',
+                    promptFeedback: data?.error?.details || data?.error || null,
+                    contentParts:null, responseObject:data,
+                    errorMessage:lastError, failureType
+                });
                 continue;
             } catch (err) {
-                const message = err?.name === 'AbortError' ? 'API 요청 시간이 초과되었습니다.' : String(err?.message || err);
-                recordDiagnostic({
-                    model,
-                    httpStatus: null,
-                    finishReason: '',
-                    promptFeedback: null,
-                    contentParts: null,
-                    responseObject: null,
-                    errorMessage: message
-                });
+                const message = err?.name === 'AbortError'
+                    ? 'API 요청 시간이 초과되었습니다.'
+                    : String(err?.message || err);
                 lastError = `[${model}] ${message}`;
                 requestFailedModels.add(model);
+                emitFailure({
+                    model, httpStatus:null, finishReason:'', promptFeedback:null,
+                    contentParts:null, responseObject:null,
+                    errorMessage:lastError,
+                    failureType: err?.name === 'AbortError' ? 'timeout' : 'network'
+                });
                 continue;
             }
         }
 
-        const debugDump = `\n\n[디버그 상태 덤프]\n- 기본 후보 모델: [${baseModels.join(', ')}]\n- 영구 차단(hardBlacklist): [${Array.from(hardBlacklist).join(', ')}]\n- 일시 실패(requestFailedModels): [${Array.from(requestFailedModels).join(', ')}]`;
+        if (!lastError) {
+            lastError = hardBlacklist.size && baseModels.every(m => hardBlacklist.has(m))
+                ? '사용 가능한 텍스트 생성 모델이 없습니다. 모든 후보가 영구 차단(404) 상태입니다.'
+                : '텍스트 생성 모델의 응답을 받지 못했습니다.';
+        }
 
-        config.lastError = (lastError || '텍스트 생성 모델의 응답을 받지 못했습니다.') + debugDump;
+        const debugDump = makeDebugDump();
+        config.lastError = `${lastError}${debugDump}`;
 
-        // [해결 2] 파일 저장 객체(diagnosticHandler)에 디버그 덤프를 병합하여 넘기도록 수정
-        if (typeof config.diagnosticHandler === 'function') {
-            if (lastDiagnostic) {
-                lastDiagnostic.errorMessage = (lastDiagnostic.errorMessage || '') + debugDump;
-                config.diagnosticHandler(lastDiagnostic);
-            } else {
-                config.diagnosticHandler({
-                    model: '', httpStatus: null, finishReason: '', promptFeedback: null,
-                    contentParts: null, responseObject: null,
-                    errorMessage: config.lastError
-                });
-            }
+        // 위에서 각 실패를 즉시 기록했으므로 여기서는 아무 오류도 기록하지 않았을 때만 보조 로그를 남깁니다.
+        if (!lastDiagnostic && typeof config.diagnosticHandler === 'function') {
+            config.diagnosticHandler({
+                model: '', httpStatus: null, finishReason: '', promptFeedback: null,
+                contentParts: null, responseObject: null,
+                errorMessage: config.lastError,
+                failureType: terminalFailure ? 'terminal' : 'exhausted'
+            });
         }
 
         if (!config.silent) {
