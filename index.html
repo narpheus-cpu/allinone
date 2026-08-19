@@ -5345,12 +5345,16 @@ Rules:
             const workbook = XLSX.read(data, { type: 'array' });
             const priorState = mtWordWebGetState();
             const pattern = mtWordWebGetPattern(priorState);
-            if (!workbook.SheetNames.includes(pattern.topicSheet) || !workbook.SheetNames.includes(pattern.outputSheet)) {
-                alert(`엑셀 파일에 [${pattern.topicSheet}]와 [${pattern.outputSheet}] 시트가 모두 있어야 합니다.`);
+            // 참조형 신규 파일은 [차례] 시트만 있어도 등록할 수 있습니다.
+            // 기존 내보내기 파일에 [시트1]이 있으면 기존 생성결과를 그대로 복원합니다.
+            if (!workbook.SheetNames.includes(pattern.topicSheet)) {
+                alert(`참조형 파일에는 [${pattern.topicSheet}] 시트가 반드시 있어야 합니다.`);
                 return;
             }
             const topicRows = XLSX.utils.sheet_to_json(workbook.Sheets[pattern.topicSheet], { header: 1, defval: '' });
-            const outputRows = XLSX.utils.sheet_to_json(workbook.Sheets[pattern.outputSheet], { header: 1, defval: '' });
+            const outputRows = workbook.SheetNames.includes(pattern.outputSheet)
+                ? XLSX.utils.sheet_to_json(workbook.Sheets[pattern.outputSheet], { header: 1, defval: '' })
+                : [];
             const topics = topicRows.map((row, idx) => ({
                 rowNumber: idx + 1,
                 topic: Array.from({length: pattern.topicColCount}, (_, n) => String((row || [])[pattern.topicStartCol - 1 + n] ?? '').trim()).filter(Boolean).join(' - ')
@@ -5381,7 +5385,9 @@ Rules:
             mtWordWebSaveState(state);
             mtWordWebStartAutoTrigger(true);
             mtInitSlots();
-            alert('[워드웹회화] 엑셀 등록이 완료되었습니다.');
+            alert(workbook.SheetNames.includes(pattern.outputSheet)
+                ? '[참조형] 차례와 기존 생성결과를 불러왔습니다.'
+                : `[참조형] 차례 시트 등록이 완료되었습니다. [${pattern.outputSheet}] 시트는 생성 결과가 쌓일 때 자동으로 만들어집니다.`);
         } catch (error) {
             console.error(error);
             alert('엑셀 파일을 읽는 중 오류가 발생했습니다.');
@@ -6406,10 +6412,12 @@ Example:
             reference_generate:'[차례] 시트의 주제를 바탕으로 AI가 새로운 대화를 생성합니다.'
         };
         const hasData = !!state.fileName || words.length>0;
-        div.className = 'mt-slot ' + (hasData ? 'has-data' : '');
+        const isReference = type === 'reference_generate';
+        div.className = 'mt-slot ' + (hasData ? 'has-data' : '') + (isReference ? ' mt-reference-type-slot' : '');
         const displayTitle = state.fileName || `슬롯 ${Number(slotIndex)}`;
         const displayBadge = mtGetSlotTypeLabel(type);
-        div.innerHTML = `<div class="mt-slot-title">${mtEscapeHTML(displayTitle)}</div><span class="mt-slot-meta-badge ${type==='normal'?'':'ai'}">${displayBadge}</span><div class="mt-slot-stat-row"><div><div class="mt-slot-count">${words.length}</div><div class="mt-slot-count-label">${type==='normal'?'카드':'생성 카드'}</div></div><div class="mt-slot-star-count">★ ${star}</div></div><div class="mt-slot-desc">${hasData && state.fileName ? `파일: ${mtEscapeHTML(state.fileName)}` : ''}${hasData && state.fileName ? '<br>' : ''}${descs[type]}</div><div class="mt-slot-actions-row">${hasData?`<button class="btn-download" style="padding:5px 10px;" onclick="mtTypedExport(event,${slotIndex})">내보내기</button><button class="mt-btn-delete" onclick="mtDeleteSlot(event,${slotIndex})">삭제</button>`:''}</div>`;
+        const badgeClass = type === 'reference_generate' ? 'success' : (type === 'self_generate' ? 'ai' : '');
+        div.innerHTML = `<div class="mt-slot-title">${mtEscapeHTML(displayTitle)}</div><span class="mt-slot-meta-badge ${badgeClass}">${displayBadge}</span><div class="mt-slot-stat-row"><div><div class="mt-slot-count">${words.length}</div><div class="mt-slot-count-label">${type==='normal'?'카드':'생성 카드'}</div></div><div class="mt-slot-star-count">★ ${star}</div></div><div class="mt-slot-desc">${hasData && state.fileName ? `파일: ${mtEscapeHTML(state.fileName)}` : ''}${hasData && state.fileName ? '<br>' : ''}${descs[type]}</div><div class="mt-slot-actions-row">${hasData?`<button class="btn-download" style="padding:5px 10px;" onclick="mtTypedExport(event,${slotIndex})">내보내기</button><button class="mt-btn-delete" onclick="mtDeleteSlot(event,${slotIndex})">삭제</button>`:''}</div>`;
         div.onclick = () => {
             if (!hasData) mtOpenConfiguredEmptySlotModal(slotIndex);
             else mtPromptAction(slotIndex, mtTypedBuildSlotData(slotIndex));
