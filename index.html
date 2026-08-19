@@ -1440,7 +1440,7 @@
                     </div>
                     <button class="btn-excel" onclick="mtCloseConfiguredEmptySlotModal()">닫기</button>
                 </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px;">
+                <div class="mt-type-option-grid" style="margin-top:16px;">
                     <button type="button" class="mt-type-option" onclick="mtRegisterConfiguredEmptySlotFile()">
                         <span class="mt-type-option-badge">UPLOAD</span>
                         <div class="mt-type-option-title">현재 유형으로 파일 등록</div>
@@ -1999,7 +1999,7 @@
     // ★ 최근 코드 업데이트 시각: 202608191233
     // ★ ※ 코드를 직접 수정할 때마다 위 시간값도 변경하세요.
     // ============================================================================
-    const APP_BUILD_TIMESTAMP = '202608191351';
+    const APP_BUILD_TIMESTAMP = '202608191359';
     
         /* ========================================== */
     /* [신규 기능] AI 도움 프롬프트 통합 템플릿 관리   */
@@ -4334,13 +4334,13 @@ Rules:
 
                 div.className = 'mt-slot has-data';
                 div.innerHTML = `
-                    <div class="mt-slot-title">${mtEscapeHTML(slotData.name || "슬롯 " + i)}</div>
-                    <span class="mt-slot-meta-badge">일반 학습 슬롯</span>
+                    <div class="mt-slot-title">${mtEscapeHTML(slotData.name || `슬롯 ${i}`)}</div>
+                    <span class="mt-slot-meta-badge">일반유형</span>
                     <div class="mt-slot-stat-row">
                         <div><div class="mt-slot-count">${slotData.words.length}</div><div class="mt-slot-count-label">카드</div></div>
                         <div class="mt-slot-star-count">★ ${starredCount}</div>
                     </div>
-                    <div class="mt-slot-desc">학습 카드와 ★ 표시 상태가 함께 저장됩니다.</div>
+                    <div class="mt-slot-desc">${mtEscapeHTML(slotData.name || '')}<br>일반 학습 카드와 ★ 표시 상태가 함께 저장됩니다.</div>
                     <div class="mt-slot-actions-row">
                         <button class="btn-download" style="padding: 5px 10px;" onclick="mtExportSlot(event, ${i})">내보내기</button>
                         <button class="mt-btn-delete" onclick="mtDeleteSlot(event, ${i})">삭제</button>
@@ -4355,7 +4355,10 @@ Rules:
                     <div class="mt-slot-desc">클릭하여 슬롯 유형을 선택하거나 파일을 등록합니다.</div>
                     <div class="mt-slot-empty">클릭하여 설정</div>
                 `;
-                div.onclick = () => mtTriggerUpload(i);
+                div.onclick = () => {
+                    if (mtGetSlotType(i)) mtOpenConfiguredEmptySlotModal(i);
+                    else mtOpenSlotTypeModal(i);
+                };
             }
             grid.appendChild(div);
         }
@@ -4402,13 +4405,13 @@ Rules:
                 const generatorStarred = generatorData.words.filter(w => w?.starred).length;
                 generatorDiv.className = 'mt-slot has-data';
                 generatorDiv.innerHTML = `
-                    <div class="mt-slot-title">${mtEscapeHTML(generatorData.name || '생성형 슬롯')}</div>
-                    <span class="mt-slot-meta-badge">생성형 학습 슬롯</span>
+                    <div class="mt-slot-title">${mtEscapeHTML(slotData.name || `슬롯 ${i}`)}</div>
+                    <span class="mt-slot-meta-badge">일반유형</span>
                     <div class="mt-slot-stat-row">
                         <div><div class="mt-slot-count">${generatorData.words.length}</div><div class="mt-slot-count-label">카드</div></div>
                         <div class="mt-slot-star-count">★ ${generatorStarred}</div>
                     </div>
-                    <div class="mt-slot-desc">생성형 학습 카드와 ★ 표시 상태가 함께 저장됩니다.</div>
+                    <div class="mt-slot-desc">${mtEscapeHTML(generatorData.name || '')}<br>일반 학습 카드와 ★ 표시 상태가 함께 저장됩니다.</div>
                     <div class="mt-slot-actions-row">
                         <button class="btn-download" style="padding: 5px 10px;" onclick="mtExportSlot(event, 11)">내보내기</button>
                         <button class="mt-btn-delete" onclick="mtDeleteSlot(event, 11)">삭제</button>
@@ -4423,7 +4426,10 @@ Rules:
                     <div class="mt-slot-desc">클릭하여 슬롯 유형을 선택하세요.</div>
                     <div class="mt-slot-empty">클릭하여 설정</div>
                 `;
-                generatorDiv.onclick = () => mtTriggerUpload(11);
+                generatorDiv.onclick = () => {
+                    if (mtGetSlotType(11)) mtOpenConfiguredEmptySlotModal(11);
+                    else mtOpenSlotTypeModal(11);
+                };
             }
         }
         grid.appendChild(generatorDiv);
@@ -4768,7 +4774,7 @@ Rules:
         const words=mtSlot9BuildSlotData(st).words;
         const star=mtSlot9GetStarredCount(st);
         div.className='mt-slot mt-wordweb-slot '+(st.fileName?'has-data':'');
-        div.innerHTML=`<div class="mt-slot-title">${mtEscapeHTML(st.fileName || '슬롯 9')}</div><span class="mt-slot-meta-badge ai">AI 자동 생성 · 슬롯 9</span><div class="mt-slot-stat-row"><div><div class="mt-slot-count">${words.length}</div><div class="mt-slot-count-label">생성 카드</div></div><div class="mt-slot-star-count">★ ${star}</div></div><div class="mt-slot-desc">생성 결과를 저장하고 다음 자동 생성까지 이어갑니다.</div><div style="width:100%;margin:0 0 8px;" onclick="event.stopPropagation()" onpointerdown="event.stopPropagation()"><div style="display:flex;gap:4px;align-items:center;"><input id="mtSlot9ApiKeyInput" type="password" autocomplete="off" placeholder="슬롯9 전용 API Key" value="${mtEscapeHTML(mtGetSlotApiKey('slot9'))}" style="flex:1;min-width:0;padding:7px 8px;border:1px solid #d1d5db;border-radius:7px;font-size:10px;box-sizing:border-box;"><button class="btn-excel" style="padding:6px 9px;font-size:10px;" onclick="event.stopPropagation();mtSaveSlotApiKey('slot9')">저장</button></div></div><div class="mt-slot-actions-row">${st.fileName?`<button class="btn-download" style="padding:5px 10px;" onclick="mtSlot9DownloadClick(event)">내보내기</button>`:'<button class="btn-download" disabled style="padding:5px 10px;">내보내기</button>'}${st.fileName?`<button class="mt-btn-delete" onclick="mtDeleteSlot(event,'slot9')">삭제</button>`:'<button class="mt-btn-delete" disabled>삭제</button>'}</div><div id="mtSlot9Status" class="mt-wordweb-status"></div>`;
+        div.innerHTML=`<div class="mt-slot-title">생성유형: 자체형</div><span class="mt-slot-meta-badge ai">생성유형: 자체형</span><div class="mt-slot-stat-row"><div><div class="mt-slot-count">${words.length}</div><div class="mt-slot-count-label">생성 카드</div></div><div class="mt-slot-star-count">★ ${star}</div></div><div class="mt-slot-desc">${st.fileName ? `파일: ${mtEscapeHTML(st.fileName)}<br>` : ''}생성 결과를 저장하고 다음 자동 생성까지 이어갑니다.</div><div style="width:100%;margin:0 0 8px;" onclick="event.stopPropagation()" onpointerdown="event.stopPropagation()"><div style="display:flex;gap:4px;align-items:center;"><input id="mtSlot9ApiKeyInput" type="password" autocomplete="off" placeholder="슬롯9 전용 API Key" value="${mtEscapeHTML(mtGetSlotApiKey('slot9'))}" style="flex:1;min-width:0;padding:7px 8px;border:1px solid #d1d5db;border-radius:7px;font-size:10px;box-sizing:border-box;"><button class="btn-excel" style="padding:6px 9px;font-size:10px;" onclick="event.stopPropagation();mtSaveSlotApiKey('slot9')">저장</button></div></div><div class="mt-slot-actions-row">${st.fileName?`<button class="btn-download" style="padding:5px 10px;" onclick="mtSlot9DownloadClick(event)">내보내기</button>`:'<button class="btn-download" disabled style="padding:5px 10px;">내보내기</button>'}${st.fileName?`<button class="mt-btn-delete" onclick="mtDeleteSlot(event,'slot9')">삭제</button>`:'<button class="mt-btn-delete" disabled>삭제</button>'}</div><div id="mtSlot9Status" class="mt-wordweb-status"></div>`;
         div.onclick=()=>{ if(!st.fileName){ mtSlot9TriggerUpload(); return;} mtPromptAction('slot9',mtSlot9BuildSlotData(st)); };
         mtSlot9RenderStatus();
     }
@@ -5225,13 +5231,13 @@ Rules:
 
         div.className = 'mt-slot mt-wordweb-slot ' + (state.fileName ? 'has-data' : '');
         div.innerHTML = `
-            <div class="mt-slot-title">워드웹회화</div>
-            <span class="mt-slot-meta-badge success">자동 생성 · 슬롯 10</span>
+            <div class="mt-slot-title">생성유형: 참조형</div>
+            <span class="mt-slot-meta-badge success">생성유형: 참조형</span>
             <div class="mt-slot-stat-row">
                 <div><div class="mt-slot-count">${cardCount}</div><div class="mt-slot-count-label">생성 카드</div></div>
                 <div class="mt-slot-star-count">★ ${starredCount}</div>
             </div>
-            <div class="mt-slot-desc">주제별 회화 카드가 누적되며 원본 구조도 함께 보존됩니다.</div>
+            <div class="mt-slot-desc">${state.fileName ? `파일: ${mtEscapeHTML(state.fileName)}<br>` : ''}주제별 회화 카드가 누적되며 원본 구조도 함께 보존됩니다.</div>
             <div style="width:100%;margin:6px 0 7px;" onclick="event.stopPropagation()" onpointerdown="event.stopPropagation()">
                 <div style="display:flex;gap:4px;align-items:center;">
                     <input id="mtWordWebApiKeyInput" type="password" autocomplete="off" placeholder="워드웹 전용 API Key (비워두면 메인 API 사용)" value="${mtEscapeHTML(mtGetSlotApiKey('wordweb'))}" style="flex:1;min-width:0;padding:6px 7px;border:1px solid #d1d5db;border-radius:6px;font-size:10px;box-sizing:border-box;">
@@ -6401,9 +6407,9 @@ Example:
         };
         const hasData = !!state.fileName || words.length>0;
         div.className = 'mt-slot ' + (hasData ? 'has-data' : '');
-        const displayTitle = hasData ? (state.fileName || mtGetSlotTypeLabel(type)) : mtGetSlotTypeLabel(type);
-        const displayBadge = hasData ? labels[type] : mtGetSlotTypeLabel(type);
-        div.innerHTML = `<div class="mt-slot-title">${mtEscapeHTML(displayTitle)}</div><span class="mt-slot-meta-badge ${type==='normal'?'':'ai'}">${displayBadge}</span><div class="mt-slot-stat-row"><div><div class="mt-slot-count">${words.length}</div><div class="mt-slot-count-label">${type==='normal'?'카드':'생성 카드'}</div></div><div class="mt-slot-star-count">★ ${star}</div></div><div class="mt-slot-desc">${descs[type]}</div><div class="mt-slot-actions-row">${hasData?`<button class="btn-download" style="padding:5px 10px;" onclick="mtTypedExport(event,${slotIndex})">내보내기</button><button class="mt-btn-delete" onclick="mtDeleteSlot(event,${slotIndex})">삭제</button>`:''}</div>`;
+        const displayTitle = state.fileName || `슬롯 ${Number(slotIndex)}`;
+        const displayBadge = mtGetSlotTypeLabel(type);
+        div.innerHTML = `<div class="mt-slot-title">${mtEscapeHTML(displayTitle)}</div><span class="mt-slot-meta-badge ${type==='normal'?'':'ai'}">${displayBadge}</span><div class="mt-slot-stat-row"><div><div class="mt-slot-count">${words.length}</div><div class="mt-slot-count-label">${type==='normal'?'카드':'생성 카드'}</div></div><div class="mt-slot-star-count">★ ${star}</div></div><div class="mt-slot-desc">${hasData && state.fileName ? `파일: ${mtEscapeHTML(state.fileName)}` : ''}${hasData && state.fileName ? '<br>' : ''}${descs[type]}</div><div class="mt-slot-actions-row">${hasData?`<button class="btn-download" style="padding:5px 10px;" onclick="mtTypedExport(event,${slotIndex})">내보내기</button><button class="mt-btn-delete" onclick="mtDeleteSlot(event,${slotIndex})">삭제</button>`:''}</div>`;
         div.onclick = () => {
             if (!hasData) mtOpenConfiguredEmptySlotModal(slotIndex);
             else mtPromptAction(slotIndex, mtTypedBuildSlotData(slotIndex));
