@@ -2004,10 +2004,10 @@
 
 <script>
     // ============================================================================
-    // ★ 최근 코드 업데이트 시각: 202608191440
+    // ★ 최근 코드 업데이트 시각: 202608191502
     // ★ ※ 코드를 직접 수정할 때마다 위 시간값도 변경하세요.
     // ============================================================================
-    const APP_BUILD_TIMESTAMP = '202608191440';
+    const APP_BUILD_TIMESTAMP = '202608191502';
     
         /* ========================================== */
     /* [신규 기능] AI 도움 프롬프트 통합 템플릿 관리   */
@@ -2442,6 +2442,207 @@
         }
     }
 
+    // 생성형 슬롯 공통 AI 오류 로그
+    const MT_GENERATOR_ERROR_LOG_PREFIX = 'mt_generator_error_log_v2_';
+    function mtGeneratorLogKey(slotKey) { return MT_GENERATOR_ERROR_LOG_PREFIX + String(slotKey); }
+    function mtGetGeneratorErrorLogs(slotKey) {
+        try {
+            const raw = JSON.parse(localStorage.getItem(mtGeneratorLogKey(slotKey)) || '[]');
+            return Array.isArray(raw) ? raw : [];
+        } catch (_) { return []; }
+    }
+    function mtRecordGeneratorErrorLog(slotKey, detail = {}) {
+        try {
+            const logs = mtGetGeneratorErrorLogs(slotKey);
+            const entry = {
+                seq: logs.length + 1,
+                timestampKST: mtGetSeoulTimestamp(),
+                slotKey: String(slotKey),
+                ...detail
+            };
+            logs.push(entry);
+            const kept = logs.slice(-500);
+            kept.forEach((item, idx) => { item.seq = idx + 1; });
+            localStorage.setItem(mtGeneratorLogKey(slotKey), JSON.stringify(kept));
+            return kept[kept.length - 1] || entry;
+        } catch (e) {
+            console.error('[생성형 슬롯 오류로그 저장 실패]', e);
+            return null;
+        }
+    }
+    function mtFormatGeneratorErrorEntry(entry) {
+        return [
+            `===== ${entry.slotLabel || entry.slotKey || '생성형 슬롯'} 오류 #${entry.seq} =====`,
+            `발생시각(KST): ${entry.timestampKST || ''}`,
+            `모델: ${entry.model || ''}`,
+            `HTTP 상태: ${entry.httpStatus ?? ''}`,
+            `finishReason: ${entry.finishReason || ''}`,
+            'promptFeedback:',
+            JSON.stringify(entry.promptFeedback ?? null, null, 2),
+            'candidates[0].content.parts:',
+            JSON.stringify(entry.contentParts ?? null, null, 2),
+            '전체 응답 객체:',
+            JSON.stringify(entry.responseObject ?? null, null, 2),
+            `오류 메시지: ${entry.errorMessage || ''}`,
+            ''
+        ].join('\\n');
+    }
+    function mtDownloadGeneratorErrorLog(event, slotKey, slotLabel) {
+        if (event) event.stopPropagation();
+        const logs = mtGetGeneratorErrorLogs(slotKey).slice().sort((a,b) => Number(a.seq||0) - Number(b.seq||0));
+        if (!logs.length) {
+            alert('저장된 오류 로그가 없습니다.');
+            return;
+        }
+        const text = [
+            `[마스킹타이핑] ${slotLabel || slotKey} 오류 로그`,
+            `생성시각(KST): ${mtGetSeoulTimestamp()}`,
+            `총 오류 수: ${logs.length}`,
+            '',
+            ...logs.map(mtFormatGeneratorErrorEntry)
+        ].join('\\n');
+        const blob = new Blob([text], {type:'text/plain;charset=utf-8'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `[마스킹타이핑]_${String(slotLabel || slotKey).replace(/[\\/:*?"<>|]/g,'')}_오류로그_${mtGetSeoulTimestamp().replace(/[-:T]/g,'')}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+    function mtGetGeneratorAiConfig(baseConfig, slotKey, slotLabel) {
+        const cfg = {...(baseConfig || {})};
+        cfg.diagnosticHandler = (detail) => mtHandleGeneratorApiDiagnostic(slotKey, slotLabel, detail);
+        return cfg;
+    }
+    function mtHandleGeneratorApiDiagnostic(slotKey, slotLabel, detail) {
+        const entry = mtRecordGeneratorErrorLog(slotKey, {
+            slotLabel: String(slotLabel || slotKey),
+            model: detail.model || '',
+            httpStatus: detail.httpStatus ?? null,
+            finishReason: detail.finishReason || '',
+            promptFeedback: detail.promptFeedback ?? null,
+            contentParts: detail.contentParts ?? null,
+            responseObject: detail.responseObject ?? null,
+            errorMessage: detail.errorMessage || ''
+        });
+        const compact = [
+            `AI 요청 실패: [${detail.model || 'unknown'}]`,
+            detail.errorMessage || '알 수 없는 오류',
+            `finishReason=${detail.finishReason || '없음'}`,
+            `HTTP=${detail.httpStatus ?? '없음'}`
+        ].join(' | ');
+        if (slotKey === 'slot9') {
+            const st = mtSlot9GetState();
+            st.lastError = compact;
+            st.lastDiagnostic = entry;
+            mtSlot9SaveState(st);
+            mtSlot9RenderStatus();
+        } else if (slotKey === 'wordweb') {
+            const st = mtWordWebGetState();
+            st.lastError = compact;
+            st.lastDiagnostic = entry;
+            mtWordWebSaveState(st);
+            mtWordWebRenderStatus();
+        } else if (/^typed_\d+$/.test(String(slotKey))) {
+            const idx = Number(String(slotKey).slice(6));
+            const st = mtGetTypedState(idx);
+            st.lastError = compact;
+            st.lastDiagnostic = entry;
+            mtSaveTypedState(idx, st);
+            const el = document.getElementById(`mtTypedStatus_${idx}`);
+            if (el) el.innerHTML = `<span style="color:#dc2626;">최근 오류: ${mtEscapeHTML(compact)}</span>`;
+        }
+    }
+
+    // 슬롯9 AI 오류 진단 로그
+    const MT_SLOT9_ERROR_LOG_KEY = 'mt_slot9_error_log_v1';
+    function mtGetSeoulTimestamp() {
+        return new Intl.DateTimeFormat('sv-SE', {
+            timeZone: 'Asia/Seoul', year:'numeric', month:'2-digit', day:'2-digit',
+            hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false
+        }).format(new Date()).replace(' ', 'T');
+    }
+    function mtRecordSlot9ErrorLog(detail) {
+        try {
+            const logs = JSON.parse(localStorage.getItem(MT_SLOT9_ERROR_LOG_KEY) || '[]');
+            const arr = Array.isArray(logs) ? logs : [];
+            const entry = {
+                seq: arr.length + 1,
+                timestampKST: mtGetSeoulTimestamp(),
+                ...detail
+            };
+            arr.push(entry);
+            // 과도한 누적을 방지하되 최근 기록은 충분히 보존합니다.
+            const kept = arr.slice(-300);
+            kept.forEach((item, idx) => { item.seq = idx + 1; });
+            localStorage.setItem(MT_SLOT9_ERROR_LOG_KEY, JSON.stringify(kept));
+            return entry;
+        } catch (e) {
+            console.error('[슬롯9 오류로그 저장 실패]', e);
+            return null;
+        }
+    }
+    function mtFormatSlot9ErrorEntry(entry) {
+        const lines = [
+            `===== 슬롯9 오류 #${entry.seq} =====`,
+            `발생시각(KST): ${entry.timestampKST || ''}`,
+            `모델: ${entry.model || ''}`,
+            `HTTP 상태: ${entry.httpStatus ?? ''}`,
+            `finishReason: ${entry.finishReason || ''}`,
+            'promptFeedback:',
+            JSON.stringify(entry.promptFeedback ?? null, null, 2),
+            'candidates[0].content.parts:',
+            JSON.stringify(entry.contentParts ?? null, null, 2),
+            '전체 응답 객체:',
+            JSON.stringify(entry.responseObject ?? null, null, 2),
+            `오류 메시지: ${entry.errorMessage || ''}`,
+            ''
+        ];
+        return lines.join('\n');
+    }
+    function mtDownloadSlot9ErrorLog(event) {
+        if (event) event.stopPropagation();
+        let logs = [];
+        try { logs = JSON.parse(localStorage.getItem(MT_SLOT9_ERROR_LOG_KEY) || '[]'); } catch (e) {}
+        if (!Array.isArray(logs) || !logs.length) {
+            alert('저장된 슬롯9 오류 로그가 없습니다.');
+            return;
+        }
+        const text = [
+            '[마스킹타이핑] 슬롯9 오류 로그',
+            `생성시각(KST): ${mtGetSeoulTimestamp()}`,
+            `총 오류 수: ${logs.length}`,
+            '',
+            ...logs.map(mtFormatSlot9ErrorEntry)
+        ].join('\n');
+        const blob = new Blob([text], {type:'text/plain;charset=utf-8'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `[마스킹타이핑]_슬롯9_오류로그_${mtGetSeoulTimestamp().replace(/[-:T]/g,'')}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+    function mtRecordSlot9ApiDiagnostic(detail) {
+        const entry = mtRecordSlot9ErrorLog(detail);
+        if (!entry) return;
+        const st = mtSlot9GetState();
+        const compact = [
+            `AI 요청 실패: [${detail.model || 'unknown'}]`,
+            detail.errorMessage || '알 수 없는 오류',
+            `finishReason=${detail.finishReason || '없음'}`,
+            `HTTP=${detail.httpStatus ?? '없음'}`
+        ].join(' | ');
+        st.lastError = compact;
+        st.lastDiagnostic = entry;
+        mtSlot9SaveState(st);
+        mtSlot9RenderStatus();
+    }
+
     // AI API 호출 통합 함수
     async function mtFetchWithTimeout(url, options = {}, timeoutMs = 45000) {
         const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
@@ -2459,7 +2660,11 @@
         config = config || {};
         const apiKey = String(config.apiKey || localStorage.getItem('gemini_api_key') || '').trim();
         if (!apiKey) {
-            if (!config.silent) alert(config.missingKeyMessage || '상단 API 키 설정 메뉴에서 Gemini API Key를 먼저 입력하고 저장해 주세요!');
+            const missingMessage = config.missingKeyMessage || '상단 API 키 설정 메뉴에서 Gemini API Key를 먼저 입력하고 저장해 주세요!';
+            if (typeof config.diagnosticHandler === 'function') {
+                config.diagnosticHandler({ model:'', httpStatus:null, finishReason:'', promptFeedback:null, contentParts:null, responseObject:null, errorMessage:missingMessage });
+            }
+            if (!config.silent) alert(missingMessage);
             return null;
         }
 
@@ -2523,28 +2728,39 @@
                     const data = await res.json().catch(() => ({}));
                     const candidate = data.candidates?.[0];
                     const finishReason = candidate?.finishReason || '';
-                    const responseText = candidate?.content?.parts?.[0]?.text?.trim() || '';
+                    const promptFeedback = data.promptFeedback ?? null;
+                    const contentParts = candidate?.content?.parts ?? null;
+                    const responseText = Array.isArray(contentParts)
+                        ? contentParts.map(part => String(part?.text || '')).join('').trim()
+                        : '';
 
                     if (finishReason === 'MAX_TOKENS') {
+                        const message = `${model} 모델 응답이 길이 제한으로 잘렸습니다.`;
+                        if (typeof config.diagnosticHandler === 'function') config.diagnosticHandler({ model, httpStatus:res.status, finishReason, promptFeedback, contentParts, responseObject:data, errorMessage:message });
                         blacklistSet.add(model);
-                        lastError = `${model} 모델 응답이 길이 제한으로 잘렸습니다.`;
+                        lastError = message;
                         continue;
                     }
                     if (responseText) return responseText;
 
+                    const emptyMessage = `[${model}] 응답 본문이 비어 있습니다.`;
+                    if (typeof config.diagnosticHandler === 'function') config.diagnosticHandler({ model, httpStatus:res.status, finishReason, promptFeedback, contentParts, responseObject:data, errorMessage:emptyMessage });
                     blacklistSet.add(model);
-                    lastError = `[${model}] 응답 본문이 비어 있습니다.`;
+                    lastError = emptyMessage;
                     continue;
                 }
 
                 const errJson = await res.json().catch(() => ({}));
                 const message = String(errJson?.error?.message || `HTTP ${res.status}`).trim();
+                if (typeof config.diagnosticHandler === 'function') config.diagnosticHandler({ model, httpStatus:res.status, finishReason:'', promptFeedback:errJson?.error?.details || null, contentParts:null, responseObject:errJson, errorMessage:message });
                 lastError = `[${model}] ${message}`;
 
-                // Interactions 전용/미지원 모델은 즉시 blacklist하고 다음 모델로 넘어갑니다.
+                // 지원하지 않는 모델/요청은 즉시 blacklist하고 다음 모델로 넘어갑니다.
                 blacklistSet.add(model);
             } catch (err) {
-                lastError = `[${model}] ${err?.name === 'AbortError' ? 'API 요청 시간이 초과되었습니다.' : String(err?.message || err)}`;
+                const message = err?.name === 'AbortError' ? 'API 요청 시간이 초과되었습니다.' : String(err?.message || err);
+                if (typeof config.diagnosticHandler === 'function') config.diagnosticHandler({ model, httpStatus:null, finishReason:'', promptFeedback:null, contentParts:null, responseObject:null, errorMessage:message });
+                lastError = `[${model}] ${message}`;
                 blacklistSet.add(model);
             }
         }
@@ -4709,7 +4925,7 @@ Rules:
                 return normalized.state;
             }
         } catch(e) {}
-        return { fileName:'', sourceRows:[], sourceRowsLock:[], retryRows:[], nextSourceIndex:0, outputRows:[], nextRun:null, lastRun:null, lastError:'', starredSerials:[], lastSession:null, pattern:mtSlot9GetDefaultPattern() };
+        return { fileName:'', sourceRows:[], sourceRowsLock:[], retryRows:[], nextSourceIndex:0, outputRows:[], nextRun:null, lastRun:null, lastError:'', starredSerials:[], lastSession:null, lastDiagnostic:null, pattern:mtSlot9GetDefaultPattern() };
     }
 
     function mtSlot9NormalizeSerials(state) {
@@ -4784,7 +5000,7 @@ Rules:
         const words=mtSlot9BuildSlotData(st).words;
         const star=mtSlot9GetStarredCount(st);
         div.className='mt-slot mt-wordweb-slot '+(st.fileName?'has-data':'');
-        div.innerHTML=`<div class="mt-slot-title">${mtEscapeHTML(st.fileName || '슬롯 9')}</div><div class="mt-slot-stat-row"><div><div class="mt-slot-count">${words.length}</div></div><div class="mt-slot-star-count">★ ${star}</div></div><div class="mt-slot-desc">생성 결과를 저장하고 다음 자동 생성까지 이어갑니다.</div><div style="width:100%;margin:0 0 8px;" onclick="event.stopPropagation()" onpointerdown="event.stopPropagation()"><div style="display:flex;gap:4px;align-items:center;"><input id="mtSlot9ApiKeyInput" type="password" autocomplete="off" placeholder="슬롯9 전용 API Key" value="${mtEscapeHTML(mtGetSlotApiKey('slot9'))}" style="flex:1;min-width:0;padding:7px 8px;border:1px solid #d1d5db;border-radius:7px;font-size:10px;box-sizing:border-box;"><button class="btn-excel" style="padding:6px 9px;font-size:10px;" onclick="event.stopPropagation();mtSaveSlotApiKey('slot9')">저장</button></div></div><div class="mt-slot-actions-row"><span class="mt-slot-meta-badge ai">생성유형: 자체형</span>${st.fileName?`<button class="btn-download" onclick="mtSlot9DownloadClick(event)">내보내기</button>`:'<button class="btn-download" disabled>내보내기</button>'}${st.fileName?`<button class="mt-btn-delete" onclick="mtDeleteSlot(event,'slot9')">삭제</button>`:'<button class="mt-btn-delete" disabled>삭제</button>'}</div><div id="mtSlot9Status" class="mt-wordweb-status"></div>`;
+        div.innerHTML=`<div class="mt-slot-title">${mtEscapeHTML(st.fileName || '슬롯 9')}</div><div class="mt-slot-stat-row"><div><div class="mt-slot-count">${words.length}</div></div><div style="display:flex;align-items:center;gap:6px;"><div class="mt-slot-star-count">★ ${star}</div><button class="btn-excel" style="padding:4px 8px;font-size:10px;" onclick="mtDownloadGeneratorErrorLog(event,'slot9','슬롯9')">오류로그</button></div></div><div class="mt-slot-desc">생성 결과를 저장하고 다음 자동 생성까지 이어갑니다.</div><div style="width:100%;margin:0 0 8px;" onclick="event.stopPropagation()" onpointerdown="event.stopPropagation()"><div style="display:flex;gap:4px;align-items:center;"><input id="mtSlot9ApiKeyInput" type="password" autocomplete="off" placeholder="슬롯9 전용 API Key" value="${mtEscapeHTML(mtGetSlotApiKey('slot9'))}" style="flex:1;min-width:0;padding:7px 8px;border:1px solid #d1d5db;border-radius:7px;font-size:10px;box-sizing:border-box;"><button class="btn-excel" style="padding:6px 9px;font-size:10px;" onclick="event.stopPropagation();mtSaveSlotApiKey('slot9')">저장</button></div></div><div class="mt-slot-actions-row"><span class="mt-slot-meta-badge ai">생성유형: 자체형</span>${st.fileName?`<button class="btn-download" onclick="mtSlot9DownloadClick(event)">내보내기</button>`:'<button class="btn-download" disabled>내보내기</button>'}${st.fileName?`<button class="mt-btn-delete" onclick="mtDeleteSlot(event,'slot9')">삭제</button>`:'<button class="mt-btn-delete" disabled>삭제</button>'}</div><div id="mtSlot9Status" class="mt-wordweb-status"></div>`;
         div.onclick=()=>{ if(!st.fileName){ mtSlot9TriggerUpload(); return;} mtPromptAction('slot9',mtSlot9BuildSlotData(st)); };
         mtSlot9RenderStatus();
     }
@@ -4843,7 +5059,7 @@ Rules:
     }
     async function mtSlot9GenerateEnglishBatch(koreanItems){
         const prompt=`You are an expert English teacher. For each Korean sentence, create ONE faithful, natural everyday English sentence at CEFR A2 level. Preserve meaning exactly. Return ONLY a JSON array with exactly ${koreanItems.length} objects: [{"index":0,"english":"..."}]. Do not add greetings, names, time expressions, or unrelated content. DATA=${JSON.stringify(koreanItems.map((k,i)=>({index:i,korean:k})))}`;
-        const raw=await fetchGemini(prompt,{type:'ARRAY',minItems:koreanItems.length,maxItems:koreanItems.length,items:{type:'OBJECT',properties:{index:{type:'INTEGER'},english:{type:'STRING'}},required:['index','english']}},mtGetSlot9AiConfig()); if(!raw) return null; const arr=Array.isArray(raw)?raw:mtWordWebExtractJsonValue(raw); if(!Array.isArray(arr)||arr.length!==koreanItems.length)return null; return arr.sort((a,b)=>Number(a.index)-Number(b.index)).map(x=>String(x.english||'').trim());
+        const raw=await fetchGemini(prompt,{type:'ARRAY',minItems:koreanItems.length,maxItems:koreanItems.length,items:{type:'OBJECT',properties:{index:{type:'INTEGER'},english:{type:'STRING'}},required:['index','english']}},mtGetGeneratorAiConfig(mtGetSlot9AiConfig(), 'slot9', '슬롯9')); if(!raw) return null; const arr=Array.isArray(raw)?raw:mtWordWebExtractJsonValue(raw); if(!Array.isArray(arr)||arr.length!==koreanItems.length)return null; return arr.sort((a,b)=>Number(a.index)-Number(b.index)).map(x=>String(x.english||'').trim());
     }
     async function mtSlot9GenerateSix(){
         if (mtSlot9Busy) return;
@@ -5019,7 +5235,7 @@ Rules:
                             },
                             required:['source_korean','english','korean','literal_korean']
                         },
-                        aiConfig
+                        mtGetGeneratorAiConfig(aiConfig, 'slot9', '슬롯9')
                     );
                     if (!repairedRaw) continue;
                     try {
@@ -5092,7 +5308,7 @@ Rules:
         } catch (e) {
             st.lastRun=Date.now();
             st.nextRun=Date.now()+MT_SLOT9_INTERVAL_MS;
-            st.lastError=String(e?.message || e).substring(0,220);
+            if (!st.lastDiagnostic) st.lastError=String(e?.message || e).substring(0,220);
             mtSlot9SaveState(st);
             mtSlot9RenderStatus();
             console.error('[슬롯9]', e);
@@ -5234,7 +5450,7 @@ Rules:
             <div class="mt-slot-title">워드웹회화</div>
             <div class="mt-slot-stat-row">
                 <div><div class="mt-slot-count">${cardCount}</div></div>
-                <div class="mt-slot-star-count">★ ${starredCount}</div>
+                <div style="display:flex;align-items:center;gap:6px;"><div class="mt-slot-star-count">★ ${starredCount}</div><button class="btn-excel" style="padding:4px 8px;font-size:10px;" onclick="mtDownloadGeneratorErrorLog(event,'wordweb','참조형 슬롯10')">오류로그</button></div>
             </div>
             <div class="mt-slot-desc">주제별 회화 카드가 누적되며 원본 구조도 함께 보존됩니다.</div>
             <div style="width:100%;margin:6px 0 7px;" onclick="event.stopPropagation()" onpointerdown="event.stopPropagation()">
@@ -6094,7 +6310,7 @@ Rules:
 Example:
 {"english":"Please stretch your arms carefully.","korean":"팔을 조심스럽게 스트레칭 하세요."}`;
 
-            const wordWebAiConfig = mtGetWordWebAiConfig();
+            const wordWebAiConfig = mtGetGeneratorAiConfig(mtGetWordWebAiConfig(), 'wordweb', '참조형 슬롯10');
             let rawDialogue = await fetchGemini(dialoguePrompt, {
                 type:'ARRAY', minItems:6, maxItems:6,
                 items:{
@@ -6387,7 +6603,7 @@ Example:
         const displayTitle = state.fileName || `슬롯 ${Number(slotIndex)}`;
         const displayBadge = mtGetSlotTypeLabel(type);
         const badgeClass = type === 'reference_generate' ? 'success' : (type === 'self_generate' ? 'ai' : '');
-        div.innerHTML = `<div class="mt-slot-title">${mtEscapeHTML(displayTitle)}</div><div class="mt-slot-stat-row"><div><div class="mt-slot-count">${words.length}</div></div><div class="mt-slot-star-count">★ ${star}</div></div><div class="mt-slot-desc">${descs[type]}</div><div class="mt-slot-actions-row"><span class="mt-slot-meta-badge ${badgeClass}">${displayBadge}</span>${hasData?`<button class="btn-download" onclick="mtTypedExport(event,${slotIndex})">내보내기</button><button class="mt-btn-delete" onclick="mtDeleteSlot(event,${slotIndex})">삭제</button>`:''}</div>`;
+        div.innerHTML = `<div class="mt-slot-title">${mtEscapeHTML(displayTitle)}</div><div class="mt-slot-stat-row"><div><div class="mt-slot-count">${words.length}</div></div><div style="display:flex;align-items:center;gap:6px;"><div class="mt-slot-star-count">★ ${star}</div>${type!=='normal'?`<button class="btn-excel" style="padding:4px 8px;font-size:10px;" onclick="mtDownloadGeneratorErrorLog(event,'typed_${slotIndex}',${JSON.stringify(displayBadge)})">오류로그</button>`:''}</div></div><div class="mt-slot-desc">${descs[type]}</div><div class="mt-slot-actions-row"><span class="mt-slot-meta-badge ${badgeClass}">${displayBadge}</span>${hasData?`<button class="btn-download" onclick="mtTypedExport(event,${slotIndex})">내보내기</button><button class="mt-btn-delete" onclick="mtDeleteSlot(event,${slotIndex})">삭제</button>`:''}</div>${type!=='normal'?`<div id="mtTypedStatus_${slotIndex}" class="mt-wordweb-status"></div>`:''}`;
         div.onclick = () => {
             if (!hasData) mtOpenConfiguredEmptySlotModal(slotIndex);
             else mtPromptAction(slotIndex, mtTypedBuildSlotData(slotIndex));
@@ -6409,36 +6625,36 @@ Example:
         const start=Number(state.nextSourceIndex||0); if(start>=state.sourceRows.length)return;
         const batch=state.sourceRows.slice(start,Math.min(start+6,state.sourceRows.length));
         const prompt=`You are an expert English teacher. For each Korean sentence, create ONE faithful, natural everyday English sentence at CEFR A2 level. Preserve meaning exactly. Return ONLY a JSON array with exactly ${batch.length} objects: [{"index":0,"english":"..."}]. Do not add greetings, names, time expressions, or unrelated content. DATA=${JSON.stringify(batch.map((k,i)=>({index:i,korean:k})))}`;
-        const raw=await fetchGemini(prompt,{type:'ARRAY',minItems:batch.length,maxItems:batch.length,items:{type:'OBJECT',properties:{index:{type:'INTEGER'},english:{type:'STRING'}},required:['index','english']}},mtGetSlot9AiConfig());
+        const raw=await fetchGemini(prompt,{type:'ARRAY',minItems:batch.length,maxItems:batch.length,items:{type:'OBJECT',properties:{index:{type:'INTEGER'},english:{type:'STRING'}},required:['index','english']}},mtGetGeneratorAiConfig(mtGetSlot9AiConfig(), `typed_${slotIndex}`, `슬롯 ${Number(slotIndex)+1}`));
         const arr=Array.isArray(raw)?raw:mtWordWebExtractJsonValue(raw); if(!Array.isArray(arr)||arr.length!==batch.length) throw new Error('AI 문장 생성 결과가 정확하지 않습니다.');
         const p=state.pattern || {engCol:2,mainKorCol:3,subKorCol:4,serialCol:5}; state.pattern=p;
         const current=mtTypedSerialNext(state);
         arr.sort((a,b)=>Number(a.index)-Number(b.index)).forEach((x,i)=>{const row=Array(Math.max(p.engCol,p.mainKorCol,p.subKorCol,p.serialCol)).fill(''); row[p.engCol-1]=String(x.english||'').trim(); row[p.mainKorCol-1]=batch[i]; row[p.subKorCol-1]=batch[i]; row[p.serialCol-1]=String(current+i); state.outputRows.push(row);});
-        state.nextSourceIndex=start+batch.length; state.lastRun=Date.now(); state.nextRun=Date.now()+5*60*1000; state.lastError=''; mtSaveTypedState(slotIndex,state); mtInitSlots();
+        state.nextSourceIndex=start+batch.length; state.lastRun=Date.now(); state.nextRun=Date.now()+5*60*1000; state.lastError=''; state.lastDiagnostic=null; mtSaveTypedState(slotIndex,state); mtInitSlots();
     }
     async function mtTypedReferenceGenerate(slotIndex) {
         const state=mtGetTypedState(slotIndex); if(state.type!=='reference_generate'||!state.fileName||!state.topics.length)return;
         const topic=state.topics[Math.floor(Math.random()*state.topics.length)].topic;
         const prompt=`You are an expert English dialogue writer and English-Korean translator.\nCreate a continuous, natural everyday conversation between 2 people based on this topic: "${topic}"\n\nRules:\n1. CEFR A2, simple everyday English.\n2. EXACTLY 6 sentences total, flowing naturally from sentence 1 to 6.\n3. NO speaker labels.\n4. Return ONLY a JSON array of exactly 6 objects.\n5. Each object MUST contain only: english and korean.\n6. The Korean translation must preserve the exact meaning of the English sentence.\n7. NEVER repeat phrases unnaturally.\n8. NEVER add unrelated greetings, farewells, time expressions, names, or content from another sentence/topic.\n9. Do not create any direct-reading/chunk translation in this step.`;
-        const raw=await fetchGemini(prompt,{type:'ARRAY',minItems:6,maxItems:6,items:{type:'OBJECT',properties:{english:{type:'STRING'},korean:{type:'STRING'}},required:['english','korean']}},mtGetWordWebAiConfig());
+        const raw=await fetchGemini(prompt,{type:'ARRAY',minItems:6,maxItems:6,items:{type:'OBJECT',properties:{english:{type:'STRING'},korean:{type:'STRING'}},required:['english','korean']}},mtGetGeneratorAiConfig(mtGetWordWebAiConfig(), `typed_${slotIndex}`, `슬롯 ${Number(slotIndex)+1}`));
         let arr=Array.isArray(raw)?raw:mtWordWebExtractJsonValue(raw); if(!Array.isArray(arr)||arr.length!==6) throw new Error('영어/한국어 기본 문장이 정확히 6개 생성되지 않았습니다.');
         arr=arr.map(x=>({english:String(x.english||'').trim(),korean:String(x.korean||'').trim(),literal_korean:''}));
         const p=state.pattern || {engCol:1,mainKorCol:2,subKorCol:3,serialCol:4,topicOutputCol:5}; state.pattern=p;
         const start=mtTypedSerialNext({...state,pattern:p});
         for(let i=0;i<arr.length;i++){
-            const lit=await mtWordWebGenerateLiteralForOne(arr[i],mtGetWordWebAiConfig());
+            const lit=await mtWordWebGenerateLiteralForOne(arr[i],mtGetGeneratorAiConfig(mtGetWordWebAiConfig(), `typed_${slotIndex}`, `슬롯 ${Number(slotIndex)+1}`));
             if(!lit?.literal) throw new Error('직독직해 생성에 실패했습니다.');
             arr[i].literal_korean=lit.literal;
         }
         arr.forEach((x,i)=>{const row=Array(Math.max(p.engCol,p.mainKorCol,p.subKorCol,p.serialCol,p.topicOutputCol)).fill(''); row[p.engCol-1]=x.english; row[p.mainKorCol-1]=x.korean; row[p.subKorCol-1]=x.literal_korean; row[p.serialCol-1]=`${start}-${i+1}`; row[p.topicOutputCol-1]=topic; state.outputRows.push(row);});
-        state.lastRun=Date.now(); state.nextRun=Date.now()+5*60*1000; state.lastError=''; mtSaveTypedState(slotIndex,state); mtInitSlots();
+        state.lastRun=Date.now(); state.nextRun=Date.now()+5*60*1000; state.lastError=''; state.lastDiagnostic=null; mtSaveTypedState(slotIndex,state); mtInitSlots();
     }
     function mtStartTypedTimer(slotIndex, immediate=false){
         if(mtTypedTimers[slotIndex]) clearTimeout(mtTypedTimers[slotIndex]);
         const state=mtGetTypedState(slotIndex); const type=state.type;
         if(!state.fileName)return;
         if(immediate){
-            (async()=>{try{if(type==='self_generate')await mtTypedSelfGenerate(slotIndex); else if(type==='reference_generate')await mtTypedReferenceGenerate(slotIndex);}catch(e){state.lastError=String(e?.message||e);mtSaveTypedState(slotIndex,state);mtInitSlots();}finally{mtStartTypedTimer(slotIndex,false);}})(); return;
+            (async()=>{try{if(type==='self_generate')await mtTypedSelfGenerate(slotIndex); else if(type==='reference_generate')await mtTypedReferenceGenerate(slotIndex);}catch(e){const latest=mtGetTypedState(slotIndex);if(!latest.lastDiagnostic)latest.lastError=String(e?.message||e);mtSaveTypedState(slotIndex,latest);mtInitSlots();}finally{mtStartTypedTimer(slotIndex,false);}})(); return;
         }
         const next=Number(state.nextRun||0); if(!next)return;
         const delay=Math.max(1000,next-Date.now());
