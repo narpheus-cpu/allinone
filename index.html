@@ -5123,7 +5123,7 @@ Rules:
         const prompt=`You are an expert English teacher. For each Korean sentence, create ONE faithful, natural everyday English sentence at CEFR A2 level. Preserve meaning exactly. Return ONLY a JSON array with exactly ${koreanItems.length} objects: [{"index":0,"english":"..."}]. Do not add greetings, names, time expressions, or unrelated content. DATA=${JSON.stringify(koreanItems.map((k,i)=>({index:i,korean:k})))}`;
         const raw=await fetchGemini(prompt,{type:'ARRAY',minItems:koreanItems.length,maxItems:koreanItems.length,items:{type:'OBJECT',properties:{index:{type:'INTEGER'},english:{type:'STRING'}},required:['index','english']}},mtGetGeneratorAiConfig(mtGetSlot9AiConfig(), 'slot9', '슬롯9')); if(!raw) return null; const arr=Array.isArray(raw)?raw:mtWordWebExtractJsonValue(raw); if(!Array.isArray(arr)||arr.length!==koreanItems.length)return null; return arr.sort((a,b)=>Number(a.index)-Number(b.index)).map(x=>String(x.english||'').trim());
     }
-    async function mtSlot9GenerateSix(){
+ async function mtSlot9GenerateSix() {
         if (mtSlot9Busy) return;
 
         const st = mtSlot9GetState();
@@ -5139,6 +5139,9 @@ Rules:
 
         try {
             const aiConfig = mtGetSlot9AiConfig();
+            // [수정점 1] 에러 로그 기록기(diagnosticHandler)를 API 설정에 정상적으로 부착
+            const wrappedAiConfig = mtGetGeneratorAiConfig(aiConfig, 'slot9', '슬롯9');
+
             const freshStart = Number(st.nextSourceIndex || 0);
             const freshBatch = canUseRetry ? [] : st.sourceRows
                 .slice(freshStart, freshStart + 6)
@@ -5204,10 +5207,10 @@ ${JSON.stringify(batch)}
                         required:['source_korean','english','korean','literal_korean']
                     }
                 },
-                aiConfig
+                wrappedAiConfig // [수정점 1 적용] 이제 로그 파일 시스템이 정상 작동합니다.
             );
 
-            if (!raw) throw new Error('AI 요청 실패: ' + (aiConfig && aiConfig.lastError ? aiConfig.lastError : 'API 응답을 받지 못했습니다.'));
+            if (!raw) throw new Error('AI 요청 실패: ' + (wrappedAiConfig && wrappedAiConfig.lastError ? wrappedAiConfig.lastError : 'API 응답을 받지 못했습니다.'));
 
             let resultList = Array.isArray(raw) ? raw : mtWordWebExtractJsonValue(raw);
             if (!Array.isArray(resultList) || resultList.length !== batch.length) {
@@ -5249,7 +5252,6 @@ ${JSON.stringify(batch)}
                 return true;
             };
 
-            // 초기 배열을 원문 순서에 맞추고 각 행을 로컬 검증
             resultList = resultList.map((x, i) => ({
                 source_korean:String(x?.source_korean ?? ''),
                 english:String(x?.english ?? '').trim(),
@@ -5263,7 +5265,6 @@ ${JSON.stringify(batch)}
                 if (!validRow(item, batch[i])) failed.push({ index:i, sourceKorean:batch[i], reason:'로컬 검증 실패' });
             });
 
-            // 실패 행만 개별 재시도: 검증용 AI 호출을 별도로 수행하지 않습니다.
             async function repairOne(sourceKorean, reason) {
                 const repairPrompt = `
 Repair exactly ONE row.
@@ -5329,7 +5330,6 @@ Rules:
                 .map((item,i) => validRow(item,batch[i]) ? {item, batchIndex:i} : null)
                 .filter(Boolean);
 
-            // 성공 행은 즉시 저장하고, 실패 행만 retryRows로 남깁니다.
             const p = mtSlot9GetPattern(st);
             let serialStart = (st.outputRows || []).length + 1;
             for (const s of successful) {
@@ -5345,8 +5345,6 @@ Rules:
                 st.outputRows.push(row);
             }
 
-            // 새 배치였다면 이미 시도한 6개를 nextSourceIndex에서 소비합니다.
-            // 실패한 행만 정확한 원본 인덱스를 보존해 다음 실행에서 재시도합니다.
             if (!canUseRetry) st.nextSourceIndex = freshStart + batch.length;
             else st.retryRows = retryRows.slice(batch.length);
 
@@ -5368,14 +5366,20 @@ Rules:
             mtInitSlots();
 
         } catch (e) {
-            st.lastRun=Date.now();
-            st.nextRun=Date.now()+MT_SLOT9_INTERVAL_MS;
-            if (!st.lastDiagnostic) st.lastError=String(e?.message || e).substring(0,220);
-            mtSlot9SaveState(st);
+            // [수정점 2] 상태를 새로고침하여 기록기가 작성한 로그(lastDiagnostic)를 덮어쓰지 않게 보호
+            const latestSt = mtSlot9GetState();
+            latestSt.lastRun = Date.now();
+            latestSt.nextRun = Date.now() + MT_SLOT9_INTERVAL_MS;
+            
+            // [수정점 3] UI 에러 메시지가 짤리지 않도록 220자 제한 해제
+            if (!latestSt.lastDiagnostic) {
+                latestSt.lastError = String(e?.message || e);
+            }
+            mtSlot9SaveState(latestSt);
             mtSlot9RenderStatus();
             console.error('[슬롯9]', e);
         } finally {
-            mtSlot9Busy=false;
+            mtSlot9Busy = false;
         }
     }
     function mtSlot9StartAutoTrigger(reset=false){
