@@ -2709,7 +2709,6 @@
 
         const recordDiagnostic = (detail) => {
             lastDiagnostic = detail;
-            if (typeof config.diagnosticHandler === 'function') config.diagnosticHandler(detail);
         };
 
         const classifyHttpFailure = (status, message) => {
@@ -2732,10 +2731,10 @@
 
             const generateUrl = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
             try {
+                // [해결 1] 문제가 되던 temperature 파라미터 완전 삭제
                 const reqBody = {
                     contents: [{ parts: [{ text: String(promptText || '') }] }],
                     generationConfig: {
-                        temperature: 0.7,
                         maxOutputTokens: Number(config.maxOutputTokens || 4096)
                     }
                 };
@@ -2812,20 +2811,24 @@
             }
         }
 
-        // ==========================================
-        // 상태 덤프(디버그 로그) 추가
-        // ==========================================
-        const debugDump = `\n\n[디버그 상태 덤프]\n- 기본 후보 모델(baseModels): [${baseModels.join(', ')}]\n- 영구 차단 모델(hardBlacklist): [${Array.from(hardBlacklist).join(', ')}]\n- 일시 실패 모델(requestFailedModels): [${Array.from(requestFailedModels).join(', ')}]`;
+        const debugDump = `\n\n[디버그 상태 덤프]\n- 기본 후보 모델: [${baseModels.join(', ')}]\n- 영구 차단(hardBlacklist): [${Array.from(hardBlacklist).join(', ')}]\n- 일시 실패(requestFailedModels): [${Array.from(requestFailedModels).join(', ')}]`;
 
-        config.lastError = (lastError || '이번 요청에서 사용할 수 있는 텍스트 생성 모델의 응답을 받지 못했습니다.') + debugDump;
+        config.lastError = (lastError || '텍스트 생성 모델의 응답을 받지 못했습니다.') + debugDump;
 
-        if (typeof config.diagnosticHandler === 'function' && !lastDiagnostic) {
-            config.diagnosticHandler({
-                model: '', httpStatus: null, finishReason: '', promptFeedback: null,
-                contentParts: null, responseObject: null,
-                errorMessage: config.lastError
-            });
+        // [해결 2] 파일 저장 객체(diagnosticHandler)에 디버그 덤프를 병합하여 넘기도록 수정
+        if (typeof config.diagnosticHandler === 'function') {
+            if (lastDiagnostic) {
+                lastDiagnostic.errorMessage = (lastDiagnostic.errorMessage || '') + debugDump;
+                config.diagnosticHandler(lastDiagnostic);
+            } else {
+                config.diagnosticHandler({
+                    model: '', httpStatus: null, finishReason: '', promptFeedback: null,
+                    contentParts: null, responseObject: null,
+                    errorMessage: config.lastError
+                });
+            }
         }
+
         if (!config.silent) {
             alert(`AI 응답 생성 실패:\n${config.lastError}`);
         }
