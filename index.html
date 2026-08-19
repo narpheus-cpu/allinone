@@ -2671,7 +2671,7 @@
         }
     }
 
-    async function fetchGemini(promptText, responseSchema = null, config = null) {
+ async function fetchGemini(promptText, responseSchema = null, config = null) {
         config = config || {};
         const apiKey = String(config.apiKey || localStorage.getItem('gemini_api_key') || '').trim();
         if (!apiKey) {
@@ -2683,8 +2683,6 @@
             return null;
         }
 
-        // 텍스트 생성형 슬롯은 텍스트 생성용 안정형 Flash 모델만 사용합니다.
-        // 자동 모델 탐색은 사용하지 않으며, 이 목록 밖의 모델은 절대 호출하지 않습니다.
         const TEXT_GENERATION_MODELS = [
             'gemini-3.6-flash',
             'gemini-3.5-flash',
@@ -2695,7 +2693,6 @@
             ? config.models.map(String).map(s => s.trim()).filter(Boolean)
             : ['gemini-3.6-flash'];
 
-        // blacklistSet은 '영구 제외'가 아니라 404/지원하지 않는 모델 같은 확정적 실패에만 사용합니다.
         const hardBlacklist = config.blacklistSet instanceof Set ? config.blacklistSet : blacklistedModels;
         const allowedPreferred = preferredModels.filter(m => TEXT_GENERATION_MODELS.includes(m));
         const baseModels = Array.from(new Set([
@@ -2703,7 +2700,6 @@
             ...TEXT_GENERATION_MODELS
         ]));
 
-        // 한 번의 요청에서만 적용되는 실패 기록입니다. 일시적 오류 때문에 다음 생성까지 모델을 죽이지 않습니다.
         const requestFailedModels = new Set();
         const emptyResponseRetries = new Map();
         const maxAttempts = Math.max(1, Number(config.maxModelAttempts || baseModels.length * 2));
@@ -2718,7 +2714,6 @@
 
         const classifyHttpFailure = (status, message) => {
             if (status === 404) return 'hard';
-            // 400은 모델 자체가 아니라 요청/schema 문제일 수 있으므로 모델을 영구 제외하지 않습니다.
             if (status === 429) return 'temporary';
             if (status >= 500) return 'temporary';
             if (status === 408) return 'temporary';
@@ -2728,9 +2723,11 @@
         const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
         while (attempts < maxAttempts) {
-            // 선호 모델부터 시도하되, 이번 요청에서 실패한 모델은 다음 모델로 이동합니다.
             const model = baseModels.find(m => !hardBlacklist.has(m) && !requestFailedModels.has(m));
-            if (!model) break;
+            if (!model) {
+                if (!lastError) lastError = '사용 가능한 후보 모델이 없습니다.';
+                break;
+            }
             attempts++;
 
             const generateUrl = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
@@ -2765,8 +2762,6 @@
 
                     if (responseText) return responseText;
 
-                    // 빈 응답은 모델의 영구적인 고장이 아닐 수 있습니다.
-                    // 같은 모델을 이 요청에서 딱 한 번만 재시도한 뒤 다음 모델로 넘어갑니다.
                     const emptyCount = Number(emptyResponseRetries.get(model) || 0);
                     const emptyMessage = `[${model}] 응답 본문이 비어 있습니다.`;
                     recordDiagnostic({ model, httpStatus:res.status, finishReason, promptFeedback, contentParts, responseObject:data, errorMessage:emptyMessage });
@@ -2796,11 +2791,8 @@
                 lastError = `[${model}] ${message}`;
 
                 if (failureType === 'hard') {
-                    // 404처럼 모델 자체가 존재하지 않거나 명백히 지원되지 않는 경우에만 영구 제외합니다.
                     hardBlacklist.add(model);
                 }
-                // 429/5xx/408/400 등은 모델을 영구 blacklist하지 않습니다.
-                // 현재 요청에서는 다음 허용 모델로 넘어갑니다.
                 requestFailedModels.add(model);
                 continue;
             } catch (err) {
@@ -2815,13 +2807,18 @@
                     errorMessage: message
                 });
                 lastError = `[${model}] ${message}`;
-                // 네트워크/타임아웃은 일시적 오류로 취급하고 영구 blacklist하지 않습니다.
                 requestFailedModels.add(model);
                 continue;
             }
         }
 
-        config.lastError = lastError || '이번 요청에서 사용할 수 있는 텍스트 생성 모델의 응답을 받지 못했습니다.';
+        // ==========================================
+        // 상태 덤프(디버그 로그) 추가
+        // ==========================================
+        const debugDump = `\n\n[디버그 상태 덤프]\n- 기본 후보 모델(baseModels): [${baseModels.join(', ')}]\n- 영구 차단 모델(hardBlacklist): [${Array.from(hardBlacklist).join(', ')}]\n- 일시 실패 모델(requestFailedModels): [${Array.from(requestFailedModels).join(', ')}]`;
+
+        config.lastError = (lastError || '이번 요청에서 사용할 수 있는 텍스트 생성 모델의 응답을 받지 못했습니다.') + debugDump;
+
         if (typeof config.diagnosticHandler === 'function' && !lastDiagnostic) {
             config.diagnosticHandler({
                 model: '', httpStatus: null, finishReason: '', promptFeedback: null,
