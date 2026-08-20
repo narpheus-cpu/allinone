@@ -6500,6 +6500,19 @@ ${JSON.stringify(finalPayload)}`;
         return state.topics[Math.floor(Math.random() * state.topics.length)]?.topic || '';
     }
 
+    // 슬롯10 전용 저호출 생성 설정: 한 생성 단계에서 모델을 최대 1회만 호출합니다.
+    // quota가 있는 다른 모델로 무의미하게 연쇄 재시도하지 않고, 다음 자동 실행에서 다시 시도합니다.
+    function mtGetWordWebLowCallAiConfig() {
+        const cfg = mtGetWordWebAiConfig();
+        cfg.maxModelAttempts = 1;
+        cfg.requestTimeoutMs = 90000;
+        return cfg;
+    }
+
+    // 슬롯10 1배치 = 최대 2번의 논리적 Gemini 요청
+    // 1) 영어 + 자연스러운 한국어 6개
+    // 2) 6개 전체의 직독직해 청크를 한 번에 생성
+    // 검증은 로컬에서 수행하여 추가 API 호출을 만들지 않습니다.
     async function mtWordWebGenerateSix() {
         if (mtWordWebBusy) return;
         const state = mtWordWebGetState();
@@ -6513,7 +6526,9 @@ ${JSON.stringify(finalPayload)}`;
         mtWordWebRenderStatus();
 
         try {
-            // 1단계: 영어 문장 + 자연스러운 한국어 번역만 생성
+            const wordWebAiConfig = mtGetWordWebLowCallAiConfig();
+
+            // ===== 호출 1: 영어 + 자연스러운 한국어 6개 =====
             const dialoguePrompt = `
 You are an expert English dialogue writer and English-Korean translator.
 Create a continuous, natural everyday conversation between 2 people based on this topic: "${topic}"
@@ -6527,15 +6542,13 @@ Rules:
    - english: the English sentence
    - korean: ONE faithful, natural Korean translation of that English sentence
 6. The Korean translation must preserve the exact meaning of the English sentence.
-7. NEVER repeat phrases unnaturally.
-8. NEVER add unrelated greetings, farewells, time expressions, names, or content from another sentence/topic.
-9. Do not create any direct-reading/chunk translation in this step.
+7. Never repeat phrases unnaturally.
+8. Never add unrelated greetings, farewells, time expressions, names, or content from another sentence/topic.
+9. Do not create direct-reading/chunk translation in this step.
 
-Example:
-{"english":"Please stretch your arms carefully.","korean":"팔을 조심스럽게 스트레칭 하세요."}`;
+Return JSON only.`;
 
-            const wordWebAiConfig = mtGetGeneratorAiConfig(mtGetWordWebAiConfig(), 'wordweb', '참조형 슬롯10');
-            let rawDialogue = await fetchGemini(dialoguePrompt, {
+            const rawDialogue = await fetchGemini(dialoguePrompt, {
                 type:'ARRAY', minItems:6, maxItems:6,
                 items:{
                     type:'OBJECT',
@@ -6543,11 +6556,11 @@ Example:
                     required:['english','korean']
                 }
             }, wordWebAiConfig);
-            if (!rawDialogue) throw new Error('영어/한국어 기본 문장 생성에 실패했습니다.');
+            if (!rawDialogue) throw new Error('영어/한국어 기본 문장 생성에 실패했습니다. 다음 자동 실행에서 다시 시도합니다.');
 
             let resultList = Array.isArray(rawDialogue) ? rawDialogue : mtWordWebExtractJsonValue(rawDialogue);
             if (!Array.isArray(resultList) || resultList.length !== 6) {
-                throw new Error('영어/한국어 기본 문장이 정확히 6개 생성되지 않았습니다.');
+                throw new Error('영어/한국어 기본 문장이 정확히 6개 생성되지 않았습니다. 다음 자동 실행에서 다시 시도합니다.');
             }
 
             resultList = resultList.map(item => ({
@@ -6556,37 +6569,85 @@ Example:
                 literal_korean:''
             }));
             if (resultList.some(item => !item.english || !item.korean)) {
-                throw new Error('영어 또는 한국어 문장이 비어 있습니다.');
+                throw new Error('영어 또는 한국어 문장이 비어 있습니다. 다음 자동 실행에서 다시 시도합니다.');
             }
 
-            // 2단계: B열 자연번역의 의미 일치성 검증/재생성
-            const validatedTranslations = await mtWordWebValidateNaturalTranslations(resultList, wordWebAiConfig);
-            if (!validatedTranslations) {
-                throw new Error('자연스러운 한국어 번역 검증에 실패했습니다. 다음 자동 실행에서 다시 시도합니다.');
+            // 추가 검증 API 호출은 하지 않습니다. 명백히 이상한 번역만 로컬에서 차단합니다.
+            const suspicious = resultList.find(item => mtWordWebLooksSuspiciousNaturalKorean(item.english, item.korean));
+            if (suspicious) {
+                throw new Error('자연스러운 한국어 번역에 명백한 이상 패턴이 있어 이번 배치를 저장하지 않았습니다. 다음 자동 실행에서 다시 시도합니다.');
             }
-            resultList = validatedTranslations;
 
-            // 3단계: 검증을 통과한 영어+B열만 사용하여 C열 직독직해 생성
-            const literalResults = await mtWordWebGenerateLiteralForItems(resultList, wordWebAiConfig);
-            literalResults.forEach((result, idx) => {
-                if (result?.literal) resultList[idx].literal_korean = result.literal;
-            });
+            // ===== 호출 2: 6개 전체의 직독직해를 한 번에 생성 =====
+            const literalPrompt = `
+You are an expert English syntax and direct-reading teacher.
+For each of the 6 English-Korean sentence pairs below, create an English phrase-chunked direct-reading Korean translation.
 
-            // 4단계: 실패한 C열 문장만 재시도
-            for (let idx = 0; idx < resultList.length; idx++) {
-                if (mtWordWebIsKoreanChunkList(resultList[idx].literal_korean)) continue;
-                let repaired = null;
-                for (let attempt = 1; attempt <= 5 && !repaired; attempt++) {
-                    repaired = await mtWordWebRepairLiteralOne(resultList[idx], wordWebAiConfig);
+Rules:
+1. Return ONLY a JSON array of exactly 6 objects.
+2. Each object MUST contain:
+   - index: 0 through 5
+   - english_chunks: English phrase chunks in EXACT original order
+   - korean_chunks: Korean chunk translations corresponding to the SAME indexes
+3. Preserve every important English word. Do not omit, duplicate, or reorder words.
+4. Prefer 2-8 meaningful phrase chunks per sentence.
+5. korean_chunks length MUST equal english_chunks length.
+6. korean_chunks must contain Korean only. No English letters.
+7. Keep Korean chunks in the exact English chunk order, even if the resulting Korean sounds unnatural.
+8. Use the supplied natural Korean sentence only as a meaning reference.
+
+DATA:
+${JSON.stringify(resultList.map((item,index)=>({index,english:item.english,korean:item.korean})))}
+
+Return JSON only.`;
+
+            const rawLiteral = await fetchGemini(literalPrompt, {
+                type:'ARRAY', minItems:6, maxItems:6,
+                items:{
+                    type:'OBJECT',
+                    properties:{
+                        index:{type:'INTEGER'},
+                        english_chunks:{type:'ARRAY', items:{type:'STRING'}, minItems:2, maxItems:8},
+                        korean_chunks:{type:'ARRAY', items:{type:'STRING'}, minItems:2, maxItems:8}
+                    },
+                    required:['index','english_chunks','korean_chunks']
                 }
-                if (repaired) resultList[idx].literal_korean = repaired;
+            }, wordWebAiConfig);
+            if (!rawLiteral) throw new Error('직독직해 일괄 생성에 실패했습니다. 다음 자동 실행에서 다시 시도합니다.');
+
+            let literalResults = Array.isArray(rawLiteral) ? rawLiteral : mtWordWebExtractJsonValue(rawLiteral);
+            if (!Array.isArray(literalResults) || literalResults.length !== 6) {
+                throw new Error('직독직해 결과가 정확히 6개 생성되지 않았습니다. 다음 자동 실행에서 다시 시도합니다.');
             }
 
-            const unresolved = resultList.filter(item => !mtWordWebIsKoreanChunkList(item.literal_korean)).length;
-            if (unresolved > 0) {
-                throw new Error(`보조문장 ${unresolved}개를 자동 생성하지 못했습니다. 다음 자동 실행에서 다시 시도합니다.`);
+            const byIndex = new Map();
+            for (const item of literalResults) {
+                const idx = Number(item?.index);
+                if (!Number.isInteger(idx) || idx < 0 || idx >= 6 || byIndex.has(idx)) {
+                    throw new Error('직독직해 결과의 인덱스가 올바르지 않습니다. 다음 자동 실행에서 다시 시도합니다.');
+                }
+                const englishChunks = Array.isArray(item?.english_chunks) ? item.english_chunks.map(x=>String(x||'').trim()).filter(Boolean) : [];
+                const koreanChunks = Array.isArray(item?.korean_chunks) ? item.korean_chunks.map(x=>String(x||'').trim()) : [];
+                if (englishChunks.length < 2 || englishChunks.length > 8 || koreanChunks.length !== englishChunks.length) {
+                    throw new Error(`직독직해 청크 수가 올바르지 않습니다. (${idx + 1}번 문장)`);
+                }
+                if (!mtWordWebEnglishChunksCoverSentence(englishChunks, resultList[idx].english)) {
+                    throw new Error(`영어 청크가 원문과 일치하지 않습니다. (${idx + 1}번 문장)`);
+                }
+                if (!koreanChunks.every(x => x && /[가-힣]/.test(x) && !/[A-Za-z]/.test(x))) {
+                    throw new Error(`한국어 청크 형식이 올바르지 않습니다. (${idx + 1}번 문장)`);
+                }
+                const literal = koreanChunks.map(chunk => `[${chunk}]`).join(' ');
+                if (!mtWordWebIsKoreanChunkList(literal)) {
+                    throw new Error(`직독직해 결과 검증에 실패했습니다. (${idx + 1}번 문장)`);
+                }
+                byIndex.set(idx, literal);
             }
 
+            if (byIndex.size !== 6) throw new Error('직독직해 6개가 모두 생성되지 않았습니다. 다음 자동 실행에서 다시 시도합니다.');
+            resultList.forEach((item, idx) => { item.literal_korean = byIndex.get(idx) || ''; });
+
+            // ===== 로컬 검증 통과 후 저장 =====
             const pattern = mtWordWebGetPattern(state);
             const currentX = mtWordWebFindNextSerial(state.outputRows, state);
             const maxCol = Math.max(pattern.engCol, pattern.mainKorCol, pattern.subKorCol, pattern.serialCol, pattern.topicOutputCol);
@@ -6606,7 +6667,7 @@ Example:
             state.totalGenerated = Number(state.totalGenerated || 0) + 1;
             state.lastError = '';
             mtWordWebSaveState(state);
-            mtWordWebRenderStatus('6문장 생성 완료');
+            mtWordWebRenderStatus('6문장 생성 완료 (API 2단계)');
             mtInitSlots();
         } catch (error) {
             state.lastRun = Date.now();
