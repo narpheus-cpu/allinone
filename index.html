@@ -2685,6 +2685,7 @@
             return null;
         }
 
+        // 텍스트 생성 슬롯에서 사용할 모델을 명시적으로 제한합니다.
         const TEXT_GENERATION_MODELS = [
             'gemini-3.6-flash',
             'gemini-3.5-flash',
@@ -2694,88 +2695,147 @@
         const preferredModels = Array.isArray(config.models) && config.models.length
             ? config.models.map(String).map(s => s.trim()).filter(Boolean)
             : ['gemini-3.6-flash'];
-
         const hardBlacklist = config.blacklistSet instanceof Set ? config.blacklistSet : blacklistedModels;
         const allowedPreferred = preferredModels.filter(m => TEXT_GENERATION_MODELS.includes(m));
         const baseModels = Array.from(new Set([...allowedPreferred, ...TEXT_GENERATION_MODELS]));
 
-        const requestFailedModels = new Set();
+        // 이번 fetchGemini 호출에서 이미 시도한 모델은 절대로 2차 순환하지 않습니다.
+        const attemptedModels = new Set();
         const emptyResponseRetries = new Map();
-        const maxAttempts = Math.max(1, Math.min(Number(config.maxModelAttempts || baseModels.length), baseModels.length));
-        let attempts = 0;
+        const attemptHistory = [];
         let lastError = '';
         let lastDiagnostic = null;
-        const attemptHistory = [];
+        let attempts = 0;
 
-        const recordDiagnostic = (detail) => { lastDiagnostic = detail; };
         const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-        const extractQuotaInfo = (errJson) => {
-            const details = Array.isArray(errJson?.error?.details) ? errJson.error.details : [];
-            let quotaId = '', quotaMetric = '', quotaModel = '', retryDelaySec = 0;
-            for (const item of details) {
-                if (item?.['@type']?.includes('QuotaFailure')) {
-                    const v = Array.isArray(item.violations) ? (item.violations[0] || {}) : {};
-                    quotaId = String(v.quotaId || '');
-                    quotaMetric = String(v.quotaMetric || '');
-                    quotaModel = String(v.quotaDimensions?.model || '');
-                }
-                if (item?.['@type']?.includes('RetryInfo')) {
-                    const m = String(item.retryDelay || '').match(/(\d+(?:\.\d+)?)s/i);
-                    if (m) retryDelaySec = Number(m[1]) || 0;
-                }
-            }
-            return { quotaId, quotaMetric, quotaModel, retryDelaySec };
+        const recordDiagnostic = (detail) => {
+            lastDiagnostic = detail;
+            if (typeof config.diagnosticHandler === 'function') config.diagnosticHandler(detail);
         };
-        const isDailyQuota = (quotaId, quotaMetric) => /PerDay/i.test(`${quotaId} ${quotaMetric}`);
-        const cooldownKey = (model) => `${apiKey}::${model}`;
-        const getCooldownUntil = (model) => Number(GEMINI_MODEL_COOLDOWN_UNTIL.get(cooldownKey(model)) || 0);
-        const setCooldown = (model, until) => GEMINI_MODEL_COOLDOWN_UNTIL.set(cooldownKey(model), Number(until) || 0);
+
+        // API key별 quota 상태를 분리하기 위한 간단한 fingerprint입니다.
+        function apiKeyFingerprint(key) {
+            let h = 2166136261;
+            for (let i = 0; i < key.length; i++) {
+                h ^= key.charCodeAt(i);
+                h = Math.imul(h, 16777619);
+            }
+            return (h >>> 0).toString(36);
+        }
+        const quotaStoreKey = 'gemini_model_quota_cooldowns_v2';
+        const quotaKeyPrefix = `${apiKeyFingerprint(apiKey)}::`;
+        const nowMs = () => Date.now();
+
+        function readPersistentQuotaState() {
+            try {
+                const raw = JSON.parse(localStorage.getItem(quotaStoreKey) || '{}');
+                return raw && typeof raw === 'object' ? raw : {};
+            } catch (_) { return {}; }
+        }
+        function writePersistentQuotaState(state) {
+            try { localStorage.setItem(quotaStoreKey, JSON.stringify(state)); } catch (_) {}
+        }
+        function getPersistentCooldown(model) {
+            const state = readPersistentQuotaState();
+            const until = Number(state[quotaKeyPrefix + model] || 0);
+            if (until > nowMs()) return until;
+            if (until) { delete state[quotaKeyPrefix + model]; writePersistentQuotaState(state); }
+            return 0;
+        }
+        function setPersistentCooldown(model, until) {
+            const state = readPersistentQuotaState();
+            state[quotaKeyPrefix + model] = Number(until) || 0;
+            const cutoff = nowMs() - 7 * 24 * 60 * 60 * 1000;
+            for (const [k, v] of Object.entries(state)) {
+                if (Number(v) < cutoff) delete state[k];
+            }
+            writePersistentQuotaState(state);
+        }
+
+        const inMemoryCooldown = (model) => Number(GEMINI_MODEL_COOLDOWN_UNTIL.get(`${apiKey}::${model}`) || 0);
+        const getCooldownUntil = (model) => Math.max(inMemoryCooldown(model), getPersistentCooldown(model));
+        const setCooldown = (model, until) => {
+            GEMINI_MODEL_COOLDOWN_UNTIL.set(`${apiKey}::${model}`, Number(until) || 0);
+            setPersistentCooldown(model, until);
+        };
         const formatCooldown = (until) => {
-            const remainSec = Math.max(0, Math.ceil((until - Date.now()) / 1000));
-            if (remainSec <= 0) return '';
+            const remainSec = Math.max(0, Math.ceil((until - nowMs()) / 1000));
+            if (!remainSec) return '';
             if (remainSec < 60) return `${remainSec}초`;
             const min = Math.floor(remainSec / 60), sec = remainSec % 60;
             return sec ? `${min}분 ${sec}초` : `${min}분`;
         };
-        const buildAttemptHistoryText = () => {
-            if (!attemptHistory.length) return '';
-            return '\n\n[이번 요청 시도 내역]\n' + attemptHistory.map((x, i) =>
-                `${i + 1}. ${x.model} | HTTP=${x.httpStatus ?? '없음'} | finishReason=${x.finishReason || '없음'} | type=${x.type} | ${x.message}`
-            ).join('\n');
-        };
 
-        while (attempts < maxAttempts) {
-            const now = Date.now();
-            const eligibleModels = baseModels.filter(model =>
+        function extractQuotaInfo(errJson) {
+            const details = Array.isArray(errJson?.error?.details) ? errJson.error.details : [];
+            let quotaId = '', quotaMetric = '', quotaModel = '', retryDelaySec = 0;
+            for (const item of details) {
+                const type = String(item?.['@type'] || '');
+                if (type.includes('QuotaFailure')) {
+                    const violation = Array.isArray(item.violations) ? (item.violations[0] || {}) : {};
+                    quotaId = String(violation.quotaId || '');
+                    quotaMetric = String(violation.quotaMetric || '');
+                    quotaModel = String(violation.quotaDimensions?.model || '');
+                }
+                if (type.includes('RetryInfo')) {
+                    const match = String(item.retryDelay || '').match(/(\d+(?:\.\d+)?)s/i);
+                    if (match) retryDelaySec = Number(match[1]) || 0;
+                }
+            }
+            const msg = String(errJson?.error?.message || '');
+            if (!retryDelaySec) {
+                const match = msg.match(/retry in\s+(\d+(?:\.\d+)?)s/i);
+                if (match) retryDelaySec = Number(match[1]) || 0;
+            }
+            if (!quotaId && /PerDayPerProjectPerModel|PerDay.*Model/i.test(msg)) quotaId = 'GenerateRequestsPerDayPerProjectPerModel-FreeTier';
+            if (!quotaMetric && /generate_content_free_tier_requests/i.test(msg)) quotaMetric = 'generativelanguage.googleapis.com/generate_content_free_tier_requests';
+            if (!quotaModel) {
+                const m = msg.match(/model:\s*([A-Za-z0-9._-]+)/i);
+                if (m) quotaModel = m[1];
+            }
+            return { quotaId, quotaMetric, quotaModel, retryDelaySec };
+        }
+
+        const isDailyQuota = (quotaId, quotaMetric) => /PerDay/i.test(`${quotaId} ${quotaMetric}`);
+        const getDailyCooldownMs = () => 24 * 60 * 60 * 1000;
+        const getTemporaryCooldownMs = sec => Math.max(30, Math.ceil(Number(sec) || 30)) * 1000;
+
+        while (attemptedModels.size < baseModels.length) {
+            const now = nowMs();
+            const eligible = baseModels.filter(model =>
                 !hardBlacklist.has(model) &&
-                !requestFailedModels.has(model) &&
+                !attemptedModels.has(model) &&
                 getCooldownUntil(model) <= now
             );
-            const model = eligibleModels[0];
+
+            const model = eligible[0];
             if (!model) {
-                const quotaModels = baseModels.filter(m => getCooldownUntil(m) > now && !hardBlacklist.has(m));
+                const quotaModels = baseModels.filter(m => !hardBlacklist.has(m) && getCooldownUntil(m) > now);
                 const quotaRemain = quotaModels.map(m => `${m}: ${formatCooldown(getCooldownUntil(m))}`).join(', ');
                 lastError = quotaModels.length
                     ? `Gemini API 사용량 한도로 인해 현재 사용할 수 있는 모델이 없습니다.${quotaRemain ? ` (${quotaRemain})` : ''}`
                     : (lastError || '현재 요청에서 사용할 수 있는 텍스트 생성 모델이 없습니다.');
                 break;
             }
+
+            attemptedModels.add(model);
             attempts++;
             const generateUrl = `https://generativelanguage.googleapis.com/v1/models/${encodeURIComponent(model)}:generateContent`;
+
             try {
-                const reqBody = {
-                    contents: [{ role: 'user', parts: [{ text: String(promptText || '') }] }],
-                    generationConfig: { maxOutputTokens: Number(config.maxOutputTokens || 4096) }
-                };
+                const generationConfig = { maxOutputTokens: Number(config.maxOutputTokens || 4096) };
                 if (responseSchema) {
-                    reqBody.generationConfig.responseMimeType = 'application/json';
-                    reqBody.generationConfig.responseSchema = responseSchema;
+                    generationConfig.responseMimeType = 'application/json';
+                    generationConfig.responseSchema = responseSchema;
                 }
+                const reqBody = {
+                    contents: [{ role:'user', parts:[{ text:String(promptText || '') }] }],
+                    generationConfig
+                };
                 const res = await mtFetchWithTimeout(generateUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-                    body: JSON.stringify(reqBody)
+                    method:'POST',
+                    headers:{ 'Content-Type':'application/json', 'x-goog-api-key':apiKey },
+                    body:JSON.stringify(reqBody)
                 }, Number(config.requestTimeoutMs || 45000));
 
                 if (res.ok) {
@@ -2791,57 +2851,99 @@
                     if (['PROHIBITED_CONTENT','SAFETY','BLOCKLIST','SPII','RECITATION'].includes(finishReason)) {
                         const message = `[${model}] ${finishReason}로 인해 생성 결과가 차단되었습니다.`;
                         attemptHistory.push({model,httpStatus:res.status,finishReason,type:'content_block',message});
-                        recordDiagnostic({ model, httpStatus:res.status, finishReason, promptFeedback, contentParts, responseObject:data, errorMessage:message });
+                        recordDiagnostic({ model,httpStatus:res.status,finishReason,promptFeedback,contentParts,responseObject:data,errorMessage:message });
                         lastError = message;
                         break;
                     }
+
                     if (responseText) return responseText;
 
                     const emptyCount = Number(emptyResponseRetries.get(model) || 0);
                     const emptyMessage = `[${model}] 응답 본문이 비어 있습니다.`;
                     attemptHistory.push({model,httpStatus:res.status,finishReason,type:'empty_response',message:emptyMessage});
-                    recordDiagnostic({ model, httpStatus:res.status, finishReason, promptFeedback, contentParts, responseObject:data, errorMessage:emptyMessage });
+                    recordDiagnostic({ model,httpStatus:res.status,finishReason,promptFeedback,contentParts,responseObject:data,errorMessage:emptyMessage });
                     lastError = emptyMessage;
                     if (emptyCount < 1) {
                         emptyResponseRetries.set(model, emptyCount + 1);
+                        // 같은 모델의 빈 응답 재시도는 1회만 허용하고, 그 이후에는 다음 모델로 이동합니다.
                         await sleep(500);
+                        const retryRes = await mtFetchWithTimeout(generateUrl, {
+                            method:'POST',
+                            headers:{ 'Content-Type':'application/json', 'x-goog-api-key':apiKey },
+                            body:JSON.stringify(reqBody)
+                        }, Number(config.requestTimeoutMs || 45000));
+                        if (retryRes.ok) {
+                            const retryData = await retryRes.json().catch(() => ({}));
+                            const retryCandidate = retryData.candidates?.[0] || null;
+                            const retryFinish = String(retryCandidate?.finishReason || '');
+                            const retryParts = retryCandidate?.content?.parts ?? null;
+                            const retryText = Array.isArray(retryParts)
+                                ? retryParts.map(part => String(part?.text || '')).join('').trim()
+                                : String(retryData?.text || '').trim();
+                            if (['PROHIBITED_CONTENT','SAFETY','BLOCKLIST','SPII','RECITATION'].includes(retryFinish)) {
+                                const message = `[${model}] ${retryFinish}로 인해 생성 결과가 차단되었습니다.`;
+                                attemptHistory.push({model,httpStatus:retryRes.status,finishReason:retryFinish,type:'content_block_retry',message});
+                                recordDiagnostic({ model,httpStatus:retryRes.status,finishReason:retryFinish,promptFeedback:retryData.promptFeedback ?? null,contentParts:retryParts,responseObject:retryData,errorMessage:message });
+                                lastError = message;
+                                break;
+                            }
+                            if (retryText) return retryText;
+                            attemptHistory.push({model,httpStatus:retryRes.status,finishReason:retryFinish,type:'empty_response_retry',message:`[${model}] 재시도에서도 응답 본문이 비어 있습니다.`});
+                        } else {
+                            const retryErr = await retryRes.json().catch(() => ({}));
+                            const retryQuota = extractQuotaInfo(retryErr);
+                            const retryMessage = String(retryErr?.error?.message || `HTTP ${retryRes.status}`).trim();
+                            if (retryRes.status === 429) {
+                                const cooldownMs = isDailyQuota(retryQuota.quotaId,retryQuota.quotaMetric)
+                                    ? getDailyCooldownMs() : getTemporaryCooldownMs(retryQuota.retryDelaySec);
+                                setCooldown(model, nowMs() + cooldownMs);
+                                recordDiagnostic({ model,httpStatus:retryRes.status,finishReason:'',promptFeedback:retryErr?.error?.details || retryErr?.error || null,contentParts:null,responseObject:retryErr,errorMessage:`[${model}] ${retryMessage}` });
+                                lastError = isDailyQuota(retryQuota.quotaId,retryQuota.quotaMetric)
+                                    ? `[${model}] 일일 Gemini API quota를 초과했습니다.`
+                                    : `[${model}] Gemini API quota를 초과했습니다.`;
+                            }
+                        }
                         continue;
                     }
-                    requestFailedModels.add(model);
                     continue;
                 }
 
                 const errJson = await res.json().catch(() => ({}));
                 const message = String(errJson?.error?.message || `HTTP ${res.status}`).trim();
                 const quotaInfo = extractQuotaInfo(errJson);
-                const isQuota429 = res.status === 429 && (/RESOURCE_EXHAUSTED/i.test(String(errJson?.error?.status || '')) || Boolean(quotaInfo.quotaId || quotaInfo.quotaMetric));
+                const isQuota429 = res.status === 429 && (
+                    /RESOURCE_EXHAUSTED/i.test(String(errJson?.error?.status || '')) ||
+                    Boolean(quotaInfo.quotaId || quotaInfo.quotaMetric) ||
+                    /quota exceeded/i.test(message)
+                );
 
                 if (isQuota429) {
-                    const cooldownMs = isDailyQuota(quotaInfo.quotaId, quotaInfo.quotaMetric)
-                        ? 24 * 60 * 60 * 1000
-                        : Math.max(30, quotaInfo.retryDelaySec || 30) * 1000;
-                    setCooldown(model, Date.now() + cooldownMs);
-                    requestFailedModels.add(model);
+                    const cooldownMs = isDailyQuota(quotaInfo.quotaId,quotaInfo.quotaMetric)
+                        ? getDailyCooldownMs()
+                        : getTemporaryCooldownMs(quotaInfo.retryDelaySec);
+                    setCooldown(model, nowMs() + cooldownMs);
                     const quotaMessage = `${message}${quotaInfo.quotaId ? ` [quotaId=${quotaInfo.quotaId}]` : ''}${quotaInfo.retryDelaySec ? ` [retryDelay=${quotaInfo.retryDelaySec}s]` : ''}`;
                     attemptHistory.push({model,httpStatus:res.status,finishReason:'',type:'quota',message:quotaMessage});
-                    recordDiagnostic({ model, httpStatus:res.status, finishReason:'', promptFeedback:errJson?.error?.details || errJson?.error || null, contentParts:null, responseObject:errJson, errorMessage:quotaMessage });
-                    lastError = isDailyQuota(quotaInfo.quotaId, quotaInfo.quotaMetric)
+                    recordDiagnostic({ model,httpStatus:res.status,finishReason:'',promptFeedback:errJson?.error?.details || errJson?.error || null,contentParts:null,responseObject:errJson,errorMessage:quotaMessage });
+                    lastError = isDailyQuota(quotaInfo.quotaId,quotaInfo.quotaMetric)
                         ? `[${model}] 일일 Gemini API quota를 초과했습니다.`
                         : `[${model}] Gemini API quota를 초과했습니다.`;
+                    // 핵심: quota 초과 모델은 attemptedModels + cooldown 양쪽으로 차단합니다.
                     continue;
                 }
 
                 attemptHistory.push({model,httpStatus:res.status,finishReason:'',type:'http_error',message});
-                recordDiagnostic({ model, httpStatus:res.status, finishReason:'', promptFeedback:errJson?.error?.details || errJson?.error || null, contentParts:null, responseObject:errJson, errorMessage:message });
+                recordDiagnostic({ model,httpStatus:res.status,finishReason:'',promptFeedback:errJson?.error?.details || errJson?.error || null,contentParts:null,responseObject:errJson,errorMessage:message });
                 lastError = `[${model}] ${message}`;
                 if (res.status === 404) hardBlacklist.add(model);
-                requestFailedModels.add(model);
+                continue;
             } catch (err) {
                 const message = err?.name === 'AbortError' ? 'API 요청 시간이 초과되었습니다.' : String(err?.message || err);
                 attemptHistory.push({model,httpStatus:null,finishReason:'',type:'network_error',message});
-                recordDiagnostic({ model, httpStatus:null, finishReason:'', promptFeedback:null, contentParts:null, responseObject:null, errorMessage:message });
+                recordDiagnostic({ model,httpStatus:null,finishReason:'',promptFeedback:null,contentParts:null,responseObject:null,errorMessage:message });
                 lastError = `[${model}] ${message}`;
-                requestFailedModels.add(model);
+                // 네트워크/timeout은 이번 요청에서만 제외하고 다음 후보로 이동합니다.
+                continue;
             }
         }
 
@@ -2850,19 +2952,16 @@
             '[디버그 상태 덤프]',
             `- 기본 후보 모델: [${baseModels.join(', ')}]`,
             `- 영구 차단(hardBlacklist): [${Array.from(hardBlacklist).join(', ')}]`,
-            `- 이번 요청 실패(requestFailedModels): [${Array.from(requestFailedModels).join(', ')}]`,
+            `- 이번 요청 시도 완료 모델: [${Array.from(attemptedModels).join(', ')}]`,
             `- 현재 quota cooldown 모델: [${baseModels.filter(m => getCooldownUntil(m) > Date.now()).map(m => `${m}(${formatCooldown(getCooldownUntil(m))})`).join(', ')}]`,
-            `- 시도 횟수: ${attempts}/${maxAttempts}`,
-            buildAttemptHistoryText()
+            `- 시도 횟수: ${attempts}/${baseModels.length}`,
+            attemptHistory.length ? '\n[이번 요청 시도 내역]\n' + attemptHistory.map((x,i) => `${i+1}. ${x.model} | HTTP=${x.httpStatus ?? '없음'} | finishReason=${x.finishReason || '없음'} | type=${x.type} | ${x.message}`).join('\n') : ''
         ].join('\n');
-        config.lastError = (lastError || '텍스트 생성 모델의 응답을 받지 못했습니다.') + debugDump;
 
+        config.lastError = (lastError || '텍스트 생성 모델의 응답을 받지 못했습니다.') + debugDump;
         if (typeof config.diagnosticHandler === 'function') {
-            if (lastDiagnostic) {
-                config.diagnosticHandler({ ...lastDiagnostic, errorMessage: `${lastDiagnostic.errorMessage || ''}${debugDump}` });
-            } else {
-                config.diagnosticHandler({ model:'', httpStatus:null, finishReason:'', promptFeedback:null, contentParts:null, responseObject:null, errorMessage:config.lastError });
-            }
+            if (lastDiagnostic) config.diagnosticHandler({ ...lastDiagnostic, errorMessage:`${lastDiagnostic.errorMessage || ''}${debugDump}` });
+            else config.diagnosticHandler({ model:'',httpStatus:null,finishReason:'',promptFeedback:null,contentParts:null,responseObject:null,errorMessage:config.lastError });
         }
         if (!config.silent) alert(`AI 응답 생성 실패:\n${config.lastError}`);
         return null;
