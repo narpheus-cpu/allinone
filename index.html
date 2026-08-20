@@ -2004,10 +2004,10 @@
 
 <script>
     // ============================================================================
-    // ★ 최근 코드 업데이트 시각: 202608200128
+    // ★ 최근 코드 업데이트 시각: 202608201446
     // ★ ※ 코드를 직접 수정할 때마다 위 시간값도 변경하세요.
     // ============================================================================
-    const APP_BUILD_TIMESTAMP = '202608200128';
+    const APP_BUILD_TIMESTAMP = '202608201446';
     
         /* ========================================== */
     /* [신규 기능] AI 도움 프롬프트 통합 템플릿 관리   */
@@ -2703,6 +2703,7 @@
         const attemptedModels = new Set();
         const emptyResponseRetries = new Map();
         const attemptHistory = [];
+        const confirmedQuotaModels = new Set();
         let lastError = '';
         let lastDiagnostic = null;
         let attempts = 0;
@@ -2722,7 +2723,7 @@
             }
             return (h >>> 0).toString(36);
         }
-        const quotaStoreKey = 'gemini_model_quota_cooldowns_v2';
+        const quotaStoreKey = 'gemini_model_quota_cooldowns_v3';
         const quotaKeyPrefix = `${apiKeyFingerprint(apiKey)}::`;
         const nowMs = () => Date.now();
 
@@ -2754,7 +2755,20 @@
 
         const inMemoryCooldown = (model) => Number(GEMINI_MODEL_COOLDOWN_UNTIL.get(`${apiKey}::${model}`) || 0);
         const getCooldownUntil = (model) => Math.max(inMemoryCooldown(model), getPersistentCooldown(model));
+        function clearUnconfirmedPersistedCooldowns() {
+            const state = readPersistentQuotaState();
+            let changed = false;
+            for (const key of Object.keys(state)) {
+                if (key.startsWith(quotaKeyPrefix)) {
+                    const model = key.slice(quotaKeyPrefix.length);
+                    if (!TEXT_GENERATION_MODELS.includes(model)) { delete state[key]; changed = true; }
+                }
+            }
+            if (changed) writePersistentQuotaState(state);
+        }
+        clearUnconfirmedPersistedCooldowns();
         const setCooldown = (model, until) => {
+            if (!confirmedQuotaModels.has(model)) return;
             GEMINI_MODEL_COOLDOWN_UNTIL.set(`${apiKey}::${model}`, Number(until) || 0);
             setPersistentCooldown(model, until);
         };
@@ -2894,6 +2908,7 @@
                             const retryQuota = extractQuotaInfo(retryErr);
                             const retryMessage = String(retryErr?.error?.message || `HTTP ${retryRes.status}`).trim();
                             if (retryRes.status === 429) {
+                                confirmedQuotaModels.add(model);
                                 const cooldownMs = isDailyQuota(retryQuota.quotaId,retryQuota.quotaMetric)
                                     ? getDailyCooldownMs() : getTemporaryCooldownMs(retryQuota.retryDelaySec);
                                 setCooldown(model, nowMs() + cooldownMs);
@@ -2918,6 +2933,7 @@
                 );
 
                 if (isQuota429) {
+                    confirmedQuotaModels.add(model);
                     const cooldownMs = isDailyQuota(quotaInfo.quotaId,quotaInfo.quotaMetric)
                         ? getDailyCooldownMs()
                         : getTemporaryCooldownMs(quotaInfo.retryDelaySec);
@@ -2954,14 +2970,21 @@
             `- 영구 차단(hardBlacklist): [${Array.from(hardBlacklist).join(', ')}]`,
             `- 이번 요청 시도 완료 모델: [${Array.from(attemptedModels).join(', ')}]`,
             `- 현재 quota cooldown 모델: [${baseModels.filter(m => getCooldownUntil(m) > Date.now()).map(m => `${m}(${formatCooldown(getCooldownUntil(m))})`).join(', ')}]`,
-            `- 시도 횟수: ${attempts}/${baseModels.length}`,
+            `- 시도 횟수: ${attempts}/${baseModels.length}` + (attempts === 0 ? '\n- API 호출: 없음 (모델 선택 단계에서 종료)' : ''),
             attemptHistory.length ? '\n[이번 요청 시도 내역]\n' + attemptHistory.map((x,i) => `${i+1}. ${x.model} | HTTP=${x.httpStatus ?? '없음'} | finishReason=${x.finishReason || '없음'} | type=${x.type} | ${x.message}`).join('\n') : ''
         ].join('\n');
 
         config.lastError = (lastError || '텍스트 생성 모델의 응답을 받지 못했습니다.') + debugDump;
         if (typeof config.diagnosticHandler === 'function') {
-            if (lastDiagnostic) config.diagnosticHandler({ ...lastDiagnostic, errorMessage:`${lastDiagnostic.errorMessage || ''}${debugDump}` });
-            else config.diagnosticHandler({ model:'',httpStatus:null,finishReason:'',promptFeedback:null,contentParts:null,responseObject:null,errorMessage:config.lastError });
+            if (lastDiagnostic) {
+                const mergedMessage = `${lastDiagnostic.errorMessage || ''}${debugDump}`;
+                config.diagnosticHandler({ ...lastDiagnostic, errorMessage: mergedMessage });
+            } else {
+                config.diagnosticHandler({
+                    model:'',httpStatus:null,finishReason:'',promptFeedback:null,contentParts:null,responseObject:null,
+                    errorMessage: config.lastError
+                });
+            }
         }
         if (!config.silent) alert(`AI 응답 생성 실패:\n${config.lastError}`);
         return null;
