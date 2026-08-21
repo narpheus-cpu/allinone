@@ -7542,11 +7542,12 @@ Return JSON only.`;
     function mtCloseEbookTyping(){
         if(!mtEbookTypingActive){ return; }
         const slot=mtEbookActiveSlot,index=Number(mtCurrentStudyWords?.[0]?.originalIndex);
-        const completed = mtIsCurrentTypedAnswerComplete();
+        const completed = mtIsCurrentMaskFullyUnmasked();
         if(completed && Number.isInteger(index)){
             const st=mtGetTypedState(slot), set=new Set((st.ebookReadIndexes||[]).map(Number));
             set.add(index); st.ebookReadIndexes=Array.from(set).sort((a,b)=>a-b); mtSaveTypedState(slot,st);
         }
+        mtRecordEbookCompletedCardIfReady();
         mtEbookTypingActive=false;
         const card=document.getElementById('mt-flashcard'); card.classList.remove('mt-ebook-typing'); card.style.display='none'; card.classList.remove('mt-ebook-freeform'); card.style.removeProperty('left'); card.style.removeProperty('top'); card.style.removeProperty('width'); card.style.removeProperty('height'); card.style.removeProperty('transform');
         const settingsBtn=document.getElementById('mtEbookPopupSettingsBtn'); if(settingsBtn) settingsBtn.style.display='none';
@@ -8080,6 +8081,37 @@ Return JSON only.`;
                typed.toLowerCase() === target.toLowerCase();
     }
 
+    // 전자책에서는 '모든 마스킹이 해제된 상태'를 카드 완료로 봅니다.
+    // 직접 타이핑 완료뿐 아니라 마스킹 박스/청크를 모두 힌트로 공개한 경우도 포함합니다.
+    function mtIsCurrentMaskFullyUnmasked() {
+        const currentWord = mtCurrentStudyWords[mtCurrentIndex];
+        if (!currentWord) return false;
+        const target = String(currentWord.eng || '');
+        if (!target.trim()) return false;
+        const input = document.getElementById('mtEngInput');
+        const typed = String(input?.value || '');
+
+        // 입력으로 문장 전체가 완성된 경우
+        const typingTarget = target.replace(/[.!?。！？]+\s*$/, '');
+        if (typed.toLowerCase() === typingTarget.toLowerCase() || typed.toLowerCase() === target.toLowerCase()) return true;
+
+        // 마스킹 대상(영문/숫자) 전체가 직접 입력 또는 힌트 공개되었는지 확인
+        for (let i = 0; i < target.length; i++) {
+            if (!/[a-zA-Z0-9]/.test(target[i])) continue;
+            if (i < typed.length) continue;
+            if (!mtRevealedSet.has(i)) return false;
+        }
+        return true;
+    }
+
+    function mtRecordEbookCompletedCardIfReady() {
+        if (!mtEbookTypingActive || mtCardCompletionRecorded) return false;
+        if (!mtIsCurrentMaskFullyUnmasked()) return false;
+        mtCardCompletionRecorded = true;
+        mtRecordDailyStat('cards', 1);
+        return true;
+    }
+
     function mtCompleteCurrentCardIfTyped() {
         if (!mtCardHadDirectTyping) return false;
         if (!mtIsCurrentTypedAnswerComplete()) return false;
@@ -8293,6 +8325,7 @@ Return JSON only.`;
             }
 
             if (row.childNodes.length > 0) container.appendChild(row);
+            mtRecordEbookCompletedCardIfReady();
             return;
         }
 
@@ -8340,6 +8373,7 @@ Return JSON only.`;
             }
         }
         if (wordDiv.childNodes.length > 0) container.appendChild(wordDiv);
+        mtRecordEbookCompletedCardIfReady();
     }
 
     function copyMtAiPrompt() {
