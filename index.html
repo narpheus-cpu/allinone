@@ -2418,10 +2418,10 @@
 
 <script>
     // ============================================================================
-    // ★ 최근 코드 업데이트 시각: 202608220318
+    // ★ 최근 코드 업데이트 시각: 202608220821
     // ★ ※ 코드를 직접 수정할 때마다 위 시간값도 변경하세요.
     // ============================================================================
-    const APP_BUILD_TIMESTAMP = '202608220318';
+    const APP_BUILD_TIMESTAMP = '202608220821';
     
         /* ========================================== */
     /* [신규 기능] AI 도움 프롬프트 통합 템플릿 관리   */
@@ -2624,13 +2624,13 @@
                 if (t) typedSlots[i] = { type:t, state:localStorage.getItem(mtGetTypedStateKey(i)) || '' };
             }
             mtBackupData['typed_slots'] = typedSlots;
-            const slot9Data = localStorage.getItem(MT_SLOT9_STORAGE_KEY);
+            const slot9Data = mtSlot9StateCache ? JSON.stringify(mtSlot9StateCache) : '';
             if (slot9Data) mtBackupData['slot9_conversation'] = slot9Data;
-            const wordWebData = localStorage.getItem(MT_WORDWEB_STORAGE_KEY);
+            const wordWebData = mtWordWebStateCache ? JSON.stringify(mtWordWebStateCache) : '';
             if (wordWebData) mtBackupData['wordweb_conversation'] = wordWebData;
             const starSess = localStorage.getItem('word_slot_star_session');
             if (starSess) mtBackupData['star_session'] = starSess;
-            const wordWebSlot = localStorage.getItem(MT_WORDWEB_STORAGE_KEY);
+            const wordWebSlot = mtWordWebStateCache ? JSON.stringify(mtWordWebStateCache) : '';
             if (wordWebSlot) mtBackupData['wordweb_conversation'] = wordWebSlot;
             const slot9ApiKey = localStorage.getItem(MT_SLOT9_API_KEY_STORAGE_KEY);
             if (slot9ApiKey) mtBackupData['slot9_api_key'] = slot9ApiKey;
@@ -2685,6 +2685,7 @@
                 // 일반 슬롯 1~8만 word_slot_* 키로 복원합니다.
                 // 슬롯9/10은 전용 저장 키로 복원해야 카드 수가 0으로 초기화되지 않습니다.
                 await mtInitNormalSlotCache();
+            await mtInitGeneratorStates();
                 for(let i = 1; i <= 8; i++) {
                     if(parsed.mtBackupData[i]) {
                         try { mtSetNormalSlotSync(i, JSON.parse(parsed.mtBackupData[i])); } catch (_) {}
@@ -2708,17 +2709,19 @@
                 }
 
                 if (Object.prototype.hasOwnProperty.call(parsed.mtBackupData, 'slot9_conversation')) {
-                    if (parsed.mtBackupData['slot9_conversation']) localStorage.setItem(MT_SLOT9_STORAGE_KEY, parsed.mtBackupData['slot9_conversation']);
-                    else localStorage.removeItem(MT_SLOT9_STORAGE_KEY);
+                    try { mtSlot9StateCache = parsed.mtBackupData['slot9_conversation'] ? JSON.parse(parsed.mtBackupData['slot9_conversation']) : mtSlot9DefaultState(); } catch (_) { mtSlot9StateCache = mtSlot9DefaultState(); }
                 }
                 if(parsed.mtBackupData['star_session']) {
                     localStorage.setItem('word_slot_star_session', parsed.mtBackupData['star_session']);
                 }
                 if (parsed.mtBackupData['wordweb_conversation']) {
-                    localStorage.setItem(MT_WORDWEB_STORAGE_KEY, parsed.mtBackupData['wordweb_conversation']);
+                    try { mtWordWebStateCache = JSON.parse(parsed.mtBackupData['wordweb_conversation']); } catch (_) { mtWordWebStateCache = mtWordWebDefaultState(); }
                 } else {
-                    localStorage.removeItem(MT_WORDWEB_STORAGE_KEY);
+                    mtWordWebStateCache = mtWordWebDefaultState();
                 }
+                try { await mtPersistGeneratorStates(); } catch (e) { console.warn('[백업 복원] 생성형 IndexedDB 저장 실패:', e); }
+                try { localStorage.removeItem(MT_SLOT9_STORAGE_KEY); } catch (_) {}
+                try { localStorage.removeItem(MT_WORDWEB_STORAGE_KEY); } catch (_) {}
                 if (Object.prototype.hasOwnProperty.call(parsed.mtBackupData, 'slot9_api_key')) {
                     if (parsed.mtBackupData['slot9_api_key']) localStorage.setItem(MT_SLOT9_API_KEY_STORAGE_KEY, parsed.mtBackupData['slot9_api_key']);
                     else localStorage.removeItem(MT_SLOT9_API_KEY_STORAGE_KEY);
@@ -5101,6 +5104,7 @@ Rules:
     /* 일반유형 대용량 카드 저장소: localStorage 대신 IndexedDB 사용        */
     /* ------------------------------------------------------------------ */
     const MT_NORMAL_SLOT_STORE_NAME = 'maskingTypingNormalSlotsStore';
+    const MT_GENERATOR_STORE_NAME = 'maskingTypingGeneratorSlotsStore';
     // 과거 버전의 통합 레코드는 호환/마이그레이션용으로만 유지합니다.
     const MT_NORMAL_SLOT_LEGACY_DATA_KEY = 'maskingTypingNormalSlotsDataV1';
     const MT_NORMAL_SLOT_KEY_PREFIX = 'slot_';
@@ -6239,30 +6243,76 @@ Rules:
     let mtSlot9TimerId = null;
     let mtSlot9Busy = false;
     let mtSlot9ListPage = 1;
+    let mtSlot9StateCache = null;
+    let mtWordWebStateCache = null;
+    let mtGeneratorSaveTimer = null;
 
+    function mtSlot9DefaultState() { return { fileName:'', sourceRows:[], sourceRowsLock:[], retryRows:[], nextSourceIndex:0, outputRows:[], nextRun:null, lastRun:null, lastError:'', starredSerials:[], lastSession:null, lastDiagnostic:null, pattern:mtSlot9GetDefaultPattern() }; }
     function mtSlot9GetDefaultPattern() { return { sourceKorCol:1, engCol:2, mainKorCol:3, subKorCol:4, serialCol:5 }; }
-    function mtSlot9GetState() {
-        try {
-            const saved = JSON.parse(localStorage.getItem(MT_SLOT9_STORAGE_KEY) || 'null');
-            if (saved && Array.isArray(saved.sourceRows) && Array.isArray(saved.outputRows)) {
-                if (!Array.isArray(saved.retryRows)) saved.retryRows = [];
-                const normalized = mtSlot9NormalizeSerials(saved);
-
-                // 과거 버전 데이터에는 원본 잠금값이 없을 수 있으므로 최초 1회 현재 A열을 기준으로 잠급니다.
-                if (!Array.isArray(normalized.state.sourceRowsLock)) {
-                    mtSlot9CreateSourceLock(normalized.state);
-                    normalized.changed = true;
-                } else {
-                    mtSlot9ProtectSourceRows(normalized.state);
-                }
-
-                if (normalized.changed) {
-                    localStorage.setItem(MT_SLOT9_STORAGE_KEY, JSON.stringify(normalized.state));
-                }
-                return normalized.state;
+    function mtScheduleGeneratorStoreSave(){
+        clearTimeout(mtGeneratorSaveTimer);
+        mtGeneratorSaveTimer=setTimeout(()=>{ mtGeneratorSaveTimer=null; mtPersistGeneratorStates().catch(e=>console.error('[생성형 IndexedDB 저장]',e)); },500);
+    }
+    function mtPersistGeneratorStates(){
+        return mtWithGeneratorStore('readwrite', store=>{
+            store.put(mtSlot9StateCache || mtSlot9DefaultState(), 'slot9');
+            store.put(mtWordWebStateCache || mtWordWebDefaultState(), 'wordweb');
+        });
+    }
+    async function mtInitGeneratorStates(){
+        let db;
+        try{
+            db=await initDB();
+            const tx=db.transaction(MT_GENERATOR_STORE_NAME,'readonly');
+            const store=tx.objectStore(MT_GENERATOR_STORE_NAME);
+            const [s9,ww]=await Promise.all([
+                new Promise(r=>{const q=store.get('slot9'); q.onsuccess=()=>r(q.result); q.onerror=()=>r(undefined);}),
+                new Promise(r=>{const q=store.get('wordweb'); q.onsuccess=()=>r(q.result); q.onerror=()=>r(undefined);})
+            ]);
+            mtSlot9StateCache=s9 || null;
+            mtWordWebStateCache=ww || null;
+            // 기존 localStorage 데이터 1회 마이그레이션
+            if(!mtSlot9StateCache){
+                try{ const raw=localStorage.getItem(MT_SLOT9_STORAGE_KEY); if(raw) mtSlot9StateCache=JSON.parse(raw); }catch(_){}
             }
-        } catch(e) {}
-        return { fileName:'', sourceRows:[], sourceRowsLock:[], retryRows:[], nextSourceIndex:0, outputRows:[], nextRun:null, lastRun:null, lastError:'', starredSerials:[], lastSession:null, lastDiagnostic:null, pattern:mtSlot9GetDefaultPattern() };
+            if(!mtWordWebStateCache){
+                try{ const raw=localStorage.getItem(MT_WORDWEB_STORAGE_KEY); if(raw) mtWordWebStateCache=JSON.parse(raw); }catch(_){}
+            }
+            if(mtSlot9StateCache || mtWordWebStateCache){
+                await mtPersistGeneratorStates();
+                try{ localStorage.removeItem(MT_SLOT9_STORAGE_KEY); }catch(_){}
+                try{ localStorage.removeItem(MT_WORDWEB_STORAGE_KEY); }catch(_){}
+            }
+            if(!mtSlot9StateCache) mtSlot9StateCache=mtSlot9DefaultState();
+            if(!mtWordWebStateCache) mtWordWebStateCache=mtWordWebDefaultState();
+        }catch(e){
+            console.warn('[생성형 IndexedDB 초기화 실패]',e);
+            try{ mtSlot9StateCache=JSON.parse(localStorage.getItem(MT_SLOT9_STORAGE_KEY)||'null') || mtSlot9DefaultState(); }catch(_){ mtSlot9StateCache=mtSlot9DefaultState(); }
+            try{ mtWordWebStateCache=JSON.parse(localStorage.getItem(MT_WORDWEB_STORAGE_KEY)||'null') || mtWordWebDefaultState(); }catch(_){ mtWordWebStateCache=mtWordWebDefaultState(); }
+        }finally{ if(db) db.close(); }
+    }
+
+    function mtWithGeneratorStore(mode, callback){
+        return (async()=>{
+            const db=await initDB();
+            try{
+                const tx=db.transaction(MT_GENERATOR_STORE_NAME,mode);
+                const store=tx.objectStore(MT_GENERATOR_STORE_NAME);
+                const result=callback(store);
+                await waitForTransaction(tx);
+                return result;
+            }finally{ db.close(); }
+        })();
+    }
+
+    function mtSlot9GetState() {
+        const saved = mtSlot9StateCache || mtSlot9DefaultState();
+        if(!Array.isArray(saved.retryRows)) saved.retryRows=[];
+        const normalized=mtSlot9NormalizeSerials(saved);
+        if(!Array.isArray(normalized.state.sourceRowsLock)){ mtSlot9CreateSourceLock(normalized.state); normalized.changed=true; }
+        else mtSlot9ProtectSourceRows(normalized.state);
+        if(normalized.changed){ mtSlot9StateCache=normalized.state; mtScheduleGeneratorStoreSave(); }
+        return normalized.state;
     }
 
     function mtSlot9NormalizeSerials(state) {
@@ -6320,7 +6370,8 @@ Rules:
 
     function mtSlot9SaveState(state){
         mtSlot9ProtectSourceRows(state);
-        localStorage.setItem(MT_SLOT9_STORAGE_KEY, JSON.stringify(state));
+        mtSlot9StateCache=state;
+        mtScheduleGeneratorStoreSave();
     }
     function mtSlot9GetPattern(state=mtSlot9GetState()){ return {...mtSlot9GetDefaultPattern(), ...(state.pattern||{})}; }
     function mtSlot9GetStarredCount(state=mtSlot9GetState()){ const set=new Set((state.starredSerials||[]).map(String)); const idx=mtSlot9GetPattern(state).serialCol-1; return (state.outputRows||[]).filter(r=>set.has(String((r||[])[idx]||'').trim())).length; }
@@ -6745,16 +6796,15 @@ Rules:
     const MT_WORDWEB_LIST_PAGE_SIZE = 60;
     let mtWordWebListPage = 1;
 
+    function mtWordWebDefaultState(){ return { fileName: '', topicRows: [], topics: [], outputRows: [], lastRun: null, nextRun: null, totalGenerated: 0, lastError: '', starredSerials: [], pattern: null }; }
     function mtWordWebGetState() {
-        try {
-            const saved = JSON.parse(localStorage.getItem(MT_WORDWEB_STORAGE_KEY) || 'null');
-            if (saved && Array.isArray(saved.topics) && Array.isArray(saved.outputRows)) return saved;
-        } catch (e) {}
-        return { fileName: '', topicRows: [], topics: [], outputRows: [], lastRun: null, nextRun: null, totalGenerated: 0, lastError: '', starredSerials: [], pattern: null };
+        if(!mtWordWebStateCache) mtWordWebStateCache=mtWordWebDefaultState();
+        return mtWordWebStateCache;
     }
 
     function mtWordWebSaveState(state) {
-        localStorage.setItem(MT_WORDWEB_STORAGE_KEY, JSON.stringify(state));
+        mtWordWebStateCache=state;
+        mtScheduleGeneratorStoreSave();
     }
 
     function mtWordWebGetStarredCount(state = mtWordWebGetState()) {
@@ -9785,7 +9835,7 @@ Return JSON only.`;
 
     const DB_NAME = "CommunityViewerDB";
     // v2: 게시판 외에 대용량 소설 슬롯/단어장도 IndexedDB로 분리 저장
-    const DB_VERSION = 4;
+    const DB_VERSION = 5;
     const STORE_NAME = "boardsStore";
     const SLOT_STORE_NAME = "slotsStore";
     const VOCA_STORE_NAME = "vocaStore";
@@ -9825,6 +9875,9 @@ Return JSON only.`;
                 }
                 if (!db.objectStoreNames.contains(MT_NORMAL_SLOT_STORE_NAME)) {
                     db.createObjectStore(MT_NORMAL_SLOT_STORE_NAME);
+                }
+                if (!db.objectStoreNames.contains(MT_GENERATOR_STORE_NAME)) {
+                    db.createObjectStore(MT_GENERATOR_STORE_NAME);
                 }
             };
 
