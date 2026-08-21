@@ -8587,8 +8587,36 @@ Return JSON only.`;
         return true;
     }
 
+    function mtAdvanceEbookAfterEnter() {
+        if (!mtEbookTypingActive) return;
+        const slot = mtEbookActiveSlot;
+        const current = mtCurrentStudyWords?.[mtCurrentIndex];
+        const currentOriginalIndex = Number(current?.originalIndex);
+        if (Number.isInteger(currentOriginalIndex)) {
+            const st = mtGetTypedState(slot);
+            const set = new Set((st.ebookReadIndexes || []).map(Number));
+            set.add(currentOriginalIndex);
+            st.ebookReadIndexes = Array.from(set).sort((a,b)=>a-b);
+            mtSaveTypedState(slot, st);
+        }
+        mtRecordEbookCompletedCardIfReady();
+
+        const words = mtGetEbookWords(slot);
+        const nextIndex = Number.isInteger(currentOriginalIndex) ? currentOriginalIndex + 1 : 0;
+        if (nextIndex < words.length) {
+            // 전자책에서는 Enter 정답 처리 후 곧바로 다음 문장으로 넘어갑니다.
+            mtOpenEbookTyping(Number(slot), nextIndex);
+        } else {
+            // 마지막 문장까지 완료한 경우에만 전자책 목록으로 돌아갑니다.
+            mtCloseEbookTyping();
+        }
+    }
+
     function mtNextWord() {
-        if (mtEbookTypingActive) { mtCloseEbookTyping(); return; }
+        if (mtEbookTypingActive) {
+            mtAdvanceEbookAfterEnter();
+            return;
+        }
         if (mtCurrentIndex < mtCurrentStudyWords.length - 1) {
             mtCurrentIndex++;
             mtLoadWord(mtCurrentIndex);
