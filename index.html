@@ -364,6 +364,110 @@
             font-size: 10px;
             font-weight: 700;
         }
+        .mt-ebook-viewer {
+            display:none;
+            background:#fff;
+            padding:28px 30px;
+            border-radius:12px;
+            border:1px solid var(--border-color);
+            text-align:left;
+        }
+        .mt-ebook-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:20px; }
+        .mt-ebook-title { font-size:20px; font-weight:800; color:#111827; }
+        .mt-ebook-subtitle { font-size:11px; color:#64748b; margin-top:4px; }
+        .mt-ebook-list { max-width:900px; margin:0 auto; }
+        .mt-ebook-item { padding:16px 4px; border-bottom:1px solid #e5e7eb; cursor:pointer; transition:background .15s,color .15s; }
+        .mt-ebook-item:hover { background:#f8fafc; }
+        .mt-ebook-item.read { color:#b0b6bf; }
+        .mt-ebook-item.read .mt-ebook-item-main { color:#a6adb7; }
+        .mt-ebook-item-num { display:inline-block; width:34px; color:#94a3b8; font-size:11px; vertical-align:top; padding-top:2px; }
+        .mt-ebook-item-main { display:inline; font-size:18px; line-height:1.7; font-weight:600; color:#111827; }
+        .mt-ebook-item-sub { margin:5px 0 0 34px; font-size:12px; line-height:1.5; color:#94a3b8; }
+        .mt-ebook-modal-backdrop { position:fixed; inset:0; background:rgba(15,23,42,.48); z-index:4990; display:none; }
+        #mt-flashcard.mt-ebook-typing {
+            position:fixed !important;
+            left:var(--mt-ebook-popup-left,50%);
+            top:var(--mt-ebook-popup-top,50%);
+            transform:translate(-50%,-50%) !important;
+            width:var(--mt-ebook-popup-width,78vw);
+            max-width:96vw !important;
+            max-height:var(--mt-ebook-popup-max-height,92vh) !important;
+            overflow:auto !important;
+            z-index:5000 !important;
+            box-sizing:border-box;
+            box-shadow:0 24px 70px rgba(0,0,0,.28);
+        }
+        .mt-ebook-popup-settings-btn { margin-left:auto; }
+        /* 전자책 팝업 직접 드래그/리사이즈 */
+        #mt-flashcard.mt-ebook-typing.mt-ebook-freeform {
+            transform:none !important;
+            max-width:none !important;
+            max-height:none !important;
+            width:780px;
+            height:720px;
+            min-width:360px !important;
+            min-height:280px !important;
+            resize:both !important;
+            overflow:auto !important;
+        }
+        #mt-flashcard.mt-ebook-typing .mt-ebook-drag-handle {
+            cursor:move;
+            user-select:none;
+            -webkit-user-select:none;
+        }
+        #mt-flashcard.mt-ebook-typing.mt-ebook-dragging { user-select:none; -webkit-user-select:none; }
+        #mt-flashcard.mt-ebook-typing .mt-ebook-resize-handle {
+            position:absolute;
+            right:6px;
+            bottom:6px;
+            width:18px;
+            height:18px;
+            cursor:nwse-resize;
+            z-index:5100;
+            border-right:3px solid #94a3b8;
+            border-bottom:3px solid #94a3b8;
+            border-radius:0 0 3px 0;
+            opacity:.75;
+        }
+        #mt-flashcard.mt-ebook-typing .mt-ebook-resize-handle:hover { opacity:1; }
+        .mt-ebook-popup-settings {
+            display:none;
+            margin:0 0 14px;
+            padding:12px;
+            border:1px solid #e2e8f0;
+            border-radius:10px;
+            background:#f8fafc;
+        }
+        .mt-ebook-popup-settings.open { display:block; }
+        .mt-ebook-popup-setting-row {
+            display:grid;
+            grid-template-columns:88px 1fr 58px;
+            align-items:center;
+            gap:8px;
+            margin-bottom:8px;
+            font-size:11px;
+            color:#475569;
+        }
+        .mt-ebook-popup-setting-row:last-child { margin-bottom:0; }
+        .mt-ebook-popup-setting-row input[type=range] { width:100%; }
+        .mt-ebook-popup-setting-value {
+            width:58px;
+            box-sizing:border-box;
+            padding:4px 6px;
+            border:1px solid #cbd5e1;
+            border-radius:6px;
+            background:#fff;
+            text-align:center;
+            font-size:11px;
+        }
+
+        .mt-ebook-pagination { display:flex; justify-content:center; align-items:center; gap:8px; margin:20px auto 0; padding-top:14px; border-top:1px solid var(--border-color); }
+        .mt-ebook-page-btn { min-width:60px; padding:7px 12px; border:1px solid var(--border-color); background:#fff; color:#475569; border-radius:7px; }
+        .mt-ebook-page-btn:disabled { opacity:.45; cursor:not-allowed; }
+        .mt-ebook-page-input { width:52px; padding:7px 5px; text-align:center; border:1px solid var(--border-color); border-radius:7px; font-size:12px; font-weight:700; box-sizing:border-box; }
+        .mt-ebook-page-info { font-size:12px; color:#64748b; font-weight:700; }
+        .mt-ebook-empty { text-align:center; padding:50px 20px; color:#94a3b8; }
+        .mt-ebook-column-note { font-size:11px; color:#64748b; line-height:1.5; margin-top:8px; }
         .mt-wordweb-status {
             margin-top: 6px;
             padding: 5px 7px;
@@ -1423,6 +1527,11 @@
                         <div class="mt-type-option-title">생성유형: 참조형</div>
                         <div class="mt-type-option-desc">[차례] 시트의 여러 주제를 참조하여 새로운 6문장 대화를 생성합니다.</div>
                     </button>
+                    <button type="button" class="mt-type-option" onclick="mtChooseSlotType('ebook')">
+                        <span class="mt-type-option-badge">BOOK</span>
+                        <div class="mt-type-option-title">전자책유형</div>
+                        <div class="mt-type-option-desc">주문장·보조문장·영어문장의 열을 지정한 뒤 전자책처럼 문장을 읽고 타이핑할 수 있습니다.</div>
+                    </button>
                 </div>
                 <div id="mtReferenceGuideBox" class="mt-reference-guide" style="display:none;">
                     <div style="font-weight:800;color:#111827;margin-bottom:3px;">참조형 엑셀 파일 규격</div>
@@ -1731,11 +1840,80 @@
             </div>
         </div>
 
+        <div id="mtEbookColumnModal" class="modal-overlay" style="display:none;">
+            <div class="modal-card" style="max-width:560px; text-align:left;">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+                    <div>
+                        <div style="font-size:16px;font-weight:800;color:#111827;">전자책 열 선택</div>
+                        <div style="font-size:11px;color:#64748b;margin-top:3px;">주문장·보조문장·영어문장이 들어 있는 열을 각각 지정하세요.</div>
+                    </div>
+                    <button class="btn-excel" onclick="mtCloseEbookColumnModal()">닫기</button>
+                </div>
+                <div class="mt-pattern-grid" style="margin-top:16px;">
+                    <label>주문장 열
+                        <select id="mtEbookMainCol" style="width:100%;box-sizing:border-box;padding:7px 8px;border:1px solid var(--border-color);border-radius:6px;font-size:12px;"></select>
+                    </label>
+                    <label>보조문장 열
+                        <select id="mtEbookSubCol" style="width:100%;box-sizing:border-box;padding:7px 8px;border:1px solid var(--border-color);border-radius:6px;font-size:12px;"></select>
+                    </label>
+                    <label>영어문장 열
+                        <select id="mtEbookEngCol" style="width:100%;box-sizing:border-box;padding:7px 8px;border:1px solid var(--border-color);border-radius:6px;font-size:12px;"></select>
+                    </label>
+                </div>
+                <div class="mt-ebook-column-note">※ 주문장과 영어문장은 필수입니다. 보조문장은 없는 경우 ‘선택 안 함’을 사용할 수 있습니다.</div>
+                <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:16px;">
+                    <button class="btn-excel" onclick="mtCloseEbookColumnModal()">취소</button>
+                    <button class="btn-primary" onclick="mtConfirmEbookColumns()">전자책 열기</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="mtEbookModalBackdrop" class="mt-ebook-modal-backdrop" onclick="mtCloseEbookTyping()"></div>
+        <div id="mtEbookViewer" class="mt-ebook-viewer">
+            <div class="mt-ebook-head">
+                <div><div class="mt-ebook-title" id="mtEbookViewerTitle">전자책</div><div class="mt-ebook-subtitle" id="mtEbookViewerSubtitle"></div></div>
+                <button class="btn-excel" onclick="mtCloseEbookViewer()">← 슬롯 목록</button>
+            </div>
+            <div id="mtEbookList" class="mt-ebook-list"></div>
+            <div id="mtEbookPagination" class="mt-ebook-pagination"></div>
+        </div>
+
         <!-- 플래시카드 (학습 화면) -->
         <div id="mt-flashcard" style="display:none; background: white; padding: 30px; border-radius: 12px; border: 1px solid var(--border-color);">
-            <div class="mt-top-bar">
-                <button class="btn-excel" onclick="mtGoMainMenu()">← 슬롯 목록으로</button>
-                <div class="mt-progress-text" id="mtProgressText">0 / 0</div>
+            <div class="mt-top-bar mt-ebook-drag-handle" id="mtEbookPopupDragHandle">
+                <div aria-hidden="true" style="position:absolute;right:8px;top:8px;font-size:9px;color:#94a3b8;pointer-events:none;">드래그하여 이동 · 우하단 모서리로 크기 조절</div>
+                <button id="mtFlashcardBackBtn" class="btn-excel" onclick="mtGoMainMenu()">← 슬롯 목록으로</button>
+                <div style="display:flex;align-items:center;gap:6px;">
+                    <div class="mt-progress-text" id="mtProgressText">0 / 0</div>
+                    <button id="mtEbookPopupSettingsBtn" type="button" class="btn-excel mt-ebook-popup-settings-btn" onclick="mtToggleEbookPopupSettings()" style="display:none;">⚙ 팝업 설정</button>
+                </div>
+            </div>
+
+            <div id="mtEbookPopupSettings" class="mt-ebook-popup-settings">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;">
+                    <div style="font-size:12px;font-weight:800;color:#111827;">전자책 타이핑 팝업 설정</div>
+                    <button type="button" class="btn-excel" onclick="mtResetEbookPopupSettings()" style="padding:4px 7px;font-size:10px;">기본값</button>
+                </div>
+                <div class="mt-ebook-popup-setting-row">
+                    <label for="mtEbookPopupWidthRange">가로 크기</label>
+                    <input id="mtEbookPopupWidthRange" type="range" min="55" max="95" step="1" value="78" oninput="mtApplyEbookPopupSettingsFromUI()">
+                    <input id="mtEbookPopupWidthValue" class="mt-ebook-popup-setting-value" value="78vw" readonly>
+                </div>
+                <div class="mt-ebook-popup-setting-row">
+                    <label for="mtEbookPopupLeftRange">가로 위치</label>
+                    <input id="mtEbookPopupLeftRange" type="range" min="20" max="80" step="1" value="50" oninput="mtApplyEbookPopupSettingsFromUI()">
+                    <input id="mtEbookPopupLeftValue" class="mt-ebook-popup-setting-value" value="50%" readonly>
+                </div>
+                <div class="mt-ebook-popup-setting-row">
+                    <label for="mtEbookPopupTopRange">세로 위치</label>
+                    <input id="mtEbookPopupTopRange" type="range" min="15" max="85" step="1" value="50" oninput="mtApplyEbookPopupSettingsFromUI()">
+                    <input id="mtEbookPopupTopValue" class="mt-ebook-popup-setting-value" value="50%" readonly>
+                </div>
+                <div class="mt-ebook-popup-setting-row">
+                    <label for="mtEbookPopupHeightRange">최대 세로</label>
+                    <input id="mtEbookPopupHeightRange" type="range" min="60" max="96" step="1" value="92" oninput="mtApplyEbookPopupSettingsFromUI()">
+                    <input id="mtEbookPopupHeightValue" class="mt-ebook-popup-setting-value" value="92vh" readonly>
+                </div>
             </div>
 
             <div id="mtKorText"></div>
@@ -4285,6 +4463,11 @@ Rules:
     let mtRevealedSet = new Set(); 
     let mtCardHadDirectTyping = false;
     let mtTempParsedData = null;
+    let mtEbookTemp = null;
+    let mtEbookTypingActive = false;
+    let mtEbookActiveSlot = null;
+    const MT_EBOOK_PAGE_SIZE = 30;
+    const mtEbookPage = {};
 
     // 타이핑 to 언마스크 영구 통계
     const MT_STATS_STORAGE_KEY = 'typing_unmask_stats_v1';
@@ -4795,8 +4978,8 @@ Rules:
             } else {
                 div.className = 'mt-slot';
                 div.innerHTML = `
-                    <div class="mt-slot-title">빈 슬롯</div>
-                    <span class="mt-slot-meta-badge">빈 슬롯</span>
+                    <div class="mt-slot-title">슬롯 ${i}</div>
+                    <span class="mt-slot-meta-badge">슬롯 ${i}</span>
                     <div class="mt-slot-desc">클릭하여 슬롯 유형을 선택하거나 파일을 등록합니다.</div>
                     <div class="mt-slot-empty">클릭하여 설정</div>
                 `;
@@ -4866,8 +5049,8 @@ Rules:
             } else {
                 generatorDiv.className = 'mt-slot';
                 generatorDiv.innerHTML = `
-                    <div class="mt-slot-title">빈 슬롯</div>
-                    <span class="mt-slot-meta-badge">빈 슬롯</span>
+                    <div class="mt-slot-title">슬롯 11</div>
+                <span class="mt-slot-meta-badge">슬롯 11</span>
                     <div class="mt-slot-desc">클릭하여 슬롯 유형을 선택하세요.</div>
                     <div class="mt-slot-empty">클릭하여 설정</div>
                 `;
@@ -4910,9 +5093,13 @@ Rules:
             slotData = mtSlot9BuildSlotData(mtSlot9GetState());
             mtOriginalSlotData = slotData;
         }
-        if (mtGetSlotType(slotIndex) && !['normal'].includes(mtGetSlotType(slotIndex))) {
+        if (mtGetSlotType(slotIndex) && !['normal','ebook'].includes(mtGetSlotType(slotIndex))) {
             slotData = mtTypedBuildSlotData(Number(slotIndex));
             mtOriginalSlotData = slotData;
+        }
+        if (mtGetSlotType(slotIndex) === 'ebook') {
+            mtOpenEbookViewer(Number(slotIndex));
+            return;
         }
 
         const btnContinue = document.getElementById('mtBtnContinue');
@@ -5671,7 +5858,7 @@ Rules:
 
         div.className = 'mt-slot mt-wordweb-slot ' + (state.fileName ? 'has-data' : '');
         div.innerHTML = `
-            <div class="mt-slot-title">워드웹회화</div>
+            <div class="mt-slot-title">${state.fileName || '슬롯 10'}</div>
             <div class="mt-slot-stat-row">
                 <div><div class="mt-slot-count">${cardCount}</div></div>
                 <div style="display:flex;align-items:center;gap:6px;"><div class="mt-slot-star-count">★ ${starredCount}</div><button class="btn-excel" style="padding:4px 8px;font-size:10px;" onclick="mtDownloadGeneratorErrorLog(event,'wordweb','참조형 슬롯10')">오류로그</button></div>
@@ -6778,7 +6965,8 @@ Return JSON only.`;
             '': '빈 슬롯',
             normal: '일반유형',
             self_generate: '생성유형: 자체형',
-            reference_generate: '생성유형: 참조형'
+            reference_generate: '생성유형: 참조형',
+            ebook: '전자책유형'
         })[type || ''] || '빈 슬롯';
     }
     function mtGetTypedStateKey(slotIndex) { return MT_TYPED_STATE_PREFIX + String(slotIndex); }
@@ -6809,7 +6997,7 @@ Return JSON only.`;
     function mtOpenConfiguredEmptySlotModal(slotIndex) {
         mtConfiguredEmptySlot = Number(slotIndex);
         const type = mtGetSlotType(slotIndex);
-        const labels = {normal:'일반유형', self_generate:'생성유형: 자체형', reference_generate:'생성유형: 참조형'};
+        const labels = {normal:'일반유형', self_generate:'생성유형: 자체형', reference_generate:'생성유형: 참조형', ebook:'전자책유형'};
         const sub = document.getElementById('mtConfiguredEmptySlotSubtitle');
         if (sub) sub.textContent = `슬롯 ${Number(slotIndex)+1} · ${labels[type] || '현재 유형'}`;
         const modal = document.getElementById('mtConfiguredEmptySlotModal');
@@ -6876,21 +7064,23 @@ Return JSON only.`;
         if (!type) return false;
         const words = mtTypedCardWords(slotIndex);
         const star = words.filter(w=>w.starred).length;
-        const labels = {normal:'일반 학습 슬롯', self_generate:'AI 자동 생성 · 자체형', reference_generate:'AI 자동 생성 · 참조형'};
+        const labels = {normal:'일반 학습 슬롯', self_generate:'AI 자동 생성 · 자체형', reference_generate:'AI 자동 생성 · 참조형', ebook:'전자책 뷰어 · 주문장 기반'};
         const descs = {
             normal:'일반 학습 카드로 사용합니다.',
             self_generate:'한국어 원본을 바탕으로 AI가 영어 카드를 생성합니다.',
-            reference_generate:'[차례] 시트의 주제를 바탕으로 AI가 새로운 대화를 생성합니다.'
+            reference_generate:'[차례] 시트의 주제를 바탕으로 AI가 새로운 대화를 생성합니다.',
+            ebook:'주문장을 읽고 클릭하면 마스킹 to 언마스크로 학습합니다.'
         };
         const hasData = !!state.fileName || words.length>0;
         const isReference = type === 'reference_generate';
         div.className = 'mt-slot ' + (hasData ? 'has-data' : '') + (isReference ? ' mt-reference-type-slot' : '');
         const displayTitle = state.fileName || `슬롯 ${Number(slotIndex)}`;
         const displayBadge = mtGetSlotTypeLabel(type);
-        const badgeClass = type === 'reference_generate' ? 'success' : (type === 'self_generate' ? 'ai' : '');
+        const badgeClass = type === 'reference_generate' ? 'success' : (type === 'ebook' ? 'book' : (type === 'self_generate' ? 'ai' : ''));
         div.innerHTML = `<div class="mt-slot-title">${mtEscapeHTML(displayTitle)}</div><div class="mt-slot-stat-row"><div><div class="mt-slot-count">${words.length}</div></div><div style="display:flex;align-items:center;gap:6px;"><div class="mt-slot-star-count">★ ${star}</div>${type!=='normal'?`<button class="btn-excel" style="padding:4px 8px;font-size:10px;" onclick="mtDownloadGeneratorErrorLog(event,'typed_${slotIndex}',${JSON.stringify(displayBadge)})">오류로그</button>`:''}</div></div><div class="mt-slot-desc">${descs[type]}</div><div class="mt-slot-actions-row"><span class="mt-slot-meta-badge ${badgeClass}">${displayBadge}</span>${hasData?`<button class="btn-download" onclick="mtTypedExport(event,${slotIndex})">내보내기</button><button class="mt-btn-delete" onclick="mtDeleteSlot(event,${slotIndex})">삭제</button>`:''}</div>${type!=='normal'?`<div id="mtTypedStatus_${slotIndex}" class="mt-wordweb-status"></div>`:''}`;
         div.onclick = () => {
             if (!hasData) mtOpenConfiguredEmptySlotModal(slotIndex);
+            else if (type === 'ebook') mtOpenEbookViewer(Number(slotIndex));
             else mtPromptAction(slotIndex, mtTypedBuildSlotData(slotIndex));
         };
         return true;
@@ -6945,11 +7135,45 @@ Return JSON only.`;
         const delay=Math.max(1000,next-Date.now());
         mtTypedTimers[slotIndex]=setTimeout(()=>mtStartTypedTimer(slotIndex,true),delay);
     }
+    async function mtEbookHandleFile(file, slotIndex){
+        const idx = Number(slotIndex);
+        if (!Number.isInteger(idx) || idx < 0) throw new Error('전자책 슬롯 번호가 올바르지 않습니다.');
+        if (typeof XLSX === 'undefined') throw new Error('엑셀 처리 모듈을 불러오지 못했습니다.');
+        const data = new Uint8Array(await file.arrayBuffer());
+        const wb = XLSX.read(data, {type:'array', cellDates:false});
+        if (!wb.SheetNames || wb.SheetNames.length === 0) throw new Error('엑셀 파일에 시트가 없습니다.');
+        const sheetName = wb.SheetNames[0];
+        const sheet = wb.Sheets[sheetName];
+        if (!sheet) throw new Error('첫 번째 시트를 읽을 수 없습니다.');
+        const rows = XLSX.utils.sheet_to_json(sheet, {header:1, defval:'', raw:false})
+            .map(r => Array.isArray(r) ? r.map(v => v == null ? '' : String(v)) : [])
+            .filter(r => r.some(v => String(v).trim() !== ''));
+        if (!rows.length) throw new Error('첫 번째 시트에 데이터가 없습니다.');
+        const state = mtGetTypedState(idx);
+        state.type = 'ebook';
+        state.fileName = String(file.name || '').replace(/\.[^/.]+$/, '').trim() || `슬롯 ${idx+1}`;
+        mtSetSlotType(idx, 'ebook');
+        mtSaveTypedState(idx, state);
+        mtEbookTemp = {slotIndex:idx, fileName:state.fileName, rows, sourceSheetName:sheetName};
+        mtOpenEbookColumnModal(rows);
+    }
+
     async function mtTypedHandleFile(file,slotIndex){
         const type=mtGetSlotType(slotIndex);
         if(type==='normal') { mtActiveSlotIndex=slotIndex; mtCurrentUploadedFileName=file.name.replace(/\.[^/.]+$/,''); return mtHandleNormalTypedFile(file,slotIndex); }
         const data=new Uint8Array(await file.arrayBuffer()); const wb=XLSX.read(data,{type:'array'});
         const state=mtGetTypedState(slotIndex); state.type=type; state.fileName=String(file.name||'').replace(/\.[^/.]+$/,'').trim()||`슬롯 ${Number(slotIndex)+1}`; state.lastError=''; state.lastSession=null; state.starredSerials=[];
+        if(type==='ebook'){
+            const sheetName=wb.SheetNames[0];
+            if(!sheetName || !wb.Sheets[sheetName]) throw new Error('엑셀 파일에서 읽을 수 있는 시트를 찾지 못했습니다.');
+            const rows=XLSX.utils.sheet_to_json(wb.Sheets[sheetName],{header:1,defval:''})
+                .map(r=>Array.isArray(r)?r.map(v=>v??''):[])
+                .filter(r=>r.some(v=>String(v??'').trim() !== ''));
+            if(!rows.length) throw new Error('엑셀 파일의 첫 번째 시트에 데이터가 없습니다.');
+            mtEbookTemp={slotIndex:Number(slotIndex),fileName:state.fileName,rows,sourceSheetName:sheetName};
+            mtOpenEbookColumnModal(rows);
+            return;
+        }
         if(type==='self_generate'){
             const sourceSheetName=wb.SheetNames.includes('원본')?'원본':wb.SheetNames[0];
             const rows=XLSX.utils.sheet_to_json(wb.Sheets[sourceSheetName],{header:1,defval:''});
@@ -7050,71 +7274,361 @@ Return JSON only.`;
         mtInitSlots();
         alert(`[슬롯 ${Number(slotIndex)}] 일반유형 ${words.length}개 카드 등록 완료!`);
     }
-    function mtTypedExport(e,slotIndex){ if(e)e.stopPropagation(); const type=mtGetSlotType(slotIndex),state=mtGetTypedState(slotIndex),wb=XLSX.utils.book_new(); if(type==='self_generate'){XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet((state.sourceRows||[]).map(x=>[x])),'원본');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(state.outputRows||[]),'생성결과');XLSX.writeFile(wb,`${state.fileName||'슬롯'}_자체형.xlsx`);} else if(type==='reference_generate'){XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(state.topicRows||[]),'차례');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(state.outputRows||[]),'시트1');XLSX.writeFile(wb,`${state.fileName||'슬롯'}_참조형.xlsx`);} }
+    function mtOpenEbookColumnModal(rows){
+        const modal=document.getElementById('mtEbookColumnModal'); if(!modal)return;
+        const maxCols=Math.max(1,...rows.map(r=>Array.isArray(r)?r.length:0));
+        const buildOptions=(allowNone=false)=>{ let h=allowNone?'<option value="-1">선택 안 함</option>':''; for(let c=0;c<maxCols;c++){ let sample=''; for(const r of rows){ const v=String(r?.[c]??'').trim(); if(v){sample=v.slice(0,24);break;} } h+=`<option value="${c}">열 ${c+1}${sample?` (${mtEscapeHTML(sample)})`:''}</option>`;} return h; };
+        document.getElementById('mtEbookMainCol').innerHTML=buildOptions(false);
+        document.getElementById('mtEbookSubCol').innerHTML=buildOptions(true);
+        document.getElementById('mtEbookEngCol').innerHTML=buildOptions(false);
+        // 간단한 자동 추천: 한국어 비율이 높은 열=주/보조, 영어 비율이 높은 열=영어
+        const scores=Array.from({length:maxCols},(_,c)=>{let k=0,e=0; for(const r of rows.slice(0,30)){const v=String(r?.[c]??''); k+=(v.match(/[가-힣]/g)||[]).length; e+=(v.match(/[A-Za-z]/g)||[]).length;} return {c,k,e};});
+        const ko=scores.filter(x=>x.k>0).sort((a,b)=>b.k-a.k).map(x=>x.c);
+        const en=scores.filter(x=>x.e>0).sort((a,b)=>b.e-a.e).map(x=>x.c);
+        if(ko.length) document.getElementById('mtEbookMainCol').value=String(ko[0]);
+        document.getElementById('mtEbookSubCol').value=ko.length>1?String(ko[1]):'-1';
+        if(en.length) document.getElementById('mtEbookEngCol').value=String(en[0]);
+        modal.style.display='flex';
+    }
+    function mtCloseEbookColumnModal(){ const m=document.getElementById('mtEbookColumnModal'); if(m)m.style.display='none'; mtEbookTemp=null; }
+    function mtConfirmEbookColumns(){
+        if(!mtEbookTemp)return;
+        const mainCol=Number(document.getElementById('mtEbookMainCol').value), subCol=Number(document.getElementById('mtEbookSubCol').value), engCol=Number(document.getElementById('mtEbookEngCol').value);
+        if(!Number.isInteger(mainCol)||!Number.isInteger(engCol)||mainCol<0||engCol<0){alert('주문장 열과 영어문장 열을 선택해 주세요.');return;}
+        const rows=mtEbookTemp.rows, words=[];
+        rows.forEach((r,i)=>{const main=String(r?.[mainCol]??'').trim(), sub=subCol>=0?String(r?.[subCol]??'').trim():'', eng=String(r?.[engCol]??'').trim(); if(!main||!eng)return; words.push({eng,kor:main,subKor:sub,literalKor:sub,serial:String(words.length+1),starred:false,originalIndex:words.length,ebookRead:false});});
+        if(!words.length){alert('선택한 열에서 주문장과 영어문장을 함께 가진 행을 찾지 못했습니다.');return;}
+        const slot=mtEbookTemp.slotIndex, state=mtGetTypedState(slot); state.type='ebook'; state.fileName=mtEbookTemp.fileName; state.ebook={mainCol,subCol,engCol,sourceRows:rows}; state.outputRows=words.map(w=>[w.eng,w.kor,w.subKor,w.serial]); state.pattern={engCol:1,mainKorCol:2,subKorCol:3,serialCol:4}; state.ebookReadIndexes=[]; state.lastSession=null; state.lastError=''; mtSetSlotType(slot,'ebook'); mtSaveTypedState(slot,state); mtCloseEbookColumnModal(); mtInitSlots(); mtOpenEbookViewer(slot);
+    }
+    function mtGetEbookWords(slotIndex){ const st=mtGetTypedState(slotIndex); const p=st.pattern||{engCol:1,mainKorCol:2,subKorCol:3,serialCol:4}; const read=new Set((st.ebookReadIndexes||[]).map(Number)); return (st.outputRows||[]).map((r,i)=>({eng:String(r?.[p.engCol-1]??'').trim(),kor:String(r?.[p.mainKorCol-1]??'').trim(),subKor:String(r?.[p.subKorCol-1]??'').trim(),serial:String(r?.[p.serialCol-1]??(i+1)).trim(),originalIndex:i,ebookRead:read.has(i)})).filter(w=>w.kor&&w.eng); }
+    function mtOpenEbookViewer(slotIndex){
+        const st=mtGetTypedState(slotIndex), words=mtGetEbookWords(slotIndex);
+        if(!st.fileName || !words.length){
+            const list=document.getElementById('mtEbookList');
+            const viewer=document.getElementById('mtEbookViewer');
+            const main=document.getElementById('mt-main-menu');
+            if(main) main.style.display='none';
+            if(viewer) viewer.style.display='block';
+            if(list) list.innerHTML='<div class="mt-ebook-empty">전자책에서 표시할 주문장 데이터를 찾지 못했습니다.</div>';
+            const pg=document.getElementById('mtEbookPagination'); if(pg) pg.innerHTML='';
+            return;
+        }
+        mtEbookActiveSlot=Number(slotIndex);
+        const key=String(slotIndex);
+        let page=Number(mtEbookPage[key]||1);
+        const totalPages=Math.max(1,Math.ceil(words.length/MT_EBOOK_PAGE_SIZE));
+        page=Math.min(Math.max(page,1),totalPages);
+        mtEbookPage[key]=page;
+        const main=document.getElementById('mt-main-menu'), viewer=document.getElementById('mtEbookViewer');
+        if(main) main.style.display='none';
+        if(viewer) viewer.style.display='block';
+        const backdrop=document.getElementById('mtEbookModalBackdrop'); if(backdrop) backdrop.style.display='none';
+        document.getElementById('mtEbookViewerTitle').textContent=st.fileName;
+        document.getElementById('mtEbookViewerSubtitle').textContent=`총 ${words.length}문장 · 한 페이지 ${MT_EBOOK_PAGE_SIZE}문장 · 언마스킹 완료 문장은 옅은 회색으로 표시됩니다.`;
+        const list=document.getElementById('mtEbookList'); if(!list)return; list.innerHTML='';
+        const start=(page-1)*MT_EBOOK_PAGE_SIZE;
+        const pageWords=words.slice(start,start+MT_EBOOK_PAGE_SIZE);
+        pageWords.forEach((w,localIndex)=>{
+            const absoluteIndex=start+localIndex;
+            const item=document.createElement('div');
+            item.className='mt-ebook-item'+(w.ebookRead?' read':'');
+            item.dataset.index=absoluteIndex;
+            item.innerHTML=`<span class="mt-ebook-item-num">${absoluteIndex+1}</span><span class="mt-ebook-item-main">${mtEscapeHTML(w.kor)}</span>`;
+            item.onclick=()=>mtOpenEbookTyping(Number(slotIndex),absoluteIndex);
+            list.appendChild(item);
+        });
+        const pg=document.getElementById('mtEbookPagination');
+        if(pg){
+            pg.innerHTML='';
+            const prev=document.createElement('button'); prev.className='mt-ebook-page-btn'; prev.textContent='이전'; prev.disabled=page<=1;
+            prev.onclick=()=>{ if(page>1){ mtEbookPage[key]=page-1; mtOpenEbookViewer(slotIndex); } };
+            const input=document.createElement('input'); input.className='mt-ebook-page-input'; input.type='number'; input.min='1'; input.max=String(totalPages); input.value=String(page);
+            const go=()=>{ let v=parseInt(input.value,10); if(!Number.isFinite(v)) v=page; v=Math.min(Math.max(v,1),totalPages); mtEbookPage[key]=v; mtOpenEbookViewer(slotIndex); };
+            input.onkeydown=(e)=>{ if(e.key==='Enter'){ e.preventDefault(); go(); } }; input.onchange=go;
+            const info=document.createElement('span'); info.className='mt-ebook-page-info'; info.textContent=`/ ${totalPages} 페이지`;
+            const next=document.createElement('button'); next.className='mt-ebook-page-btn'; next.textContent='다음'; next.disabled=page>=totalPages;
+            next.onclick=()=>{ if(page<totalPages){ mtEbookPage[key]=page+1; mtOpenEbookViewer(slotIndex); } };
+            pg.append(prev,input,info,next);
+        }
+    }
+    function mtCloseEbookViewer(){
+        if(mtEbookTypingActive){ mtCloseEbookTyping(); return; }
+        mtEbookActiveSlot=null;
+        const viewer=document.getElementById('mtEbookViewer'); if(viewer)viewer.style.display='none';
+        document.getElementById('mt-main-menu').style.display='block';
+        mtInitSlots();
+    }
+    const MT_EBOOK_POPUP_SETTINGS_KEY = 'mt_ebook_popup_settings_v1';
+    const MT_EBOOK_POPUP_DEFAULTS = Object.freeze({ width:78, left:50, top:50, maxHeight:92 });
+    function mtGetEbookPopupSettings(){
+        try {
+            const raw = JSON.parse(localStorage.getItem(MT_EBOOK_POPUP_SETTINGS_KEY) || 'null');
+            return Object.assign({}, MT_EBOOK_POPUP_DEFAULTS, raw && typeof raw === 'object' ? raw : {});
+        } catch (_) {
+            return Object.assign({}, MT_EBOOK_POPUP_DEFAULTS);
+        }
+    }
+    function mtSaveEbookPopupSettings(settings){
+        localStorage.setItem(MT_EBOOK_POPUP_SETTINGS_KEY, JSON.stringify(settings));
+    }
+    function mtApplyEbookPopupSettings(settings){
+        const card=document.getElementById('mt-flashcard');
+        if(!card) return;
+        const safe={
+            width:Math.min(95,Math.max(55,Number(settings.width)||MT_EBOOK_POPUP_DEFAULTS.width)),
+            left:Math.min(80,Math.max(20,Number(settings.left)||MT_EBOOK_POPUP_DEFAULTS.left)),
+            top:Math.min(85,Math.max(15,Number(settings.top)||MT_EBOOK_POPUP_DEFAULTS.top)),
+            maxHeight:Math.min(96,Math.max(60,Number(settings.maxHeight)||MT_EBOOK_POPUP_DEFAULTS.maxHeight))
+        };
+        card.style.setProperty('--mt-ebook-popup-width', safe.width + 'vw');
+        card.style.setProperty('--mt-ebook-popup-left', safe.left + '%');
+        card.style.setProperty('--mt-ebook-popup-top', safe.top + '%');
+        card.style.setProperty('--mt-ebook-popup-max-height', safe.maxHeight + 'vh');
+        const ids={width:['mtEbookPopupWidthRange','mtEbookPopupWidthValue','vw'],left:['mtEbookPopupLeftRange','mtEbookPopupLeftValue','%'],top:['mtEbookPopupTopRange','mtEbookPopupTopValue','%'],maxHeight:['mtEbookPopupHeightRange','mtEbookPopupHeightValue','vh']};
+        Object.entries(ids).forEach(([key,[rangeId,valueId,unit]])=>{
+            const r=document.getElementById(rangeId), v=document.getElementById(valueId);
+            if(r) r.value=String(safe[key]);
+            if(v) v.value=String(safe[key])+unit;
+        });
+    }
+    function mtApplyEbookPopupSettingsFromUI(){
+        const settings={
+            width:Number(document.getElementById('mtEbookPopupWidthRange')?.value||78),
+            left:Number(document.getElementById('mtEbookPopupLeftRange')?.value||50),
+            top:Number(document.getElementById('mtEbookPopupTopRange')?.value||50),
+            maxHeight:Number(document.getElementById('mtEbookPopupHeightRange')?.value||92)
+        };
+        mtApplyEbookPopupSettings(settings);
+        mtSaveEbookPopupSettings(settings);
+    }
+    function mtToggleEbookPopupSettings(){
+        const panel=document.getElementById('mtEbookPopupSettings');
+        if(panel) panel.classList.toggle('open');
+    }
+    function mtResetEbookPopupSettings(){
+        const settings=Object.assign({},MT_EBOOK_POPUP_DEFAULTS);
+        delete settings.freeform; delete settings.x; delete settings.y; delete settings.widthPx; delete settings.heightPx;
+        mtSaveEbookPopupSettings(settings);
+        mtApplyEbookPopupSettings(settings);
+        mtApplyEbookPopupFreeform(false);
+    }
+
+    let mtEbookPopupDragState = null;
+    let mtEbookPopupResizeState = null;
+
+    function mtGetViewportSafePosition(width, height, x, y){
+        const margin=8;
+        const maxX=Math.max(margin, window.innerWidth-width-margin);
+        const maxY=Math.max(margin, window.innerHeight-height-margin);
+        return {x:Math.min(Math.max(margin, x), maxX), y:Math.min(Math.max(margin, y), maxY)};
+    }
+
+    function mtApplyEbookPopupFreeform(enable){
+        const card=document.getElementById('mt-flashcard');
+        if(!card) return;
+        const settings=mtGetEbookPopupSettings();
+        if(!enable || !settings.freeform || !Number.isFinite(Number(settings.x)) || !Number.isFinite(Number(settings.y))){
+            card.classList.remove('mt-ebook-freeform');
+            card.style.removeProperty('left');
+            card.style.removeProperty('top');
+            card.style.removeProperty('width');
+            card.style.removeProperty('height');
+            return;
+        }
+        card.classList.add('mt-ebook-freeform');
+        const rect=card.getBoundingClientRect();
+        const width=Math.max(360, Math.min(window.innerWidth-16, Number(settings.widthPx)||rect.width||Math.round(window.innerWidth*0.78)));
+        const height=Math.max(280, Math.min(window.innerHeight-16, Number(settings.heightPx)||Math.min(rect.height||600, window.innerHeight-40)));
+        const pos=mtGetViewportSafePosition(width,height,Number(settings.x)||20,Number(settings.y)||20);
+        card.style.width=width+'px';
+        card.style.height=height+'px';
+        card.style.left=pos.x+'px';
+        card.style.top=pos.y+'px';
+    }
+
+    function mtSaveEbookPopupFreeform(){
+        const card=document.getElementById('mt-flashcard');
+        if(!card) return;
+        const r=card.getBoundingClientRect();
+        const settings=mtGetEbookPopupSettings();
+        const pos=mtGetViewportSafePosition(r.width,r.height,r.left,r.top);
+        Object.assign(settings,{freeform:true,x:pos.x,y:pos.y,widthPx:r.width,heightPx:r.height});
+        mtSaveEbookPopupSettings(settings);
+    }
+
+    function mtInitEbookPopupDirectManipulation(){
+        const card=document.getElementById('mt-flashcard');
+        const dragHandle=document.getElementById('mtEbookPopupDragHandle');
+        if(!card || !dragHandle || card.dataset.ebookManipulationBound==='1') return;
+        card.dataset.ebookManipulationBound='1';
+
+        let dragging=false;
+        let pointerId=null;
+        let offsetX=0;
+        let offsetY=0;
+
+        const onPointerMove=(e)=>{
+            if(!dragging || e.pointerId!==pointerId || !card.classList.contains('mt-ebook-typing')) return;
+            const rect=card.getBoundingClientRect();
+            const pos=mtGetViewportSafePosition(rect.width,rect.height,e.clientX-offsetX,e.clientY-offsetY);
+            card.classList.add('mt-ebook-freeform');
+            card.style.left=pos.x+'px';
+            card.style.top=pos.y+'px';
+            card.style.transform='none';
+        };
+
+        const stopDrag=(e)=>{
+            if(!dragging) return;
+            if(e && pointerId!==null && e.pointerId!==pointerId && e.type!=='blur') return;
+            dragging=false;
+            pointerId=null;
+            card.classList.remove('mt-ebook-dragging');
+            mtSaveEbookPopupFreeform();
+        };
+
+        dragHandle.addEventListener('pointerdown',(e)=>{
+            if(!card.classList.contains('mt-ebook-typing')) return;
+            if(e.target.closest('button,input,select,textarea,a')) return;
+            const rect=card.getBoundingClientRect();
+            pointerId=e.pointerId;
+            offsetX=e.clientX-rect.left;
+            offsetY=e.clientY-rect.top;
+            dragging=true;
+            card.classList.add('mt-ebook-freeform','mt-ebook-dragging');
+            card.style.left=rect.left+'px';
+            card.style.top=rect.top+'px';
+            card.style.width=rect.width+'px';
+            card.style.height=rect.height+'px';
+            card.style.transform='none';
+            e.preventDefault();
+            e.stopPropagation();
+        });
+
+        document.addEventListener('pointermove',onPointerMove,{passive:false});
+        document.addEventListener('pointerup',stopDrag);
+        document.addEventListener('pointercancel',stopDrag);
+        window.addEventListener('blur',()=>stopDrag({type:'blur'}));
+
+        // 브라우저 기본 우하단 resize 핸들을 사용합니다.
+        // 크기가 바뀌면 다음 팝업에도 그대로 복원할 수 있도록 저장합니다.
+        if(window.ResizeObserver){
+            const ro=new ResizeObserver(()=>{
+                if(card.classList.contains('mt-ebook-typing') && card.classList.contains('mt-ebook-freeform')){
+                    clearTimeout(card._ebookResizeSaveTimer);
+                    card._ebookResizeSaveTimer=setTimeout(()=>mtSaveEbookPopupFreeform(),120);
+                }
+            });
+            ro.observe(card);
+            card._ebookResizeObserver=ro;
+        }
+    }
+
+    function mtOpenEbookTyping(slotIndex,index){
+        const words=mtGetEbookWords(slotIndex), word=words[index]; if(!word)return;
+        mtEbookTypingActive=true; mtEbookActiveSlot=Number(slotIndex); mtActiveSlotIndex=slotIndex;
+        mtCurrentStudyWords=[word]; mtCurrentIndex=0;
+        mtOriginalSlotData={name:mtGetTypedState(slotIndex).fileName,words:[word],lastSession:null,ebook:true};
+        const backdrop=document.getElementById('mtEbookModalBackdrop'); if(backdrop) backdrop.style.display='block';
+        const card=document.getElementById('mt-flashcard');
+        card.classList.add('mt-ebook-typing'); card.style.display='block';
+        mtApplyEbookPopupSettings(mtGetEbookPopupSettings());
+        mtInitEbookPopupDirectManipulation();
+        mtApplyEbookPopupFreeform(true);
+        const settingsBtn=document.getElementById('mtEbookPopupSettingsBtn'); if(settingsBtn) settingsBtn.style.display='inline-flex';
+        const settingsPanel=document.getElementById('mtEbookPopupSettings'); if(settingsPanel) settingsPanel.classList.remove('open');
+        const back=document.getElementById('mtFlashcardBackBtn'); if(back){back.innerText='← 전자책으로'; back.onclick=()=>mtCloseEbookTyping();}
+        mtLoadWord(0);
+    }
+    function mtCloseEbookTyping(){
+        if(!mtEbookTypingActive){ return; }
+        const slot=mtEbookActiveSlot,index=Number(mtCurrentStudyWords?.[0]?.originalIndex);
+        const completed = mtIsCurrentTypedAnswerComplete();
+        if(completed && Number.isInteger(index)){
+            const st=mtGetTypedState(slot), set=new Set((st.ebookReadIndexes||[]).map(Number));
+            set.add(index); st.ebookReadIndexes=Array.from(set).sort((a,b)=>a-b); mtSaveTypedState(slot,st);
+        }
+        mtEbookTypingActive=false;
+        const card=document.getElementById('mt-flashcard'); card.classList.remove('mt-ebook-typing'); card.style.display='none'; card.classList.remove('mt-ebook-freeform'); card.style.removeProperty('left'); card.style.removeProperty('top'); card.style.removeProperty('width'); card.style.removeProperty('height'); card.style.removeProperty('transform');
+        const settingsBtn=document.getElementById('mtEbookPopupSettingsBtn'); if(settingsBtn) settingsBtn.style.display='none';
+        const settingsPanel=document.getElementById('mtEbookPopupSettings'); if(settingsPanel) settingsPanel.classList.remove('open');
+        const backdrop=document.getElementById('mtEbookModalBackdrop'); if(backdrop) backdrop.style.display='none';
+        const back=document.getElementById('mtFlashcardBackBtn'); if(back){back.innerText='← 슬롯 목록'; back.onclick=()=>mtGoMainMenu();}
+        const viewer=document.getElementById('mtEbookViewer'); if(viewer)viewer.style.display='block';
+        if(slot!==null && slot!==undefined) mtOpenEbookViewer(slot);
+        else mtInitSlots();
+    }
+
+    function mtTypedExport(e,slotIndex){ if(e)e.stopPropagation(); const type=mtGetSlotType(slotIndex),state=mtGetTypedState(slotIndex),wb=XLSX.utils.book_new(); if(type==='self_generate'){XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet((state.sourceRows||[]).map(x=>[x])),'원본');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(state.outputRows||[]),'생성결과');XLSX.writeFile(wb,`${state.fileName||'슬롯'}_자체형.xlsx`);} else if(type==='reference_generate'){XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(state.topicRows||[]),'차례');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(state.outputRows||[]),'시트1');XLSX.writeFile(wb,`${state.fileName||'슬롯'}_참조형.xlsx`);} else if(type==='ebook'){XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet((state.ebook?.sourceRows||[])),'전자책원본');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(state.outputRows||[]),'전자책');XLSX.writeFile(wb,`${state.fileName||'슬롯'}_전자책.xlsx`);} }
 
 
-    document.getElementById('mtFileUpload').addEventListener('change', function(e) {
-        let file = e.target.files[0];
+    document.getElementById('mtFileUpload').addEventListener('change', async function(e) {
+        const file = e.target.files && e.target.files[0];
         if (!file) return;
 
-        mtCurrentUploadedFileName = file.name.replace(/\.[^/.]+$/, ""); 
-        let ext = file.name.split('.').pop().toLowerCase();
-        const selectedTypedType = mtGetSlotType(mtActiveSlotIndex);
-        if (selectedTypedType) {
-            mtTypedHandleFile(file, Number(mtActiveSlotIndex)).catch(err => { console.error(err); alert('파일 불러오기 중 오류: ' + (err.message || err)); });
-            e.target.value = '';
-            return;
-        }
-        if (mtActiveSlotIndex === 'wordweb') {
-            mtWordWebHandleFile(file);
-            e.target.value = '';
-            return;
-        }
-        if (mtActiveSlotIndex === 'slot9') {
-            mtSlot9HandleFile(file);
-            e.target.value = '';
-            return;
-        }
+        mtCurrentUploadedFileName = file.name.replace(/\.[^/.]+$/, '');
+        const ext = file.name.split('.').pop().toLowerCase();
+        const activeSlot = mtActiveSlotIndex;
+        const selectedTypedType = mtGetSlotType(activeSlot);
 
-        let reader = new FileReader();
-
-        if (ext === 'txt') {
-            reader.onload = function(e) {
-                try {
-                    const buffer = e.target.result;
-                    const uint8 = new Uint8Array(buffer);
-                    let rawText = '';
-
-                    if (uint8.length >= 2 && uint8[0] === 0xFF && uint8[1] === 0xFE) {
-                        rawText = new TextDecoder('utf-16le').decode(uint8);
-                    } else if (uint8.length >= 3 && uint8[0] === 0xEF && uint8[1] === 0xBB && uint8[2] === 0xBF) {
-                        rawText = new TextDecoder('utf-8').decode(uint8);
-                    } else {
-                        try { 
-                            rawText = new TextDecoder('utf-8', { fatal: true }).decode(uint8); 
-                        } catch (err) { 
-                            rawText = new TextDecoder('euc-kr').decode(uint8); 
-                        }
-                    }
-
-                    rawText = rawText.normalize('NFC');
-                    mtParseTextData(rawText);
-                } catch (err) {
-                    alert('텍스트 파일 파싱 중 오류가 발생했습니다.');
+        try {
+            if (selectedTypedType === 'ebook') {
+                if (!['xlsx', 'xls'].includes(ext)) {
+                    throw new Error('전자책유형은 .xlsx 또는 .xls 엑셀 파일만 불러올 수 있습니다.');
                 }
-            };
-            reader.readAsArrayBuffer(file);
-        } else {
-            reader.onload = function(e) {
-                let data = new Uint8Array(e.target.result);
-                let workbook = XLSX.read(data, {type: 'array'});
-                let firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                let jsonData = XLSX.utils.sheet_to_json(firstSheet, {header: 1});
-                mtProcessParsedData(jsonData);
-            };
-            reader.readAsArrayBuffer(file);
+                await mtEbookHandleFile(file, Number(activeSlot));
+                return;
+            }
+
+            if (selectedTypedType) {
+                await mtTypedHandleFile(file, Number(activeSlot));
+                return;
+            }
+            if (activeSlot === 'wordweb') {
+                await mtWordWebHandleFile(file);
+                return;
+            }
+            if (activeSlot === 'slot9') {
+                await mtSlot9HandleFile(file);
+                return;
+            }
+
+            const reader = new FileReader();
+            if (ext === 'txt') {
+                reader.onload = function(ev) {
+                    try {
+                        const buffer = ev.target.result;
+                        const uint8 = new Uint8Array(buffer);
+                        let rawText = '';
+                        if (uint8.length >= 2 && uint8[0] === 0xFF && uint8[1] === 0xFE) rawText = new TextDecoder('utf-16le').decode(uint8);
+                        else if (uint8.length >= 3 && uint8[0] === 0xEF && uint8[1] === 0xBB && uint8[2] === 0xBF) rawText = new TextDecoder('utf-8').decode(uint8);
+                        else {
+                            try { rawText = new TextDecoder('utf-8', {fatal:true}).decode(uint8); }
+                            catch (_) { rawText = new TextDecoder('euc-kr').decode(uint8); }
+                        }
+                        mtParseTextData(rawText.normalize('NFC'));
+                    } catch (err) { alert('텍스트 파일 파싱 중 오류가 발생했습니다: ' + (err.message || err)); }
+                };
+                reader.readAsArrayBuffer(file);
+            } else {
+                reader.onload = function(ev) {
+                    try {
+                        const data = new Uint8Array(ev.target.result);
+                        const workbook = XLSX.read(data, {type:'array'});
+                        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                        const jsonData = XLSX.utils.sheet_to_json(firstSheet, {header:1, defval:''});
+                        mtProcessParsedData(jsonData);
+                    } catch (err) {
+                        alert('엑셀 파일 읽기 오류: ' + (err.message || err));
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            }
+        } catch (err) {
+            console.error('파일 업로드 오류:', err);
+            alert('파일 불러오기 중 오류가 발생했습니다: ' + (err.message || err));
+        } finally {
+            e.target.value = '';
         }
-        e.target.value = ''; 
     });
 
     function mtParseTextData(text) {
@@ -7308,8 +7822,11 @@ Return JSON only.`;
     }
 
     function mtGoMainMenu() {
+        if (mtEbookTypingActive) { mtCloseEbookTyping(); return; }
         document.getElementById('mt-flashcard').style.display = 'none';
+        document.getElementById('mtEbookViewer').style.display = 'none';
         document.getElementById('mt-main-menu').style.display = 'block';
+        const back=document.getElementById('mtFlashcardBackBtn'); if(back){back.innerText='← 슬롯 목록으로'; back.onclick=()=>mtGoMainMenu();}
         mtInitSlots();
     }
 
@@ -7571,6 +8088,7 @@ Return JSON only.`;
     }
 
     function mtNextWord() {
+        if (mtEbookTypingActive) { mtCloseEbookTyping(); return; }
         if (mtCurrentIndex < mtCurrentStudyWords.length - 1) {
             mtCurrentIndex++;
             mtLoadWord(mtCurrentIndex);
