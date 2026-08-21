@@ -1688,6 +1688,34 @@
             </div>
         </div>
 
+        <div id="mtNormalColumnSelectModal" class="modal-overlay" style="display:none;">
+            <div class="modal-card" style="width:min(620px,94vw);max-height:88vh;overflow:auto;text-align:left;">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+                    <div>
+                        <div style="font-size:16px;font-weight:800;color:#111827;">일반유형 열 선택</div>
+                        <div style="font-size:11px;color:#64748b;margin-top:3px;">주문장·보조문장·영어문장에 사용할 열을 각각 선택하세요.</div>
+                    </div>
+                    <button class="btn-excel" type="button" onclick="mtCloseNormalColumnSelectModal()">닫기</button>
+                </div>
+                <div class="mt-pattern-grid" style="margin-top:16px;">
+                    <label>주문장 열
+                        <select id="mtNormalMainCol" style="width:100%;box-sizing:border-box;padding:7px 8px;border:1px solid var(--border-color);border-radius:6px;font-size:12px;"></select>
+                    </label>
+                    <label>보조문장 열
+                        <select id="mtNormalSubCol" style="width:100%;box-sizing:border-box;padding:7px 8px;border:1px solid var(--border-color);border-radius:6px;font-size:12px;"></select>
+                    </label>
+                    <label>영어문장 열
+                        <select id="mtNormalEngCol" style="width:100%;box-sizing:border-box;padding:7px 8px;border:1px solid var(--border-color);border-radius:6px;font-size:12px;"></select>
+                    </label>
+                </div>
+                <div id="mtNormalColumnPreview" class="mt-ebook-column-note" style="margin-top:12px;"></div>
+                <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:16px;">
+                    <button class="btn-excel" onclick="mtCloseNormalColumnSelectModal()">취소</button>
+                    <button class="btn-primary" onclick="mtConfirmNormalColumnSelect()">적용</button>
+                </div>
+            </div>
+        </div>
+
         <div id="mtNormalClipboardModal" class="modal-overlay" style="display:none;">
             <div class="modal-card" style="width:min(760px,94vw);max-height:88vh;overflow:auto;text-align:left;">
                 <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
@@ -7445,6 +7473,7 @@ Return JSON only.`;
     }
 
     let mtNormalImportSlot = null;
+    let mtNormalColumnTemp = null;
     function mtOpenNormalImportSourceModal(slotIndex) {
         mtNormalImportSlot = Number(slotIndex);
         const sub=document.getElementById('mtNormalImportSourceSubtitle');
@@ -7684,31 +7713,129 @@ Return JSON only.`;
     function mtRegisterNormalRows(rows,slotIndex,fileName){
         const prepared=mtDetectAndRemoveHeaderRows(rows);
         if(!prepared.length) throw new Error('일반유형에서 사용할 데이터가 없습니다.');
-        const normalize = v => String(v ?? '').trim();
-        const first = Array.isArray(prepared[0]) ? prepared[0].map(normalize) : [];
-        const headerText = first.join('|').replace(/\s+/g,'').toLowerCase();
-        const looksLikeExport = /no|중요|한국어|영어/.test(headerText) && first.some(v => /한국어/.test(v)) && first.some(v => /영어/.test(v));
-        let words=[]; const baseId=Date.now();
-        if (looksLikeExport || prepared.some(r => Array.isArray(r) && r.length >= 4 && normalize(r[2]) && normalize(r[3]))) {
-            const startIndex=looksLikeExport?1:0;
-            for(let i=startIndex;i<prepared.length;i++){
-                const r=Array.isArray(prepared[i])?prepared[i]:[]; const serial=normalize(r[0]); const starCell=normalize(r[1]); const kor=normalize(r[2]); const eng=normalize(r[3]);
-                if(!kor||!eng)continue;
-                if(/^no$/i.test(serial)||/^한국어$/.test(kor)||/^영어$/.test(eng))continue;
-                words.push({id:baseId+words.length,number:serial||String(words.length+1),createdAt:Date.now(),english:eng,meaning:kor,hint:'',score:0,lastQueriedAt:0,selected:false,isEditing:false,starred:/★/.test(starCell)});
-            }
-        } else {
-            const valid=prepared.filter(r=>Array.isArray(r)&&r.some(v=>normalize(v)!=='')).slice(0,5000);
-            for(const r of valid){
-                const cells=r.map(normalize); const kor=cells.find(v=>/[ㄱ-ㅎㅏ-ㅣ가-힣]/.test(v))||''; const eng=cells.find(v=>/[A-Za-z]/.test(v))||'';
-                if(!kor||!eng)continue;
-                words.push({id:baseId+words.length,number:String(words.length+1),createdAt:Date.now(),english:eng,meaning:kor,hint:'',score:0,lastQueriedAt:0,selected:false,isEditing:false,starred:false});
-            }
-        }
-        if(!words.length) throw new Error('일반유형에서 사용할 한국어·영어 카드 데이터를 찾지 못했습니다.');
-        const stored={name:String(fileName||'').replace(/\.[^/.]+$/,'')||`슬롯 ${Number(slotIndex)+1}`,words,lastSession:null,type:'normal'};
-        localStorage.setItem(mtGetSlotStorageKey(slotIndex),JSON.stringify(stored)); mtSetSlotType(slotIndex,'normal'); mtInitSlots(); alert(`[슬롯 ${Number(slotIndex)+1}] 일반유형 ${words.length}개 카드 등록 완료!`);
+        mtNormalColumnTemp={rows:prepared,slotIndex:Number(slotIndex),fileName:String(fileName||'')};
+        mtOpenNormalColumnSelectModal(prepared);
     }
+
+    function mtOpenNormalColumnSelectModal(rows){
+        const modal=document.getElementById('mtNormalColumnSelectModal');
+        if(!modal) throw new Error('일반유형 열 선택 화면을 불러오지 못했습니다.');
+        const maxCols=Math.max(1,...rows.map(r=>Array.isArray(r)?r.length:0));
+        const buildOptions=(allowNone=false)=>{
+            let html=allowNone?'<option value="-1">선택 안 함</option>':'';
+            for(let c=0;c<maxCols;c++){
+                let sample='';
+                for(const r of rows){
+                    const v=String(r?.[c]??'').trim();
+                    if(v){sample=v.slice(0,28);break;}
+                }
+                html += `<option value="${c}">열 ${c+1}${sample?` (${mtEscapeHTML(sample)})`:''}</option>`;
+            }
+            return html;
+        };
+        const main=document.getElementById('mtNormalMainCol');
+        const sub=document.getElementById('mtNormalSubCol');
+        const eng=document.getElementById('mtNormalEngCol');
+        main.innerHTML=buildOptions(false);
+        sub.innerHTML=buildOptions(true);
+        eng.innerHTML=buildOptions(false);
+
+        // 자동 추천은 '초기 선택값'으로만 사용합니다. 사용자가 반드시 최종 확인합니다.
+        const scores=Array.from({length:maxCols},(_,c)=>{
+            let ko=0,en=0,nonEmpty=0;
+            for(const r of rows.slice(0,40)){
+                const v=String(r?.[c]??'').trim();
+                if(!v) continue;
+                nonEmpty++;
+                ko+=(v.match(/[가-힣]/g)||[]).length;
+                en+=(v.match(/[A-Za-z]/g)||[]).length;
+            }
+            return {c,ko,en,nonEmpty};
+        });
+        const koCols=scores.filter(x=>x.nonEmpty).sort((a,b)=>b.ko-a.ko);
+        const enCols=scores.filter(x=>x.nonEmpty).sort((a,b)=>b.en-a.en);
+        const exportHeader=rows[0]?.map(v=>String(v??'').trim().toLowerCase())||[];
+        const headerIndex=(patterns)=>exportHeader.findIndex(v=>patterns.some(p=>v===p||v.includes(p)));
+
+        let mainIdx=headerIndex(['한국어','주문장','korean','main','의미']);
+        let engIdx=headerIndex(['영어','영어문장','english','translation','eng']);
+        let subIdx=headerIndex(['보조문장','직독직해','힌트','sub','literal','masking']);
+        if(mainIdx<0) mainIdx=koCols[0]?.c ?? 0;
+        if(subIdx<0) subIdx=koCols.find(x=>x.c!==mainIdx)?.c ?? -1;
+        if(engIdx<0) engIdx=enCols.find(x=>x.c!==mainIdx && x.c!==subIdx)?.c ?? enCols[0]?.c ?? 0;
+        if(main) main.value=String(mainIdx);
+        if(sub) sub.value=String(subIdx);
+        if(eng) eng.value=String(engIdx);
+        const preview=document.getElementById('mtNormalColumnPreview');
+        if(preview){
+            preview.textContent=`총 ${rows.length}행 · 파일/클립보드 데이터를 위에서 선택한 3개 열로 카드화합니다.`;
+        }
+        modal.style.display='flex';
+    }
+
+    function mtCloseNormalColumnSelectModal(){
+        const modal=document.getElementById('mtNormalColumnSelectModal');
+        if(modal) modal.style.display='none';
+        mtNormalColumnTemp=null;
+    }
+
+    function mtConfirmNormalColumnSelect(){
+        if(!mtNormalColumnTemp) return;
+        const mainIdx=Number(document.getElementById('mtNormalMainCol')?.value);
+        const subIdx=Number(document.getElementById('mtNormalSubCol')?.value);
+        const engIdx=Number(document.getElementById('mtNormalEngCol')?.value);
+        if(!Number.isInteger(mainIdx)||!Number.isInteger(engIdx)||mainIdx<0||engIdx<0){
+            alert('주문장 열과 영어문장 열을 선택해 주세요.');
+            return;
+        }
+        if(subIdx===mainIdx){
+            alert('보조문장 열은 주문장 열과 다른 열을 선택해 주세요.');
+            return;
+        }
+        const rows=mtNormalColumnTemp.rows;
+        const slot=mtNormalColumnTemp.slotIndex;
+        const rawName=mtNormalColumnTemp.fileName;
+        const normalize=v=>String(v??'').trim();
+        const first=Array.isArray(rows[0])?rows[0].map(normalize):[];
+        const firstLower=first.map(v=>v.toLowerCase());
+        const looksLikeExportHeader=firstLower.some(v=>v==='no'||v==='번호') && firstLower.some(v=>v.includes('한국어')) && firstLower.some(v=>v.includes('영어'));
+        const start=looksLikeExportHeader?1:0;
+        const words=[];
+        const baseId=Date.now();
+        for(let i=start;i<rows.length;i++){
+            const r=Array.isArray(rows[i])?rows[i]:[];
+            const kor=normalize(r[mainIdx]);
+            const sub= subIdx>=0 ? normalize(r[subIdx]) : '';
+            const eng=normalize(r[engIdx]);
+            if(!kor||!eng) continue;
+            if(/^번호$|^no$/i.test(kor)||/^영어문장?$|^english$/i.test(eng)) continue;
+            const serial=normalize(r[0]) || String(words.length+1);
+            const starCell=normalize(r[1]);
+            words.push({
+                id:baseId+words.length,
+                number:serial,
+                createdAt:Date.now(),
+                english:eng,
+                meaning:kor,
+                hint:sub,
+                score:0,
+                lastQueriedAt:0,
+                selected:false,
+                isEditing:false,
+                starred:/★/.test(starCell)
+            });
+        }
+        if(!words.length) throw new Error('선택한 열에서 주문장과 영어문장을 함께 가진 카드 데이터를 찾지 못했습니다.');
+        const displayName=String(rawName||'').replace(/\.[^/.]+$/,'').trim()||`슬롯 ${Number(slot)+1}`;
+        const stored={name:displayName,words,lastSession:null,type:'normal',columnPattern:{mainKorCol:mainIdx+1,subKorCol:subIdx+1,engCol:engIdx+1}};
+        localStorage.setItem(mtGetSlotStorageKey(slot),JSON.stringify(stored));
+        mtSetSlotType(slot,'normal');
+        mtNormalColumnTemp=null;
+        const modal=document.getElementById('mtNormalColumnSelectModal'); if(modal) modal.style.display='none';
+        mtInitSlots();
+        alert(`[슬롯 ${Number(slot)+1}] 일반유형 ${words.length}개 카드 등록 완료!`);
+    }
+
     async function mtHandleNormalTypedFile(file,slotIndex){
         const data=new Uint8Array(await file.arrayBuffer()); const wb=XLSX.read(data,{type:'array'}); const sheetName=wb.SheetNames[0]; const sh=wb.Sheets[sheetName];
         const rows=XLSX.utils.sheet_to_json(sh,{header:1,defval:''}); if(!rows.length) throw new Error('엑셀 파일에 데이터가 없습니다.');
