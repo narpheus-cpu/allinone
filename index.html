@@ -1299,7 +1299,7 @@
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1>올인원 영작-단어장 시스템<small>최근 업데이트 시각 <span id="appUpdateTimestamp">-</span></small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템<small>최근 업데이트 시각 <span id="appUpdateTimestamp">-</span></small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -9770,6 +9770,34 @@ Return JSON only.`;
     })();
 
     try { mtInitSectorMarginHandles(); } catch (_) {}
+</script>
+<script>
+(function(){
+  function goHomeFromTitle(){
+    try {
+      if (typeof mtCloseEbookViewer === 'function') mtCloseEbookViewer();
+      if (typeof mtGoMainMenu === 'function') mtGoMainMenu();
+      else {
+        const main = document.getElementById('mt-main-menu');
+        const flash = document.getElementById('mt-flashcard');
+        const ebook = document.getElementById('mtEbookViewer');
+        if (main) main.style.display = 'block';
+        if (flash) flash.style.display = 'none';
+        if (ebook) ebook.style.display = 'none';
+      }
+    } catch (e) {
+      console.error('메인화면 이동 오류:', e);
+    }
+  }
+  document.addEventListener('DOMContentLoaded', function(){
+    const title = document.getElementById('appHomeTitle');
+    if (!title) return;
+    title.addEventListener('click', goHomeFromTitle);
+    title.addEventListener('keydown', function(e){
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goHomeFromTitle(); }
+    });
+  });
+})();
 </script>
 </body>
 </html>
