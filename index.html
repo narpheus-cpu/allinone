@@ -39,6 +39,12 @@
             --mt-input-line-height: 1.4;
             --mt-mask-height: 1.2em;
             --mt-input-height: 54px;
+            --mt-kor-margin-top: 10px;
+            --mt-kor-margin-bottom: 28px;
+            --mt-mask-margin-top: 0px;
+            --mt-mask-margin-bottom: 30px;
+            --mt-input-margin-top: 22px;
+            --mt-input-margin-bottom: 20px;
         }
 
         body { 
@@ -690,13 +696,14 @@
         .mt-top-bar { display: flex; justify-content: space-between; margin-bottom: 20px; align-items: center; }
         .mt-progress-text { color: #666; font-size: 14px; font-weight: bold; }
 
-        #mtKorText { font-size: var(--mt-kor-size); font-weight: bold; color: #333; margin-bottom: 30px; line-height: var(--mt-kor-line-height); text-align: center; }
+        #mtKorText { font-size: var(--mt-kor-size); font-weight: bold; color: #333; margin-top: var(--mt-kor-margin-top); margin-bottom: var(--mt-kor-margin-bottom); line-height: var(--mt-kor-line-height); text-align: center; }
         .mt-paren-text { font-size: var(--mt-paren-size); color: #555; line-height: var(--mt-paren-line-height); }
 
         .mt-mask-container { 
             display: flex; 
             justify-content: center; 
-            margin-bottom: 30px; 
+            margin-top: var(--mt-mask-margin-top);
+            margin-bottom: var(--mt-mask-margin-bottom); 
             flex-wrap: wrap; 
             gap: 10px 0; 
             line-height: var(--mt-mask-line-height);
@@ -759,7 +766,7 @@
             width: var(--mt-space-width); 
         }
 
-        .mt-input-area { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 20px; }
+        .mt-input-area { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: var(--mt-input-margin-top); margin-bottom: var(--mt-input-margin-bottom); }
         #mtStarBtn { font-size: 32px; cursor: pointer; color: #f1c40f; user-select: none; transition: transform 0.1s; }
         #mtStarBtn:active { transform: scale(0.9); }
         #mtEngInput { font-size: var(--mt-input-size); padding: 12px; width: 70%; max-width: 500px; height: var(--mt-input-height); line-height: var(--mt-input-line-height); box-sizing: border-box; text-align: center; border: 2px solid var(--border-color); border-radius: 6px; outline: none; font-family: inherit; }
@@ -1146,7 +1153,7 @@
         }
         #mtKorText {
             max-width: 860px;
-            margin: 10px auto 28px;
+            margin: var(--mt-kor-margin-top) auto var(--mt-kor-margin-bottom);
             padding: 12px 20px;
             font-weight: 800;
             color: #0f172a;
@@ -1155,13 +1162,16 @@
             max-width: 980px;
             margin-left: auto;
             margin-right: auto;
+            margin-top: var(--mt-mask-margin-top);
+            margin-bottom: var(--mt-mask-margin-bottom);
             padding: 18px 14px;
             border-radius: 12px;
             background: #fbfdff;
             border: 1px solid #eef2f7;
         }
         .mt-input-area {
-            margin-top: 22px;
+            margin-top: var(--mt-input-margin-top);
+            margin-bottom: var(--mt-input-margin-bottom);
         }
         #mtEngInput {
             min-height: 0;
@@ -2093,6 +2103,42 @@
                     <button onclick="mtAdjustLayout('inputHeight', -1)">-</button>
                     <input type="text" id="mtInputHeightInput" readonly style="width:42px;">
                     <button onclick="mtAdjustLayout('inputHeight', 1)">+</button>
+                </div>
+                <div class="mt-font-ctrl-item">
+                    <span>주문장 위여백</span>
+                    <button onclick="mtAdjustLayout('korMarginTop', -1)">-</button>
+                    <input type="text" id="mtKorMarginTopInput" readonly style="width:42px;">
+                    <button onclick="mtAdjustLayout('korMarginTop', 1)">+</button>
+                </div>
+                <div class="mt-font-ctrl-item">
+                    <span>주문장 아래여백</span>
+                    <button onclick="mtAdjustLayout('korMarginBottom', -1)">-</button>
+                    <input type="text" id="mtKorMarginBottomInput" readonly style="width:42px;">
+                    <button onclick="mtAdjustLayout('korMarginBottom', 1)">+</button>
+                </div>
+                <div class="mt-font-ctrl-item">
+                    <span>마스킹 위여백</span>
+                    <button onclick="mtAdjustLayout('maskMarginTop', -1)">-</button>
+                    <input type="text" id="mtMaskMarginTopInput" readonly style="width:42px;">
+                    <button onclick="mtAdjustLayout('maskMarginTop', 1)">+</button>
+                </div>
+                <div class="mt-font-ctrl-item">
+                    <span>마스킹 아래여백</span>
+                    <button onclick="mtAdjustLayout('maskMarginBottom', -1)">-</button>
+                    <input type="text" id="mtMaskMarginBottomInput" readonly style="width:42px;">
+                    <button onclick="mtAdjustLayout('maskMarginBottom', 1)">+</button>
+                </div>
+                <div class="mt-font-ctrl-item">
+                    <span>입력칸 위여백</span>
+                    <button onclick="mtAdjustLayout('inputMarginTop', -1)">-</button>
+                    <input type="text" id="mtInputMarginTopInput" readonly style="width:42px;">
+                    <button onclick="mtAdjustLayout('inputMarginTop', 1)">+</button>
+                </div>
+                <div class="mt-font-ctrl-item">
+                    <span>입력칸 아래여백</span>
+                    <button onclick="mtAdjustLayout('inputMarginBottom', -1)">-</button>
+                    <input type="text" id="mtInputMarginBottomInput" readonly style="width:42px;">
+                    <button onclick="mtAdjustLayout('inputMarginBottom', 1)">+</button>
                 </div>
                 <div class="mt-font-ctrl-item">
                     <span>마스킹 방식</span>
@@ -4582,6 +4628,12 @@ Rules:
         inputLineHeight: 1.4,
         maskHeight: 1.2,
         inputHeight: 54,
+        korMarginTop: 10,
+        korMarginBottom: 28,
+        maskMarginTop: 0,
+        maskMarginBottom: 30,
+        inputMarginTop: 22,
+        inputMarginBottom: 20,
         maskMode: 'char'
     });
 
@@ -4605,6 +4657,12 @@ Rules:
     let mtInputLineHeight = mtGetStoredNumber('mtInputLineHeight', MT_FONT_DEFAULTS.inputLineHeight, 1.0, 3.0);
     let mtMaskHeight = mtGetStoredNumber('mtMaskHeight', MT_FONT_DEFAULTS.maskHeight, 0.7, 3.0);
     let mtInputHeight = mtGetStoredNumber('mtInputHeight', MT_FONT_DEFAULTS.inputHeight, 32, 120);
+    let mtKorMarginTop = mtGetStoredNumber('mtKorMarginTop', MT_FONT_DEFAULTS.korMarginTop, 0, 60);
+    let mtKorMarginBottom = mtGetStoredNumber('mtKorMarginBottom', MT_FONT_DEFAULTS.korMarginBottom, 0, 60);
+    let mtMaskMarginTop = mtGetStoredNumber('mtMaskMarginTop', MT_FONT_DEFAULTS.maskMarginTop, 0, 60);
+    let mtMaskMarginBottom = mtGetStoredNumber('mtMaskMarginBottom', MT_FONT_DEFAULTS.maskMarginBottom, 0, 60);
+    let mtInputMarginTop = mtGetStoredNumber('mtInputMarginTop', MT_FONT_DEFAULTS.inputMarginTop, 0, 60);
+    let mtInputMarginBottom = mtGetStoredNumber('mtInputMarginBottom', MT_FONT_DEFAULTS.inputMarginBottom, 0, 60);
     let mtMaskMode = localStorage.getItem('mtMaskMode') === 'chunk' ? 'chunk' : 'char';
 
     function mtNormalizeFontSettings(settings = {}) {
@@ -4622,6 +4680,12 @@ Rules:
             inputLineHeight: Number.isFinite(Number(settings.inputLineHeight)) ? Math.max(1.0, Math.min(3.0, Number(settings.inputLineHeight))) : MT_FONT_DEFAULTS.inputLineHeight,
             maskHeight: Number.isFinite(Number(settings.maskHeight)) ? Math.max(0.7, Math.min(3.0, Number(settings.maskHeight))) : MT_FONT_DEFAULTS.maskHeight,
             inputHeight: Number.isFinite(Number(settings.inputHeight)) ? Math.max(32, Math.min(120, Number(settings.inputHeight))) : MT_FONT_DEFAULTS.inputHeight,
+            korMarginTop: Number.isFinite(Number(settings.korMarginTop)) ? Math.max(0, Math.min(60, Number(settings.korMarginTop))) : MT_FONT_DEFAULTS.korMarginTop,
+            korMarginBottom: Number.isFinite(Number(settings.korMarginBottom)) ? Math.max(0, Math.min(60, Number(settings.korMarginBottom))) : MT_FONT_DEFAULTS.korMarginBottom,
+            maskMarginTop: Number.isFinite(Number(settings.maskMarginTop)) ? Math.max(0, Math.min(60, Number(settings.maskMarginTop))) : MT_FONT_DEFAULTS.maskMarginTop,
+            maskMarginBottom: Number.isFinite(Number(settings.maskMarginBottom)) ? Math.max(0, Math.min(60, Number(settings.maskMarginBottom))) : MT_FONT_DEFAULTS.maskMarginBottom,
+            inputMarginTop: Number.isFinite(Number(settings.inputMarginTop)) ? Math.max(0, Math.min(60, Number(settings.inputMarginTop))) : MT_FONT_DEFAULTS.inputMarginTop,
+            inputMarginBottom: Number.isFinite(Number(settings.inputMarginBottom)) ? Math.max(0, Math.min(60, Number(settings.inputMarginBottom))) : MT_FONT_DEFAULTS.inputMarginBottom,
             maskMode: settings.maskMode === 'chunk' ? 'chunk' : 'char'
         };
     }
@@ -4641,6 +4705,12 @@ Rules:
         mtInputLineHeight = normalized.inputLineHeight;
         mtMaskHeight = normalized.maskHeight;
         mtInputHeight = normalized.inputHeight;
+        mtKorMarginTop = normalized.korMarginTop;
+        mtKorMarginBottom = normalized.korMarginBottom;
+        mtMaskMarginTop = normalized.maskMarginTop;
+        mtMaskMarginBottom = normalized.maskMarginBottom;
+        mtInputMarginTop = normalized.inputMarginTop;
+        mtInputMarginBottom = normalized.inputMarginBottom;
         mtMaskMode = normalized.maskMode;
 
         localStorage.setItem('mtKorSize', String(mtKorSize));
@@ -4656,6 +4726,12 @@ Rules:
         localStorage.setItem('mtInputLineHeight', String(mtInputLineHeight));
         localStorage.setItem('mtMaskHeight', String(mtMaskHeight));
         localStorage.setItem('mtInputHeight', String(mtInputHeight));
+        localStorage.setItem('mtKorMarginTop', String(mtKorMarginTop));
+        localStorage.setItem('mtKorMarginBottom', String(mtKorMarginBottom));
+        localStorage.setItem('mtMaskMarginTop', String(mtMaskMarginTop));
+        localStorage.setItem('mtMaskMarginBottom', String(mtMaskMarginBottom));
+        localStorage.setItem('mtInputMarginTop', String(mtInputMarginTop));
+        localStorage.setItem('mtInputMarginBottom', String(mtInputMarginBottom));
 
         return normalized;
     }
@@ -4676,6 +4752,12 @@ Rules:
             inputLineHeight: mtInputLineHeight,
             maskHeight: mtMaskHeight,
             inputHeight: mtInputHeight,
+            korMarginTop: mtKorMarginTop,
+            korMarginBottom: mtKorMarginBottom,
+            maskMarginTop: mtMaskMarginTop,
+            maskMarginBottom: mtMaskMarginBottom,
+            inputMarginTop: mtInputMarginTop,
+            inputMarginBottom: mtInputMarginBottom,
             maskMode: mtMaskMode
         });
     }
@@ -4695,6 +4777,12 @@ Rules:
         root.style.setProperty('--mt-input-line-height', mtInputLineHeight);
         root.style.setProperty('--mt-mask-height', mtMaskHeight + 'em');
         root.style.setProperty('--mt-input-height', mtInputHeight + 'px');
+        root.style.setProperty('--mt-kor-margin-top', mtKorMarginTop + 'px');
+        root.style.setProperty('--mt-kor-margin-bottom', mtKorMarginBottom + 'px');
+        root.style.setProperty('--mt-mask-margin-top', mtMaskMarginTop + 'px');
+        root.style.setProperty('--mt-mask-margin-bottom', mtMaskMarginBottom + 'px');
+        root.style.setProperty('--mt-input-margin-top', mtInputMarginTop + 'px');
+        root.style.setProperty('--mt-input-margin-bottom', mtInputMarginBottom + 'px');
 
         if(document.getElementById('mtKorSizeInput')) document.getElementById('mtKorSizeInput').value = mtKorSize;
         if(document.getElementById('mtParenSizeInput')) document.getElementById('mtParenSizeInput').value = mtParenSize;
@@ -4709,6 +4797,12 @@ Rules:
         if(document.getElementById('mtInputLineHeightInput')) document.getElementById('mtInputLineHeightInput').value = mtInputLineHeight.toFixed(1);
         if(document.getElementById('mtMaskHeightInput')) document.getElementById('mtMaskHeightInput').value = mtMaskHeight.toFixed(1) + 'em';
         if(document.getElementById('mtInputHeightInput')) document.getElementById('mtInputHeightInput').value = Math.round(mtInputHeight) + 'px';
+        if(document.getElementById('mtKorMarginTopInput')) document.getElementById('mtKorMarginTopInput').value = Math.round(mtKorMarginTop) + 'px';
+        if(document.getElementById('mtKorMarginBottomInput')) document.getElementById('mtKorMarginBottomInput').value = Math.round(mtKorMarginBottom) + 'px';
+        if(document.getElementById('mtMaskMarginTopInput')) document.getElementById('mtMaskMarginTopInput').value = Math.round(mtMaskMarginTop) + 'px';
+        if(document.getElementById('mtMaskMarginBottomInput')) document.getElementById('mtMaskMarginBottomInput').value = Math.round(mtMaskMarginBottom) + 'px';
+        if(document.getElementById('mtInputMarginTopInput')) document.getElementById('mtInputMarginTopInput').value = Math.round(mtInputMarginTop) + 'px';
+        if(document.getElementById('mtInputMarginBottomInput')) document.getElementById('mtInputMarginBottomInput').value = Math.round(mtInputMarginBottom) + 'px';
         if(document.getElementById('mtMaskModeSelect')) document.getElementById('mtMaskModeSelect').value = mtMaskMode;
     }
 
@@ -4768,6 +4862,24 @@ Rules:
         } else if(type === 'inputHeight') {
             mtInputHeight = Math.max(32, Math.min(120, mtInputHeight + delta));
             localStorage.setItem('mtInputHeight', Math.round(mtInputHeight));
+        } else if(type === 'korMarginTop') {
+            mtKorMarginTop = Math.max(0, Math.min(60, mtKorMarginTop + delta));
+            localStorage.setItem('mtKorMarginTop', Math.round(mtKorMarginTop));
+        } else if(type === 'korMarginBottom') {
+            mtKorMarginBottom = Math.max(0, Math.min(60, mtKorMarginBottom + delta));
+            localStorage.setItem('mtKorMarginBottom', Math.round(mtKorMarginBottom));
+        } else if(type === 'maskMarginTop') {
+            mtMaskMarginTop = Math.max(0, Math.min(60, mtMaskMarginTop + delta));
+            localStorage.setItem('mtMaskMarginTop', Math.round(mtMaskMarginTop));
+        } else if(type === 'maskMarginBottom') {
+            mtMaskMarginBottom = Math.max(0, Math.min(60, mtMaskMarginBottom + delta));
+            localStorage.setItem('mtMaskMarginBottom', Math.round(mtMaskMarginBottom));
+        } else if(type === 'inputMarginTop') {
+            mtInputMarginTop = Math.max(0, Math.min(60, mtInputMarginTop + delta));
+            localStorage.setItem('mtInputMarginTop', Math.round(mtInputMarginTop));
+        } else if(type === 'inputMarginBottom') {
+            mtInputMarginBottom = Math.max(0, Math.min(60, mtInputMarginBottom + delta));
+            localStorage.setItem('mtInputMarginBottom', Math.round(mtInputMarginBottom));
         }
         mtApplyFontSettings();
     }
