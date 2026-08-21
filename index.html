@@ -7547,7 +7547,7 @@ Return JSON only.`;
         if(!rows.length || !rows.some(r=>r.length>1)){alert('탭(\t)으로 열이 구분된 텍스트를 붙여넣어 주세요.');return;}
         const slot=mtNormalImportSlot;
         try{
-            mtRegisterNormalRows(mtDetectAndRemoveHeaderRows(rows),slot,`클립보드`);
+            mtRegisterNormalRows(rows,slot,'','clipboard');
             mtCloseNormalClipboardModal();
             mtNormalImportSlot=null;
         }catch(err){alert(err.message||String(err));}
@@ -7731,10 +7731,10 @@ Return JSON only.`;
             mtSaveTypedState(slotIndex,state); mtInitSlots(); mtStartTypedTimer(slotIndex,false); alert(`[슬롯 ${Number(slotIndex)+1}] 참조형 파일이 등록되었습니다. 기존 생성 카드 ${mtTypedCardWords(slotIndex).length}개`); return;
         }
     }
-    function mtRegisterNormalRows(rows,slotIndex,fileName){
+    function mtRegisterNormalRows(rows,slotIndex,fileName,sourceType='file'){
         const prepared=mtDetectAndRemoveHeaderRows(rows);
         if(!prepared.length) throw new Error('일반유형에서 사용할 데이터가 없습니다.');
-        mtNormalColumnTemp={rows:prepared,slotIndex:Number(slotIndex),fileName:String(fileName||'')};
+        mtNormalColumnTemp={rows:prepared,slotIndex:Number(slotIndex),fileName:String(fileName||''),sourceType:String(sourceType||'file')};
         mtOpenNormalColumnSelectModal(prepared);
     }
 
@@ -7816,6 +7816,7 @@ Return JSON only.`;
         const rows=mtNormalColumnTemp.rows;
         const slot=mtNormalColumnTemp.slotIndex;
         const rawName=mtNormalColumnTemp.fileName;
+        const sourceType=mtNormalColumnTemp.sourceType||'file';
         const normalize=v=>String(v??'').trim();
         const first=Array.isArray(rows[0])?rows[0].map(normalize):[];
         const firstLower=first.map(v=>v.toLowerCase());
@@ -7851,7 +7852,13 @@ Return JSON only.`;
             });
         }
         if(!words.length) throw new Error('선택한 열에서 주문장과 영어문장을 함께 가진 카드 데이터를 찾지 못했습니다.');
-        const displayName=String(rawName||'').replace(/\.[^/.]+$/,'').trim()||`슬롯 ${Number(slot)+1}`;
+        let displayName='';
+        if(sourceType==='clipboard'){
+            const firstCell=normalize(rows[0]?.[0]??'');
+            displayName=firstCell || `슬롯 ${Number(slot)+1}`;
+        } else {
+            displayName=String(rawName||'').replace(/\.[^/.]+$/,'').trim()||`슬롯 ${Number(slot)+1}`;
+        }
         const stored={name:displayName,words,lastSession:null,type:'normal',columnPattern:{mainKorCol:mainIdx+1,subKorCol:subIdx+1,engCol:engIdx+1}};
         localStorage.setItem(mtGetSlotStorageKey(slot),JSON.stringify(stored));
         mtSetSlotType(slot,'normal');
