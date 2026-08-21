@@ -5550,6 +5550,27 @@ Rules:
             return;
         }
 
+        // 일반유형/구형 저장 데이터의 필드명을 타이핑 화면 표준 필드로 정규화합니다.
+        // 최근 열 선택 경로는 english/meaning/hint를 저장할 수 있지만, 학습 화면은 eng/kor/subKor를 사용합니다.
+        if (mtGetSlotType(slotIndex) === 'normal' && Array.isArray(slotData?.words)) {
+            slotData.words = slotData.words.map((w, idx) => {
+                const out = { ...w };
+                out.eng = String(out.eng ?? out.english ?? '');
+                out.kor = String(out.kor ?? out.meaning ?? '');
+                out.subKor = String(out.subKor ?? out.literalKor ?? out.hint ?? '');
+                out.originalIndex = Number.isInteger(Number(out.originalIndex)) ? Number(out.originalIndex) : idx;
+                return out;
+            });
+            mtOriginalSlotData = slotData;
+            try {
+                const existing = JSON.parse(localStorage.getItem(mtGetSlotStorageKey(slotIndex)) || 'null');
+                if (existing && Array.isArray(existing.words)) {
+                    existing.words = slotData.words;
+                    localStorage.setItem(mtGetSlotStorageKey(slotIndex), JSON.stringify(existing));
+                }
+            } catch (_) {}
+        }
+
         const btnContinue = document.getElementById('mtBtnContinue');
         if (slotData.lastSession && slotData.lastSession.studyWords && slotData.lastSession.studyWords.length > 0) {
             let progress = slotData.lastSession.currentIndex + 1;
@@ -7818,6 +7839,10 @@ Return JSON only.`;
                 english:eng,
                 meaning:kor,
                 hint:sub,
+                // 타이핑 to 언마스크 표준 필드도 함께 저장해 즉시 학습 가능하도록 합니다.
+                eng:eng,
+                kor:kor,
+                subKor:sub,
                 score:0,
                 lastQueriedAt:0,
                 selected:false,
