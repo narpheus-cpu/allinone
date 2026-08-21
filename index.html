@@ -1663,6 +1663,48 @@
                 </div>
             </div>
         </div>
+
+        <div id="mtNormalImportSourceModal" class="modal-overlay" style="display:none;">
+            <div class="modal-card mt-type-modal-card" style="max-width:560px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+                    <div>
+                        <div style="font-size:16px;font-weight:800;color:#111827;">일반유형 입력 방법</div>
+                        <div id="mtNormalImportSourceSubtitle" style="font-size:11px;color:#64748b;margin-top:3px;">파일 또는 클립보드에서 문장을 가져오세요.</div>
+                    </div>
+                    <button class="btn-excel" type="button" onclick="mtCloseNormalImportSourceModal()">닫기</button>
+                </div>
+                <div class="mt-type-option-grid" style="margin-top:16px;">
+                    <button type="button" class="mt-type-option" onclick="mtNormalImportFromFile()">
+                        <span class="mt-type-option-badge">FILE</span>
+                        <div class="mt-type-option-title">파일 불러오기</div>
+                        <div class="mt-type-option-desc">Excel(.xlsx/.xls) 또는 탭으로 구분된 TXT 파일을 불러옵니다.</div>
+                    </button>
+                    <button type="button" class="mt-type-option" onclick="mtOpenNormalClipboardModal()">
+                        <span class="mt-type-option-badge">PASTE</span>
+                        <div class="mt-type-option-title">클립보드 붙여넣기</div>
+                        <div class="mt-type-option-desc">탭(\t)으로 열이 구분된 텍스트를 붙여넣어 바로 카드로 등록합니다.</div>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="mtNormalClipboardModal" class="modal-overlay" style="display:none;">
+            <div class="modal-card" style="width:min(760px,94vw);max-height:88vh;overflow:auto;text-align:left;">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+                    <div>
+                        <div style="font-size:16px;font-weight:800;color:#111827;">클립보드 텍스트 붙여넣기</div>
+                        <div style="font-size:11px;color:#64748b;margin-top:3px;">행은 줄바꿈, 열은 탭(\t)으로 구분된 내용을 붙여넣으세요.</div>
+                    </div>
+                    <button class="btn-excel" type="button" onclick="mtCloseNormalClipboardModal()">닫기</button>
+                </div>
+                <textarea id="mtNormalClipboardText" style="width:100%;min-height:260px;box-sizing:border-box;margin-top:14px;padding:12px;border:1px solid #cbd5e1;border-radius:8px;font-size:12px;line-height:1.5;resize:vertical;outline:none;" placeholder="1열\t2열\t3열\n오빠!\tOppa!\t[오빠!]\n응?\tYeah?\t[응?]"></textarea>
+                <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:12px;">
+                    <button class="btn-excel" type="button" onclick="mtPasteFromSystemClipboard()">클립보드에서 가져오기</button>
+                    <button class="btn-primary" type="button" onclick="mtRegisterNormalClipboardText()">등록</button>
+                </div>
+            </div>
+        </div>
+
 <div id="mtStatsModal" class="modal-overlay" style="display:none;">
             <div class="modal-card" style="width:min(960px, 94vw); max-height:88vh; overflow:auto; text-align:left; padding:22px;">
                 <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:14px;">
@@ -7396,8 +7438,69 @@ Return JSON only.`;
     function mtRegisterConfiguredEmptySlotFile() {
         if (mtConfiguredEmptySlot === null || mtConfiguredEmptySlot === undefined) return;
         const slot = mtConfiguredEmptySlot;
+        const type = mtGetSlotType(slot);
         mtCloseConfiguredEmptySlotModal();
+        if (type === 'normal') { mtOpenNormalImportSourceModal(slot); return; }
         mtTriggerUpload(slot);
+    }
+
+    let mtNormalImportSlot = null;
+    function mtOpenNormalImportSourceModal(slotIndex) {
+        mtNormalImportSlot = Number(slotIndex);
+        const sub=document.getElementById('mtNormalImportSourceSubtitle');
+        if(sub) sub.textContent=`슬롯 ${Number(slotIndex)+1} · 일반유형 입력 방법을 선택하세요.`;
+        const m=document.getElementById('mtNormalImportSourceModal'); if(m)m.style.display='flex';
+    }
+    function mtCloseNormalImportSourceModal(){ const m=document.getElementById('mtNormalImportSourceModal'); if(m)m.style.display='none'; mtNormalImportSlot=null; }
+    function mtNormalImportFromFile(){
+        if(mtNormalImportSlot===null || mtNormalImportSlot===undefined)return;
+        const slot=mtNormalImportSlot; mtCloseNormalImportSourceModal(); mtActiveSlotIndex=slot;
+        const input=document.getElementById('mtFileUpload'); if(input){input.value='';input.click();}
+    }
+    function mtOpenNormalClipboardModal(){
+        const source=document.getElementById('mtNormalImportSourceModal'); if(source)source.style.display='none';
+        const m=document.getElementById('mtNormalClipboardModal'); if(m)m.style.display='flex';
+        setTimeout(()=>document.getElementById('mtNormalClipboardText')?.focus(),40);
+    }
+    function mtCloseNormalClipboardModal(){ const m=document.getElementById('mtNormalClipboardModal'); if(m)m.style.display='none'; }
+    async function mtPasteFromSystemClipboard(){
+        const ta=document.getElementById('mtNormalClipboardText');
+        if(!ta)return;
+        try{
+            if(!navigator.clipboard?.readText) throw new Error('브라우저에서 클립보드 자동 읽기를 지원하지 않습니다. Ctrl+V로 붙여넣으세요.');
+            const text=await navigator.clipboard.readText();
+            if(text) ta.value=text;
+            ta.focus();
+        }catch(err){ alert(err.message || String(err)); ta.focus(); }
+    }
+    function mtDetectAndRemoveHeaderRows(rows){
+        if(!Array.isArray(rows)) return [];
+        const clean=rows.filter(r=>Array.isArray(r) && r.some(v=>String(v??'').trim()!=='')).map(r=>r.map(v=>String(v??'').trim()));
+        if(clean.length<2)return clean;
+        const first=clean[0];
+        const cells=first.filter(Boolean);
+        if(cells.length<2)return clean;
+        const generic=/^(?:\d+열|[A-Z]열|열\s*\d+|(?:no|번호|중요|한국어|영어|주문장|보조문장|직독직해|마스킹|masking|korean|english|main|sub|translation|hint))$/i;
+        const headerHits=cells.filter(c=>generic.test(c)).length;
+        const firstLooksGeneric=headerHits>=2 || (headerHits>=1 && cells.length>=3);
+        const next=clean[1]||[];
+        const nextLooksData=next.some(c=>/[가-힣]/.test(c)) && next.some(c=>/[A-Za-z]/.test(c));
+        if(firstLooksGeneric && nextLooksData) return clean.slice(1);
+        return clean;
+    }
+    function mtRegisterNormalClipboardText(){
+        if(mtNormalImportSlot===null || mtNormalImportSlot===undefined){alert('일반유형 슬롯이 선택되지 않았습니다.');return;}
+        const ta=document.getElementById('mtNormalClipboardText');
+        const text=String(ta?.value||'').replace(/^\uFEFF/,'').normalize('NFC');
+        if(!text.trim()){alert('붙여넣을 텍스트가 없습니다.');return;}
+        const rows=text.split(/\r?\n/).filter(line=>line.trim()!=='').map(line=>line.split('\t'));
+        if(!rows.length || !rows.some(r=>r.length>1)){alert('탭(\t)으로 열이 구분된 텍스트를 붙여넣어 주세요.');return;}
+        const slot=mtNormalImportSlot;
+        try{
+            mtRegisterNormalRows(mtDetectAndRemoveHeaderRows(rows),slot,`클립보드`);
+            mtCloseNormalClipboardModal();
+            mtNormalImportSlot=null;
+        }catch(err){alert(err.message||String(err));}
     }
 
     function mtRechooseConfiguredEmptySlotType() {
@@ -7413,7 +7516,7 @@ Return JSON only.`;
         mtSetSlotType(slot, type);
         if (type === 'normal') {
             mtCloseSlotTypeModal();
-            mtTriggerUpload(slot);
+            mtOpenNormalImportSourceModal(slot);
             return;
         }
         if (type === 'reference_generate') {
@@ -7578,84 +7681,38 @@ Return JSON only.`;
             mtSaveTypedState(slotIndex,state); mtInitSlots(); mtStartTypedTimer(slotIndex,false); alert(`[슬롯 ${Number(slotIndex)+1}] 참조형 파일이 등록되었습니다. 기존 생성 카드 ${mtTypedCardWords(slotIndex).length}개`); return;
         }
     }
-    async function mtHandleNormalTypedFile(file,slotIndex){
-        const data=new Uint8Array(await file.arrayBuffer());
-        const wb=XLSX.read(data,{type:'array'});
-        const sheetName = wb.SheetNames[0];
-        const sh = wb.Sheets[sheetName];
-        const rows = XLSX.utils.sheet_to_json(sh,{header:1,defval:''});
-        if (!rows.length) throw new Error('엑셀 파일에 데이터가 없습니다.');
-
+    function mtRegisterNormalRows(rows,slotIndex,fileName){
+        const prepared=mtDetectAndRemoveHeaderRows(rows);
+        if(!prepared.length) throw new Error('일반유형에서 사용할 데이터가 없습니다.');
         const normalize = v => String(v ?? '').trim();
-        const first = Array.isArray(rows[0]) ? rows[0].map(normalize) : [];
+        const first = Array.isArray(prepared[0]) ? prepared[0].map(normalize) : [];
         const headerText = first.join('|').replace(/\s+/g,'').toLowerCase();
         const looksLikeExport = /no|중요|한국어|영어/.test(headerText) && first.some(v => /한국어/.test(v)) && first.some(v => /영어/.test(v));
-
-        let words = [];
-        let baseId = Date.now();
-
-        if (looksLikeExport || rows.some(r => Array.isArray(r) && r.length >= 4 && normalize(r[2]) && normalize(r[3]))) {
-            // 프로그램의 [내보내기] 형식: NO | 중요 | 한국어 | 영어
-            // ★ 상태를 2열에서 그대로 복원합니다.
-            const startIndex = looksLikeExport ? 1 : 0;
-            for (let i = startIndex; i < rows.length; i++) {
-                const r = Array.isArray(rows[i]) ? rows[i] : [];
-                const serial = normalize(r[0]);
-                const starCell = normalize(r[1]);
-                const kor = normalize(r[2]);
-                const eng = normalize(r[3]);
-                if (!kor || !eng) continue;
-                if (/^no$/i.test(serial) || /^한국어$/i.test(kor) || /^영어$/i.test(eng)) continue;
-                words.push({
-                    id: baseId + words.length,
-                    number: serial || String(words.length + 1),
-                    createdAt: Date.now(),
-                    english: eng,
-                    meaning: kor,
-                    hint: '',
-                    score: 0,
-                    lastQueriedAt: 0,
-                    selected: false,
-                    isEditing: false,
-                    starred: /★/.test(starCell)
-                });
+        let words=[]; const baseId=Date.now();
+        if (looksLikeExport || prepared.some(r => Array.isArray(r) && r.length >= 4 && normalize(r[2]) && normalize(r[3]))) {
+            const startIndex=looksLikeExport?1:0;
+            for(let i=startIndex;i<prepared.length;i++){
+                const r=Array.isArray(prepared[i])?prepared[i]:[]; const serial=normalize(r[0]); const starCell=normalize(r[1]); const kor=normalize(r[2]); const eng=normalize(r[3]);
+                if(!kor||!eng)continue;
+                if(/^no$/i.test(serial)||/^한국어$/.test(kor)||/^영어$/.test(eng))continue;
+                words.push({id:baseId+words.length,number:serial||String(words.length+1),createdAt:Date.now(),english:eng,meaning:kor,hint:'',score:0,lastQueriedAt:0,selected:false,isEditing:false,starred:/★/.test(starCell)});
             }
         } else {
-            // 신규 일반형 파일: 기존처럼 한국어/영어 셀을 자동 감지합니다.
-            const valid = rows.filter(r => Array.isArray(r) && r.some(v => normalize(v) !== '')).slice(0,5000);
-            for (const r of valid) {
-                const cells = r.map(normalize);
-                const kor = cells.find(v => /[ㄱ-ㅎㅏ-ㅣ가-힣]/.test(v)) || '';
-                const eng = cells.find(v => /[A-Za-z]/.test(v)) || '';
-                if (!kor || !eng) continue;
-                words.push({
-                    id: baseId + words.length,
-                    number: String(words.length + 1),
-                    createdAt: Date.now(),
-                    english: eng,
-                    meaning: kor,
-                    hint: '',
-                    score: 0,
-                    lastQueriedAt: 0,
-                    selected: false,
-                    isEditing: false,
-                    starred: false
-                });
+            const valid=prepared.filter(r=>Array.isArray(r)&&r.some(v=>normalize(v)!=='')).slice(0,5000);
+            for(const r of valid){
+                const cells=r.map(normalize); const kor=cells.find(v=>/[ㄱ-ㅎㅏ-ㅣ가-힣]/.test(v))||''; const eng=cells.find(v=>/[A-Za-z]/.test(v))||'';
+                if(!kor||!eng)continue;
+                words.push({id:baseId+words.length,number:String(words.length+1),createdAt:Date.now(),english:eng,meaning:kor,hint:'',score:0,lastQueriedAt:0,selected:false,isEditing:false,starred:false});
             }
         }
-
-        if (!words.length) throw new Error('일반유형에서 사용할 한국어·영어 카드 데이터를 찾지 못했습니다.');
-
-        const stored = {
-            name: file.name.replace(/\.[^/.]+$/, '') || `슬롯 ${Number(slotIndex)+1}`,
-            words,
-            lastSession: null,
-            type: 'normal'
-        };
-        localStorage.setItem(mtGetSlotStorageKey(slotIndex), JSON.stringify(stored));
-        mtSetSlotType(slotIndex,'normal');
-        mtInitSlots();
-        alert(`[슬롯 ${Number(slotIndex)}] 일반유형 ${words.length}개 카드 등록 완료!`);
+        if(!words.length) throw new Error('일반유형에서 사용할 한국어·영어 카드 데이터를 찾지 못했습니다.');
+        const stored={name:String(fileName||'').replace(/\.[^/.]+$/,'')||`슬롯 ${Number(slotIndex)+1}`,words,lastSession:null,type:'normal'};
+        localStorage.setItem(mtGetSlotStorageKey(slotIndex),JSON.stringify(stored)); mtSetSlotType(slotIndex,'normal'); mtInitSlots(); alert(`[슬롯 ${Number(slotIndex)+1}] 일반유형 ${words.length}개 카드 등록 완료!`);
+    }
+    async function mtHandleNormalTypedFile(file,slotIndex){
+        const data=new Uint8Array(await file.arrayBuffer()); const wb=XLSX.read(data,{type:'array'}); const sheetName=wb.SheetNames[0]; const sh=wb.Sheets[sheetName];
+        const rows=XLSX.utils.sheet_to_json(sh,{header:1,defval:''}); if(!rows.length) throw new Error('엑셀 파일에 데이터가 없습니다.');
+        mtRegisterNormalRows(rows,slotIndex,file.name);
     }
     function mtOpenEbookColumnModal(rows){
         const modal=document.getElementById('mtEbookColumnModal'); if(!modal)return;
