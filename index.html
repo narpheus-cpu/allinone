@@ -2418,10 +2418,10 @@
 
 <script>
     // ============================================================================
-    // ★ 최근 코드 업데이트 시각: 202608220311
+    // ★ 최근 코드 업데이트 시각: 202608220318
     // ★ ※ 코드를 직접 수정할 때마다 위 시간값도 변경하세요.
     // ============================================================================
-    const APP_BUILD_TIMESTAMP = '202608220311';
+    const APP_BUILD_TIMESTAMP = '202608220318';
     
         /* ========================================== */
     /* [신규 기능] AI 도움 프롬프트 통합 템플릿 관리   */
@@ -5101,10 +5101,45 @@ Rules:
     /* 일반유형 대용량 카드 저장소: localStorage 대신 IndexedDB 사용        */
     /* ------------------------------------------------------------------ */
     const MT_NORMAL_SLOT_STORE_NAME = 'maskingTypingNormalSlotsStore';
-    const MT_NORMAL_SLOT_DATA_KEY = 'maskingTypingNormalSlotsDataV1';
+    // 과거 버전의 통합 레코드는 호환/마이그레이션용으로만 유지합니다.
+    const MT_NORMAL_SLOT_LEGACY_DATA_KEY = 'maskingTypingNormalSlotsDataV1';
+    const MT_NORMAL_SLOT_KEY_PREFIX = 'slot_';
     let mtNormalSlotCache = Object.create(null);
     let mtNormalSlotCacheReady = false;
     let mtNormalSlotSaveTimer = null;
+    const mtNormalSlotPendingWrites = new Set();
+
+    function mtNormalSlotDbKey(slotIndex) {
+        return `${MT_NORMAL_SLOT_KEY_PREFIX}${Number(slotIndex)}`;
+    }
+
+    // 일반유형 카드의 중복 alias만 제거합니다.
+    // 기존 데이터에 english/meaning/hint만 있는 경우에는 표준 필드로 승격한 뒤 alias를 제거합니다.
+    function mtCompactNormalCard(word, index = 0) {
+        const out = { ...(word || {}) };
+        if (out.eng == null && out.english != null) out.eng = String(out.english);
+        if (out.kor == null && out.meaning != null) out.kor = String(out.meaning);
+        if (out.subKor == null && (out.literalKor != null || out.hint != null)) {
+            out.subKor = String(out.literalKor ?? out.hint ?? '');
+        }
+        out.originalIndex = Number.isInteger(Number(out.originalIndex)) ? Number(out.originalIndex) : Number(index);
+        delete out.english;
+        delete out.meaning;
+        delete out.hint;
+        delete out.literalKor;
+        return out;
+    }
+
+    function mtNormalizeNormalSlotForStorage(data, slotIndex = null) {
+        let parsed = data;
+        if (Array.isArray(parsed)) parsed = { name: `슬롯 ${Number(slotIndex || 1)}`, words: parsed };
+        if (!parsed || typeof parsed !== 'object') return parsed;
+        const out = { ...parsed };
+        if (Array.isArray(parsed.words)) {
+            out.words = parsed.words.map((w, i) => mtCompactNormalCard(w, i));
+        }
+        return out;
+    }
 
     function mtIsNormalTypeSlot(slotIndex) {
         const n = Number(slotIndex);
@@ -5114,53 +5149,66 @@ Rules:
     }
 
     async function mtInitNormalSlotCache() {
-        // 캐시가 이미 준비되어 있으면 재사용합니다.
         if (mtNormalSlotCacheReady) return;
-
         let db = null;
         try {
             db = await initDB();
             const tx = db.transaction(MT_NORMAL_SLOT_STORE_NAME, 'readonly');
-            const req = tx.objectStore(MT_NORMAL_SLOT_STORE_NAME).get(MT_NORMAL_SLOT_DATA_KEY);
-            const stored = await new Promise((resolve, reject) => {
+            const store = tx.objectStore(MT_NORMAL_SLOT_STORE_NAME);
+            const readKey = key => new Promise((resolve, reject) => {
+                const req = store.get(key);
                 req.onsuccess = () => resolve(req.result);
                 req.onerror = () => reject(req.error || new Error('일반유형 IndexedDB 읽기 실패'));
             });
 
-            if (stored && typeof stored === 'object' && !Array.isArray(stored)) {
-                mtNormalSlotCache = stored;
-            } else {
-                // 1회성 마이그레이션: 기존 word_slot_1~8을 IndexedDB로 옮깁니다.
-                const migrated = Object.create(null);
-                for (let i = 1; i <= 8; i++) {
-                    if (!mtIsNormalTypeSlot(i)) continue;
-                    const parsedSlot = mtGetNormalSlotSync(i);
-            if (!parsedSlot) continue;
-            const raw = JSON.stringify(parsedSlot);
-                    if (!raw) continue;
-                    try {
-                        const parsed = JSON.parse(raw);
-                        migrated[String(i)] = Array.isArray(parsed)
-                            ? { name: `슬롯 ${i}`, words: parsed }
-                            : parsed;
-                    } catch (e) {
-                        console.warn('[일반유형] 기존 슬롯 데이터 변환 실패:', i, e);
-                    }
-                }
-                mtNormalSlotCache = migrated;
+            const [legacy, ...perSlot] = await Promise.all([
+                readKey(MT_NORMAL_SLOT_LEGACY_DATA_KEY),
+                ...Array.from({length: 8}, (_, i) => readKey(mtNormalSlotDbKey(i + 1)))
+            ]);
+            const loaded = Object.create(null);
 
-                if (Object.keys(migrated).length) {
-                    await mtPersistNormalSlotCache();
-                    // IDB 저장 성공 후에만 기존 localStorage 데이터를 제거합니다.
-                    for (const slot of Object.keys(migrated)) {
-                        try { localStorage.removeItem('word_slot_' + slot); } catch (_) {}
+            perSlot.forEach((value, i) => {
+                if (value && typeof value === 'object') {
+                    loaded[String(i + 1)] = mtNormalizeNormalSlotForStorage(value, i + 1);
+                }
+            });
+
+            let needsPersistMigration = false;
+            if (legacy && typeof legacy === 'object' && !Array.isArray(legacy)) {
+                for (const [key, value] of Object.entries(legacy)) {
+                    if (!loaded[key] && value && typeof value === 'object') {
+                        loaded[key] = mtNormalizeNormalSlotForStorage(value, Number(key));
+                        needsPersistMigration = true;
                     }
                 }
             }
 
+            // 아직 IndexedDB에 없는 슬롯이 있으면 구 localStorage 데이터에서 보충합니다.
+            // 일부 슬롯만 먼저 이전된 환경도 안전하게 마이그레이션합니다.
+            for (let i = 1; i <= 8; i++) {
+                if (loaded[String(i)] || !mtIsNormalTypeSlot(i)) continue;
+                try {
+                    const raw = localStorage.getItem('word_slot_' + i);
+                    if (!raw) continue;
+                    const parsed = JSON.parse(raw);
+                    loaded[String(i)] = mtNormalizeNormalSlotForStorage(parsed, i);
+                    needsPersistMigration = true;
+                } catch (e) {
+                    console.warn('[일반유형] 기존 슬롯 데이터 변환 실패:', i, e);
+                }
+            }
+
+            mtNormalSlotCache = loaded;
             mtNormalSlotCacheReady = true;
+
+            if (needsPersistMigration || legacy) {
+                await mtPersistNormalSlotCache();
+                // IndexedDB 저장 성공 후에만 기존 localStorage 원본과 통합 레코드를 제거합니다.
+                for (let i = 1; i <= 8; i++) {
+                    try { localStorage.removeItem('word_slot_' + i); } catch (_) {}
+                }
+            }
         } catch (e) {
-            // IndexedDB 자체를 사용할 수 없는 환경에서는 기존 localStorage를 읽기/쓰기 경로로 유지합니다.
             console.warn('[일반유형] IndexedDB 초기화 실패. 기존 저장방식으로 폴백합니다.', e);
             mtNormalSlotCacheReady = false;
         } finally {
@@ -5176,14 +5224,18 @@ Rules:
         try {
             const raw = localStorage.getItem('word_slot_' + Number(slotIndex));
             if (!raw) return null;
-            const parsed = JSON.parse(raw);
-            return Array.isArray(parsed) ? { name: `슬롯 ${Number(slotIndex)}`, words: parsed } : parsed;
+            return mtNormalizeNormalSlotForStorage(JSON.parse(raw), Number(slotIndex));
         } catch (_) {
             return null;
         }
     }
 
-    function mtQueueNormalSlotCacheSave() {
+    function mtQueueNormalSlotCacheSave(slotIndex = null) {
+        if (slotIndex != null) {
+            mtNormalSlotPendingWrites.add(String(Number(slotIndex)));
+        } else {
+            for (let i = 1; i <= 8; i++) mtNormalSlotPendingWrites.add(String(i));
+        }
         clearTimeout(mtNormalSlotSaveTimer);
         mtNormalSlotSaveTimer = setTimeout(() => {
             mtNormalSlotSaveTimer = null;
@@ -5193,11 +5245,21 @@ Rules:
 
     async function mtPersistNormalSlotCache() {
         let db = null;
+        const pending = new Set(mtNormalSlotPendingWrites);
+        if (!pending.size) for (let i = 1; i <= 8; i++) pending.add(String(i));
         try {
             db = await initDB();
             const tx = db.transaction(MT_NORMAL_SLOT_STORE_NAME, 'readwrite');
-            tx.objectStore(MT_NORMAL_SLOT_STORE_NAME).put(mtNormalSlotCache, MT_NORMAL_SLOT_DATA_KEY);
+            const store = tx.objectStore(MT_NORMAL_SLOT_STORE_NAME);
+            for (const key of pending) {
+                const data = mtNormalSlotCache[key];
+                if (data) store.put(mtNormalizeNormalSlotForStorage(data, Number(key)), mtNormalSlotDbKey(Number(key)));
+                else store.delete(mtNormalSlotDbKey(Number(key)));
+            }
+            // 구버전 통합 레코드는 새 구조로 완전히 이전했으므로 제거합니다.
+            store.delete(MT_NORMAL_SLOT_LEGACY_DATA_KEY);
             await waitForTransaction(tx);
+            pending.forEach(key => mtNormalSlotPendingWrites.delete(key));
         } finally {
             if (db) db.close();
         }
@@ -5205,22 +5267,21 @@ Rules:
 
     function mtSetNormalSlotSync(slotIndex, data) {
         const key = String(Number(slotIndex));
+        const normalized = mtNormalizeNormalSlotForStorage(data, Number(slotIndex));
         if (mtNormalSlotCacheReady) {
-            mtNormalSlotCache[key] = data;
-            mtQueueNormalSlotCacheSave();
-            // 이전 localStorage 복사본이 남아 있으면 제거하여 용량을 즉시 회수합니다.
+            mtNormalSlotCache[key] = normalized;
+            mtQueueNormalSlotCacheSave(Number(slotIndex));
             try { localStorage.removeItem('word_slot_' + Number(slotIndex)); } catch (_) {}
             return;
         }
-        // IndexedDB를 사용할 수 없을 때만 기존 안전 저장 경로를 사용합니다.
-        mtSetLocalStorageQuotaSafe('word_slot_' + Number(slotIndex), JSON.stringify(data));
+        mtSetLocalStorageQuotaSafe('word_slot_' + Number(slotIndex), JSON.stringify(normalized));
     }
 
     function mtDeleteNormalSlotSync(slotIndex) {
         const key = String(Number(slotIndex));
         if (mtNormalSlotCacheReady) {
             delete mtNormalSlotCache[key];
-            mtQueueNormalSlotCacheSave();
+            mtQueueNormalSlotCacheSave(Number(slotIndex));
         }
         try { localStorage.removeItem('word_slot_' + Number(slotIndex)); } catch (_) {}
     }
@@ -5520,12 +5581,10 @@ Rules:
         for (let i = 1; i <= 8; i++) {
             const parsedSlot = mtGetNormalSlotSync(i);
             if (!parsedSlot) continue;
-            const raw = JSON.stringify(parsedSlot);
-            if (!raw) continue;
-            try {
-                const parsed = JSON.parse(raw); const words = Array.isArray(parsed) ? parsed : parsed.words;
-                (words || []).forEach((w, idx) => { if (w?.starred) all.push({kor:w.kor,eng:w.eng,starred:true,originalIndex:idx,sourceSlot:i,sourceIndex:idx}); });
-            } catch(e) {}
+            const words = Array.isArray(parsedSlot) ? parsedSlot : parsedSlot.words;
+            (words || []).forEach((w, idx) => {
+                if (w?.starred) all.push({kor:w.kor,eng:w.eng,starred:true,originalIndex:idx,sourceSlot:i,sourceIndex:idx});
+            });
         }
         // 슬롯9
         const s9=mtSlot9GetState(), p9=mtSlot9GetPattern(s9), ss9=new Set((s9.starredSerials||[]).map(String));
@@ -5743,12 +5802,10 @@ Rules:
                 if (mtRenderTypedSlot(div, i)) { grid.appendChild(div); continue; }
             }
 
-            let normalSlotData = mtGetNormalSlotSync(i);
-            let rawData = normalSlotData ? JSON.stringify(normalSlotData) : null;
+            const normalSlotData = mtGetNormalSlotSync(i);
 
-            if (rawData) {
-                let parsedData = JSON.parse(rawData);
-                let slotData = Array.isArray(parsedData) ? { name: "슬롯 " + i, words: parsedData } : parsedData;
+            if (normalSlotData) {
+                const slotData = Array.isArray(normalSlotData) ? { name: "슬롯 " + i, words: normalSlotData } : normalSlotData;
 
                 let starredCount = 0;
                 if (slotData.words) {
@@ -6136,7 +6193,6 @@ Rules:
         // 일반유형은 mtOriginalSlotData가 학습 시작 시점의 복사본일 수 있습니다.
         // 완료 이력을 방금 저장한 최신 저장본과 병합한 뒤 세션만 갱신합니다.
         try {
-            const key = mtGetSlotStorageKey(mtActiveSlotIndex);
             const persistedDirect = mtGetNormalSlotSync(mtActiveSlotIndex);
             let persisted = persistedDirect ? JSON.parse(JSON.stringify(persistedDirect)) : null;
             if (Array.isArray(persisted)) persisted = { name: mtOriginalSlotData.name || `슬롯 ${Number(mtActiveSlotIndex)}`, words: persisted };
@@ -8261,7 +8317,7 @@ Return JSON only.`;
                 if(!kor||!eng) continue;
                 const serial=normalize(r[0])||String(words.length+1);
                 const starCell=normalize(r[1]);
-                words.push({id:baseId+words.length,number:serial,createdAt:Date.now(),english:eng,meaning:kor,hint:sub,eng,kor,subKor:sub,score:0,lastQueriedAt:0,selected:false,isEditing:false,starred:/★/.test(starCell)});
+                words.push({id:baseId+words.length,number:serial,createdAt:Date.now(),eng,kor,subKor:sub,score:0,lastQueriedAt:0,selected:false,isEditing:false,starred:/★/.test(starCell)});
             }
             if(!words.length) throw new Error(`선택한 열에서 주문장과 영어문장 데이터를 찾지 못했습니다. (주문장=${mainIdx+1}열, 영어문장=${engIdx+1}열)`);
 
