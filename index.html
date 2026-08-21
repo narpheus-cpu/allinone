@@ -1991,7 +1991,10 @@
         <div id="mtEbookViewer" class="mt-ebook-viewer">
             <div class="mt-ebook-head">
                 <div><div class="mt-ebook-title" id="mtEbookViewerTitle">전자책</div><div class="mt-ebook-subtitle" id="mtEbookViewerSubtitle"></div></div>
-                <button class="btn-excel" onclick="mtCloseEbookViewer()">← 슬롯 목록</button>
+                <div style="display:flex;align-items:center;gap:6px;">
+                    <button id="mtEbookEnglishToggleBtn" type="button" class="btn-excel" onclick="mtToggleEbookEnglishMode()">영어변환</button>
+                    <button class="btn-excel" onclick="mtCloseEbookViewer()">← 슬롯 목록</button>
+                </div>
             </div>
             <div id="mtEbookList" class="mt-ebook-list"></div>
             <div id="mtEbookPagination" class="mt-ebook-pagination"></div>
@@ -4628,6 +4631,7 @@ Rules:
     let mtEbookTemp = null;
     let mtEbookTypingActive = false;
     let mtEbookActiveSlot = null;
+    let mtEbookDisplayMode = 'kor'; // 'kor': 주문장, 'eng': 언마스킹 완료 문장만 영어로 표시
     const MT_EBOOK_PAGE_SIZE = 30;
     const mtEbookPage = {};
 
@@ -7742,6 +7746,13 @@ Return JSON only.`;
         mtOpenEbookViewer(slot);
     }
 
+    function mtToggleEbookEnglishMode(){
+        mtEbookDisplayMode = mtEbookDisplayMode === 'eng' ? 'kor' : 'eng';
+        if (mtEbookActiveSlot !== null && mtEbookActiveSlot !== undefined) {
+            mtOpenEbookViewer(Number(mtEbookActiveSlot));
+        }
+    }
+
     function mtOpenEbookViewer(slotIndex){
         const st=mtGetTypedState(slotIndex), words=mtGetEbookWords(slotIndex);
         if(!st.fileName || !words.length){
@@ -7765,7 +7776,11 @@ Return JSON only.`;
         if(viewer) viewer.style.display='block';
         const backdrop=document.getElementById('mtEbookModalBackdrop'); if(backdrop) backdrop.style.display='none';
         document.getElementById('mtEbookViewerTitle').textContent=st.fileName;
-        document.getElementById('mtEbookViewerSubtitle').textContent=`총 ${words.length}문장 · 한 페이지 ${MT_EBOOK_PAGE_SIZE}문장 · 언마스킹 완료 문장은 옅은 회색으로 표시됩니다.`;
+        document.getElementById('mtEbookViewerSubtitle').textContent=mtEbookDisplayMode === 'eng'
+            ? `총 ${words.length}문장 · 한 페이지 ${MT_EBOOK_PAGE_SIZE}문장 · 언마스킹 완료 문장만 영어로 표시합니다.`
+            : `총 ${words.length}문장 · 한 페이지 ${MT_EBOOK_PAGE_SIZE}문장 · 언마스킹 완료 문장은 옅은 회색으로 표시됩니다.`;
+        const englishToggleBtn=document.getElementById('mtEbookEnglishToggleBtn');
+        if(englishToggleBtn) englishToggleBtn.textContent=mtEbookDisplayMode === 'eng' ? '주문장 보기' : '영어변환';
         const list=document.getElementById('mtEbookList'); if(!list)return; list.innerHTML='';
         const start=(page-1)*MT_EBOOK_PAGE_SIZE;
         const pageWords=words.slice(start,start+MT_EBOOK_PAGE_SIZE);
@@ -7774,11 +7789,12 @@ Return JSON only.`;
             const item=document.createElement('div');
             item.className='mt-ebook-item'+(w.ebookRead?' read':'');
             item.dataset.index=absoluteIndex;
+            const displayText = (mtEbookDisplayMode === 'eng' && w.ebookRead) ? w.eng : w.kor;
             item.innerHTML=`<button type="button" class="mt-ebook-item-edit-btn" title="문장 수정" aria-label="문장 수정">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z"></path>
                 </svg>
-            </button><span class="mt-ebook-item-num">${absoluteIndex+1}</span><span class="mt-ebook-item-main">${mtEscapeHTML(w.kor)}</span>`;
+            </button><span class="mt-ebook-item-num">${absoluteIndex+1}</span><span class="mt-ebook-item-main">${mtEscapeHTML(displayText)}</span>`;
             item.querySelector('.mt-ebook-item-edit-btn').onclick=(e)=>{ e.preventDefault(); e.stopPropagation(); mtOpenEbookEditModal(Number(slotIndex),absoluteIndex); };
             item.onclick=()=>mtOpenEbookTyping(Number(slotIndex),absoluteIndex);
             list.appendChild(item);
@@ -7800,6 +7816,7 @@ Return JSON only.`;
     function mtCloseEbookViewer(){
         if(mtEbookTypingActive){ mtCloseEbookTyping(); return; }
         mtEbookActiveSlot=null;
+        mtEbookDisplayMode='kor';
         const viewer=document.getElementById('mtEbookViewer'); if(viewer)viewer.style.display='none';
         document.getElementById('mt-main-menu').style.display='block';
         mtInitSlots();
