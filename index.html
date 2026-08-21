@@ -5373,12 +5373,23 @@ Rules:
     }
 
     function mtNormalizeCompletionKey(word, index) {
+        // 카드별 완료 이력의 기준 키입니다.
+        // NO/일련번호만 단독으로 사용하면 동일 번호 카드가 생길 때 충돌할 수 있으므로
+        // 번호 + 현재 문장 내용을 함께 묶습니다. 문장이 수정되면 새 카드 상태로 간주합니다.
         const w = word || {};
         const serial = String(w.serial ?? '').trim();
-        const eng = String(w.eng ?? w.english ?? '').trim().toLowerCase();
-        const kor = String(w.kor ?? w.meaning ?? '').trim();
-        const sub = String(w.subKor ?? w.literalKor ?? w.hint ?? '').trim();
-        return serial || `${index}|${kor}|${eng}|${sub}`;
+        const eng = String(w.eng ?? w.english ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+        const kor = String(w.kor ?? w.meaning ?? '').trim().replace(/\s+/g, ' ');
+        const sub = String(w.subKor ?? w.literalKor ?? w.hint ?? '').trim().replace(/\s+/g, ' ');
+        const ordinal = Number.isInteger(Number(w.originalIndex)) ? Number(w.originalIndex) : Number(index);
+        return `${serial || `#${ordinal + 1}`}|${kor}|${sub}|${eng}`;
+    }
+
+    function mtGetCompletionHistoryObject(state) {
+        const history = state && state.completedMaskHistory && typeof state.completedMaskHistory === 'object'
+            ? state.completedMaskHistory
+            : {};
+        return { ...history };
     }
 
     function mtGetPersistentCompletedSet(slotIndex, slotData, type='normal') {
@@ -5435,38 +5446,42 @@ Rules:
 
         const slot = mtActiveSlotIndex;
         const key = mtNormalizeCompletionKey(currentWord, Number(currentWord.originalIndex ?? mtCurrentIndex));
+        const completedAt = new Date().toISOString();
+
         try {
-            if (mtEbookTypingActive) return false; // 전자책은 기존 ebookReadIndexes가 기준입니다.
-            if (slot === 'slot9') {
-                const st = mtSlot9GetState();
+            // 전자책은 기존의 카드별 ebookReadIndexes가 영구 완료 이력의 기준입니다.
+            if (mtEbookTypingActive) return false;
+
+            const persist = (st, saveFn) => {
+                if (!st || !Array.isArray(st.words) && !Array.isArray(st.outputRows)) return false;
                 const set = new Set((st.completedMaskKeys || []).map(String));
-                if (set.has(key)) return false;
-                set.add(key); st.completedMaskKeys = Array.from(set); mtSlot9SaveState(st);
-                return true;
+                const history = mtGetCompletionHistoryObject(st);
+                const alreadyDone = set.has(key);
+                if (!alreadyDone) set.add(key);
+                history[key] = history[key] || { completedAt };
+                st.completedMaskKeys = Array.from(set);
+                st.completedMaskHistory = history;
+                saveFn(st);
+                return !alreadyDone;
+            };
+
+            if (slot === 'slot9') {
+                return persist(mtSlot9GetState(), mtSlot9SaveState);
             }
             if (slot === 'wordweb') {
-                const st = mtWordWebGetState();
-                const set = new Set((st.completedMaskKeys || []).map(String));
-                if (set.has(key)) return false;
-                set.add(key); st.completedMaskKeys = Array.from(set); mtWordWebSaveState(st);
-                return true;
+                return persist(mtWordWebGetState(), mtWordWebSaveState);
             }
+
             const configuredType = mtGetSlotType(slot);
             if (configuredType && configuredType !== 'normal') {
-                const st = mtGetTypedState(Number(slot));
-                const set = new Set((st.completedMaskKeys || []).map(String));
-                if (set.has(key)) return false;
-                set.add(key); st.completedMaskKeys = Array.from(set); mtSaveTypedState(Number(slot), st);
-                return true;
+                const n = Number(slot);
+                return persist(mtGetTypedState(n), st => mtSaveTypedState(n, st));
             }
+
             const raw = localStorage.getItem(mtGetSlotStorageKey(slot));
             const st = raw ? JSON.parse(raw) : null;
             if (!st || !Array.isArray(st.words)) return false;
-            const set = new Set((st.completedMaskKeys || []).map(String));
-            if (set.has(key)) return false;
-            set.add(key); st.completedMaskKeys = Array.from(set);
-            localStorage.setItem(mtGetSlotStorageKey(slot), JSON.stringify(st));
-            return true;
+            return persist(st, next => localStorage.setItem(mtGetSlotStorageKey(slot), JSON.stringify(next)));
         } catch (_) {
             return false;
         }
@@ -8976,6 +8991,8 @@ Return JSON only.`;
     function mtCompleteCurrentCardIfTyped() {
         if (!mtCardHadDirectTyping) return false;
         if (!mtIsCurrentTypedAnswerComplete()) return false;
+        // 직접 입력으로 정답 처리되는 순간에도 카드별 영구 완료 이력을 반드시 저장합니다.
+        mtRecordPersistentCardCompletion();
         mtRecordTypedCompletedCard();
         return true;
     }
@@ -9390,7 +9407,9 @@ Return JSON only.`;
                                        typed.toLowerCase() === target.toLowerCase();
 
                     if (isComplete) {
+                        mtCardHadDirectTyping = true;
                         mtCompleteCurrentCardIfTyped();
+                        mtRecordPersistentCardCompletion();
                         mtNextWord();
                     }
                 } else if (e.key === 'PageUp') {
