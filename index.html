@@ -2418,10 +2418,10 @@
 
 <script>
     // ============================================================================
-    // ★ 최근 코드 업데이트 시각: 202608220220
+    // ★ 최근 코드 업데이트 시각: 202608222222
     // ★ ※ 코드를 직접 수정할 때마다 위 시간값도 변경하세요.
     // ============================================================================
-    const APP_BUILD_TIMESTAMP = '202608220220';
+    const APP_BUILD_TIMESTAMP = '202608222222';
     
         /* ========================================== */
     /* [신규 기능] AI 도움 프롬프트 통합 템플릿 관리   */
@@ -7955,8 +7955,15 @@ Return JSON only.`;
     function mtRegisterNormalRows(rows,slotIndex,fileName,sourceType='file'){
         const prepared=mtDetectAndRemoveHeaderRows(rows);
         if(!prepared.length) throw new Error('일반유형에서 사용할 데이터가 없습니다.');
-        mtNormalColumnTemp={rows:prepared,slotIndex:Number(slotIndex),fileName:String(fileName||''),sourceType:String(sourceType||'file')};
-        mtOpenNormalColumnSelectModal(prepared);
+        // 열 위치가 4열 이상인 파일도 절대 잘리지 않도록 전체 행을 동일한 폭으로 정규화합니다.
+        const maxCols=Math.max(1,...prepared.map(r=>Array.isArray(r)?r.length:0));
+        const normalized=prepared.map(r=>{
+            const row=Array.isArray(r)?r.slice():[];
+            while(row.length<maxCols) row.push('');
+            return row;
+        });
+        mtNormalColumnTemp={rows:normalized,slotIndex:Number(slotIndex),fileName:String(fileName||''),sourceType:String(sourceType||'file'),maxCols};
+        mtOpenNormalColumnSelectModal(normalized);
     }
 
     function mtOpenNormalColumnSelectModal(rows){
@@ -8034,10 +8041,15 @@ Return JSON only.`;
             alert('보조문장 열은 주문장 열과 다른 열을 선택해 주세요.');
             return;
         }
-        const rows=mtNormalColumnTemp.rows;
+        const rows=Array.isArray(mtNormalColumnTemp.rows)?mtNormalColumnTemp.rows:[];
         const slot=mtNormalColumnTemp.slotIndex;
         const rawName=mtNormalColumnTemp.fileName;
         const sourceType=mtNormalColumnTemp.sourceType||'file';
+        const maxCols=Math.max(1,...rows.map(r=>Array.isArray(r)?r.length:0));
+        if(mainIdx>=maxCols || engIdx>=maxCols || (subIdx>=maxCols && subIdx>=0)){
+            alert(`선택한 열이 실제 데이터 범위를 벗어났습니다. 현재 파일의 최대 열은 ${maxCols}열입니다.`);
+            return;
+        }
         const normalize=v=>String(v??'').trim();
         const first=Array.isArray(rows[0])?rows[0].map(normalize):[];
         const firstLower=first.map(v=>v.toLowerCase());
