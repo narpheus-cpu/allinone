@@ -5462,6 +5462,7 @@ Rules:
                 st.completedMaskKeys = Array.from(set);
                 st.completedMaskHistory = history;
                 saveFn(st);
+                try { if (typeof mtInitSlots === 'function') mtInitSlots(); } catch (_) {}
                 return !alreadyDone;
             };
 
