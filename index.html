@@ -1210,6 +1210,35 @@
             box-shadow: 0 24px 60px rgba(15, 23, 42, 0.18);
         }
 
+        /* 섹터 여백 직접 드래그 조절 */
+        .mt-layout-sector { position: relative !important; }
+        .mt-sector-resize-handle {
+            position:absolute; right:4px; bottom:2px; width:18px; height:18px;
+            display:flex; align-items:flex-end; justify-content:flex-end;
+            color:#94a3b8; font-size:14px; line-height:1;
+            cursor:ns-resize; user-select:none; -webkit-user-select:none;
+            opacity:.45; z-index:30;
+            padding:0; background:rgba(248,250,252,.92); border-radius:4px;
+        }
+        .mt-layout-sector:hover .mt-sector-resize-handle { opacity:.95; }
+        .mt-layout-sector.mt-sector-dragging .mt-sector-resize-handle { opacity:1; color:#475569; }
+        body.mt-sector-global-dragging { cursor:ns-resize !important; user-select:none !important; }
+
+        .mt-sector-wrap {
+            position: relative;
+            width: 100%;
+        }
+        .mt-sector-wrap .mt-sector-resize-handle {
+            position:absolute; right:4px; bottom:2px; width:20px; height:20px;
+            display:flex; align-items:flex-end; justify-content:flex-end;
+            color:#94a3b8; font-size:15px; line-height:1;
+            cursor:ns-resize; user-select:none; -webkit-user-select:none;
+            opacity:.28; z-index:50; padding:0 1px 1px 0;
+            background:rgba(248,250,252,.92); border-radius:4px;
+        }
+        .mt-sector-wrap:hover .mt-sector-resize-handle { opacity:.95; }
+        body.mt-sector-global-dragging { cursor:ns-resize !important; user-select:none !important; }
+
         @media (max-width: 720px) {
             .container { padding: 16px; border-radius: 12px; }
             .header-container { align-items: stretch; }
@@ -1986,11 +2015,12 @@
                 </div>
             </div>
 
-            <div id="mtKorText"></div>
+            <div class="mt-sector-wrap mt-sector-wrap-kor"><div id="mtKorText"></div><div class="mt-sector-resize-handle" data-sector="kor" title="주문장 섹터 여백 조절">↘</div></div>
 
-            <div id="mtMaskContainer" class="mt-mask-container"></div>
+            <div class="mt-sector-wrap mt-sector-wrap-mask"><div id="mtMaskContainer" class="mt-mask-container"></div><div class="mt-sector-resize-handle" data-sector="mask" title="마스킹 섹터 여백 조절">↘</div></div>
 
-            <div class="mt-input-area">
+            <div class="mt-input-area mt-layout-sector mt-sector-input">
+                <div class="mt-sector-resize-handle" data-sector="input" title="입력 섹터 여백 조절">↘</div>
                 <div id="mtStarBtn" onclick="mtToggleStar()">☆</div>
                 <input type="text" id="mtEngInput" autocomplete="off" placeholder="영어를 타이핑하세요" />
             </div>
@@ -2104,41 +2134,9 @@
                     <input type="text" id="mtInputHeightInput" readonly style="width:42px;">
                     <button onclick="mtAdjustLayout('inputHeight', 1)">+</button>
                 </div>
-                <div class="mt-font-ctrl-item">
-                    <span>주문장 위여백</span>
-                    <button onclick="mtAdjustLayout('korMarginTop', -1)">-</button>
-                    <input type="text" id="mtKorMarginTopInput" readonly style="width:42px;">
-                    <button onclick="mtAdjustLayout('korMarginTop', 1)">+</button>
-                </div>
-                <div class="mt-font-ctrl-item">
-                    <span>주문장 아래여백</span>
-                    <button onclick="mtAdjustLayout('korMarginBottom', -1)">-</button>
-                    <input type="text" id="mtKorMarginBottomInput" readonly style="width:42px;">
-                    <button onclick="mtAdjustLayout('korMarginBottom', 1)">+</button>
-                </div>
-                <div class="mt-font-ctrl-item">
-                    <span>마스킹 위여백</span>
-                    <button onclick="mtAdjustLayout('maskMarginTop', -1)">-</button>
-                    <input type="text" id="mtMaskMarginTopInput" readonly style="width:42px;">
-                    <button onclick="mtAdjustLayout('maskMarginTop', 1)">+</button>
-                </div>
-                <div class="mt-font-ctrl-item">
-                    <span>마스킹 아래여백</span>
-                    <button onclick="mtAdjustLayout('maskMarginBottom', -1)">-</button>
-                    <input type="text" id="mtMaskMarginBottomInput" readonly style="width:42px;">
-                    <button onclick="mtAdjustLayout('maskMarginBottom', 1)">+</button>
-                </div>
-                <div class="mt-font-ctrl-item">
-                    <span>입력칸 위여백</span>
-                    <button onclick="mtAdjustLayout('inputMarginTop', -1)">-</button>
-                    <input type="text" id="mtInputMarginTopInput" readonly style="width:42px;">
-                    <button onclick="mtAdjustLayout('inputMarginTop', 1)">+</button>
-                </div>
-                <div class="mt-font-ctrl-item">
-                    <span>입력칸 아래여백</span>
-                    <button onclick="mtAdjustLayout('inputMarginBottom', -1)">-</button>
-                    <input type="text" id="mtInputMarginBottomInput" readonly style="width:42px;">
-                    <button onclick="mtAdjustLayout('inputMarginBottom', 1)">+</button>
+                <div class="mt-font-ctrl-item" style="flex-basis:100%; justify-content:center; margin-top:4px; gap:8px;">
+                    <strong>섹터 여백</strong>
+                    <span style="font-size:10px;color:#64748b;">각 섹터 오른쪽 아래의 ↘ 핸들을 위·아래로 드래그해서 여백을 조절하세요.</span>
                 </div>
                 <div class="mt-font-ctrl-item">
                     <span>마스킹 방식</span>
@@ -4664,12 +4662,12 @@ Rules:
     let mtInputLineHeight = mtGetStoredNumber('mtInputLineHeight', MT_FONT_DEFAULTS.inputLineHeight, 1.0, 3.0);
     let mtMaskHeight = mtGetStoredNumber('mtMaskHeight', MT_FONT_DEFAULTS.maskHeight, 0.7, 3.0);
     let mtInputHeight = mtGetStoredNumber('mtInputHeight', MT_FONT_DEFAULTS.inputHeight, 32, 120);
-    let mtKorMarginTop = mtGetStoredNumber('mtKorMarginTop', MT_FONT_DEFAULTS.korMarginTop, 0, 60);
-    let mtKorMarginBottom = mtGetStoredNumber('mtKorMarginBottom', MT_FONT_DEFAULTS.korMarginBottom, 0, 60);
-    let mtMaskMarginTop = mtGetStoredNumber('mtMaskMarginTop', MT_FONT_DEFAULTS.maskMarginTop, 0, 60);
-    let mtMaskMarginBottom = mtGetStoredNumber('mtMaskMarginBottom', MT_FONT_DEFAULTS.maskMarginBottom, 0, 60);
-    let mtInputMarginTop = mtGetStoredNumber('mtInputMarginTop', MT_FONT_DEFAULTS.inputMarginTop, 0, 60);
-    let mtInputMarginBottom = mtGetStoredNumber('mtInputMarginBottom', MT_FONT_DEFAULTS.inputMarginBottom, 0, 60);
+    let mtKorMarginTop = mtGetStoredNumber('mtKorMarginTop', MT_FONT_DEFAULTS.korMarginTop, -60, 60);
+    let mtKorMarginBottom = mtGetStoredNumber('mtKorMarginBottom', MT_FONT_DEFAULTS.korMarginBottom, -60, 60);
+    let mtMaskMarginTop = mtGetStoredNumber('mtMaskMarginTop', MT_FONT_DEFAULTS.maskMarginTop, -60, 60);
+    let mtMaskMarginBottom = mtGetStoredNumber('mtMaskMarginBottom', MT_FONT_DEFAULTS.maskMarginBottom, -60, 60);
+    let mtInputMarginTop = mtGetStoredNumber('mtInputMarginTop', MT_FONT_DEFAULTS.inputMarginTop, -60, 60);
+    let mtInputMarginBottom = mtGetStoredNumber('mtInputMarginBottom', MT_FONT_DEFAULTS.inputMarginBottom, -60, 60);
     let mtMaskMode = localStorage.getItem('mtMaskMode') === 'chunk' ? 'chunk' : 'char';
 
     function mtNormalizeFontSettings(settings = {}) {
@@ -4804,12 +4802,6 @@ Rules:
         if(document.getElementById('mtInputLineHeightInput')) document.getElementById('mtInputLineHeightInput').value = mtInputLineHeight.toFixed(1);
         if(document.getElementById('mtMaskHeightInput')) document.getElementById('mtMaskHeightInput').value = mtMaskHeight.toFixed(1) + 'em';
         if(document.getElementById('mtInputHeightInput')) document.getElementById('mtInputHeightInput').value = Math.round(mtInputHeight) + 'px';
-        if(document.getElementById('mtKorMarginTopInput')) document.getElementById('mtKorMarginTopInput').value = Math.round(mtKorMarginTop) + 'px';
-        if(document.getElementById('mtKorMarginBottomInput')) document.getElementById('mtKorMarginBottomInput').value = Math.round(mtKorMarginBottom) + 'px';
-        if(document.getElementById('mtMaskMarginTopInput')) document.getElementById('mtMaskMarginTopInput').value = Math.round(mtMaskMarginTop) + 'px';
-        if(document.getElementById('mtMaskMarginBottomInput')) document.getElementById('mtMaskMarginBottomInput').value = Math.round(mtMaskMarginBottom) + 'px';
-        if(document.getElementById('mtInputMarginTopInput')) document.getElementById('mtInputMarginTopInput').value = Math.round(mtInputMarginTop) + 'px';
-        if(document.getElementById('mtInputMarginBottomInput')) document.getElementById('mtInputMarginBottomInput').value = Math.round(mtInputMarginBottom) + 'px';
         if(document.getElementById('mtMaskModeSelect')) document.getElementById('mtMaskModeSelect').value = mtMaskMode;
     }
 
@@ -4839,6 +4831,57 @@ Rules:
             localStorage.setItem('mtInputSize', mtInputSize);
         }
         mtApplyFontSettings();
+    }
+
+    const MT_SECTOR_MARGIN_CONFIG = Object.freeze({
+        kor: ['mtKorMarginTop','mtKorMarginBottom'],
+        mask: ['mtMaskMarginTop','mtMaskMarginBottom'],
+        input: ['mtInputMarginTop','mtInputMarginBottom']
+    });
+    let mtSectorDragState = null;
+    function mtSetSectorMargins(sector, value) {
+        const pair = MT_SECTOR_MARGIN_CONFIG[sector];
+        if (!pair) return;
+        const v = Math.round(Math.max(-60, Math.min(60, Number(value) || 0)));
+        if (sector === 'kor') { mtKorMarginTop = v; mtKorMarginBottom = v; }
+        else if (sector === 'mask') { mtMaskMarginTop = v; mtMaskMarginBottom = v; }
+        else { mtInputMarginTop = v; mtInputMarginBottom = v; }
+        localStorage.setItem(pair[0], String(v));
+        localStorage.setItem(pair[1], String(v));
+        mtApplyFontSettings();
+    }
+    function mtInitSectorMarginHandles() {
+        if (document.body.dataset.mtSectorHandlesBound === '1') return;
+        document.body.dataset.mtSectorHandlesBound = '1';
+        document.querySelectorAll('.mt-sector-resize-handle').forEach(handle => {
+            handle.addEventListener('pointerdown', e => {
+                const sector = handle.dataset.sector;
+                if (!MT_SECTOR_MARGIN_CONFIG[sector]) return;
+                const current = sector === 'kor' ? mtKorMarginTop : (sector === 'mask' ? mtMaskMarginTop : mtInputMarginTop);
+                mtSectorDragState = { sector, startY:e.clientY, startValue:Number(current)||0, pointerId:e.pointerId };
+                handle.dataset.dragging = '1';
+                document.body.classList.add('mt-sector-global-dragging');
+                try { handle.setPointerCapture(e.pointerId); } catch (_) {}
+                e.preventDefault();
+                e.stopPropagation();
+            });
+        });
+        document.addEventListener('pointermove', e => {
+            if (!mtSectorDragState || e.pointerId !== mtSectorDragState.pointerId) return;
+            const delta = Math.round((e.clientY - mtSectorDragState.startY) / 2);
+            mtSetSectorMargins(mtSectorDragState.sector, mtSectorDragState.startValue + delta);
+            e.preventDefault();
+        }, {passive:false});
+        const stop = e => {
+            if (!mtSectorDragState) return;
+            if (e && e.pointerId !== undefined && e.pointerId !== mtSectorDragState.pointerId) return;
+            document.querySelectorAll('.mt-sector-resize-handle[data-dragging="1"]').forEach(el => el.removeAttribute('data-dragging'));
+            document.body.classList.remove('mt-sector-global-dragging');
+            mtSectorDragState = null;
+        };
+        document.addEventListener('pointerup', stop);
+        document.addEventListener('pointercancel', stop);
+        window.addEventListener('blur', () => stop({type:'blur'}));
     }
 
     function mtAdjustLayout(type, delta) {
@@ -9642,6 +9685,7 @@ Return JSON only.`;
         }
     })();
 
+    try { mtInitSectorMarginHandles(); } catch (_) {}
 </script>
 </body>
 </html>
