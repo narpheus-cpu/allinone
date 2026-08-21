@@ -5374,8 +5374,9 @@ Rules:
     }
 
     function mtNormalizeCompletionKey(word, index) {
-        // 카드별 완료 이력의 보조 키입니다.
-        // 1차 식별자는 originalIndex(원본 카드 위치), 이 키는 문장 내용이 바뀌었을 때의 보조 검증용입니다.
+        // 카드별 완료 이력의 기준 키입니다.
+        // NO/일련번호만 단독으로 사용하면 동일 번호 카드가 생길 때 충돌할 수 있으므로
+        // 번호 + 현재 문장 내용을 함께 묶습니다. 문장이 수정되면 새 카드 상태로 간주합니다.
         const w = word || {};
         const serial = String(w.serial ?? '').trim();
         const eng = String(w.eng ?? w.english ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
@@ -5392,66 +5393,51 @@ Rules:
         return { ...history };
     }
 
-    function mtGetCompletionIndexes(state) {
-        return new Set(
-            Array.isArray(state?.completedCardIndexes)
-                ? state.completedCardIndexes.map(Number).filter(Number.isInteger).filter(n => n >= 0)
-                : []
-        );
-    }
-
-    function mtGetCompletionKeys(state) {
-        return new Set(Array.isArray(state?.completedMaskKeys) ? state.completedMaskKeys.map(String) : []);
-    }
-
-    function mtGetPersistentCompletionState(slotIndex, slotData, type='normal') {
+    function mtGetPersistentCompletedSet(slotIndex, slotData, type='normal') {
         try {
             if (type === 'ebook') {
                 const st = mtGetTypedState(Number(slotIndex));
-                return {
-                    indexes: new Set((st.ebookReadIndexes || []).map(Number).filter(Number.isInteger)),
-                    keys: new Set()
-                };
+                return new Set((st.ebookReadIndexes || []).map(Number));
             }
-            let state = null;
-            if (slotIndex === 'slot9') state = mtSlot9GetState();
-            else if (slotIndex === 'wordweb') state = mtWordWebGetState();
-            else {
-                const configuredType = mtGetSlotType(slotIndex);
-                if (configuredType && configuredType !== 'normal') state = mtGetTypedState(Number(slotIndex));
-                else state = slotData && typeof slotData === 'object' ? slotData : null;
+            if (slotIndex === 'slot9') {
+                const st = mtSlot9GetState();
+                return new Set((st.completedMaskKeys || []).map(String));
             }
-            return {
-                indexes: mtGetCompletionIndexes(state),
-                keys: mtGetCompletionKeys(state)
-            };
+            if (slotIndex === 'wordweb') {
+                const st = mtWordWebGetState();
+                return new Set((st.completedMaskKeys || []).map(String));
+            }
+            const configuredType = mtGetSlotType(slotIndex);
+            if (configuredType && configuredType !== 'normal') {
+                const st = mtGetTypedState(Number(slotIndex));
+                return new Set((st.completedMaskKeys || []).map(String));
+            }
+            return new Set((slotData?.completedMaskKeys || []).map(String));
         } catch (_) {
-            return { indexes: new Set(), keys: new Set() };
+            return new Set();
         }
     }
 
     function mtGetSlotLearningProgress(slotIndex, slotData, type='normal') {
         const total = Array.isArray(slotData?.words) ? slotData.words.length : 0;
-        const completion = mtGetPersistentCompletionState(slotIndex, slotData, type);
+        if (type === 'ebook') {
+            const st = mtGetTypedState(Number(slotIndex));
+            const done = new Set((st.ebookReadIndexes || []).map(Number)).size;
+            const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
+            return `진행률 ${pct}% (${done}/${total})`;
+        }
+
+        // 진행률은 '현재 학습 세션'이 아니라 슬롯 전체 카드의 영구 완료 이력으로 계산합니다.
+        const completedSet = mtGetPersistentCompletedSet(slotIndex, slotData, type);
         let done = 0;
         for (let i = 0; i < total; i++) {
             const word = slotData.words[i];
-            const originalIndex = Number.isInteger(Number(word?.originalIndex)) ? Number(word.originalIndex) : i;
             const key = mtNormalizeCompletionKey(word, i);
-            if (completion.indexes.has(originalIndex) || completion.keys.has(key)) done++;
+            if (completedSet.has(key)) done++;
         }
         done = Math.min(done, total);
         const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
         return `진행률 ${pct}% (${done}/${total})`;
-    }
-
-    function mtRefreshSlotProgressUI() {
-        // 학습 화면을 닫지 않아도 완료 즉시 슬롯 카드의 진행률이 다시 계산됩니다.
-        try {
-            if (typeof mtInitSlots === 'function') mtInitSlots();
-        } catch (e) {
-            console.warn('슬롯 진행률 갱신 실패:', e);
-        }
     }
 
     function mtRecordPersistentCardCompletion() {
@@ -5460,73 +5446,48 @@ Rules:
         if (!currentWord || !mtIsCurrentMaskFullyUnmasked()) return false;
 
         const slot = mtActiveSlotIndex;
-        const originalIndex = Number.isInteger(Number(currentWord.originalIndex))
-            ? Number(currentWord.originalIndex)
-            : Number(mtCurrentIndex);
-        const key = mtNormalizeCompletionKey(currentWord, originalIndex);
+        const key = mtNormalizeCompletionKey(currentWord, Number(currentWord.originalIndex ?? mtCurrentIndex));
         const completedAt = new Date().toISOString();
 
         try {
-            // 전자책은 기존의 카드별 ebookReadIndexes가 단일 기준입니다.
+            // 전자책은 기존의 카드별 ebookReadIndexes가 영구 완료 이력의 기준입니다.
             if (mtEbookTypingActive) return false;
 
             const persist = (st, saveFn) => {
-                if (!st || (!Array.isArray(st.words) && !Array.isArray(st.outputRows))) return false;
-
-                const indexSet = mtGetCompletionIndexes(st);
-                const keySet = mtGetCompletionKeys(st);
+                if (!st || !Array.isArray(st.words) && !Array.isArray(st.outputRows)) return false;
+                const set = new Set((st.completedMaskKeys || []).map(String));
                 const history = mtGetCompletionHistoryObject(st);
-                const alreadyDone = indexSet.has(originalIndex) || keySet.has(key);
-
-                indexSet.add(originalIndex);
-                keySet.add(key);
-                history[key] = history[key] || {
-                    originalIndex,
-                    completedAt
-                };
-
-                st.completedCardIndexes = Array.from(indexSet).sort((a,b)=>a-b);
-                st.completedMaskKeys = Array.from(keySet);
+                const alreadyDone = set.has(key);
+                if (!alreadyDone) set.add(key);
+                history[key] = history[key] || { completedAt };
+                st.completedMaskKeys = Array.from(set);
                 st.completedMaskHistory = history;
                 saveFn(st);
+                try { if (typeof mtInitSlots === 'function') mtInitSlots(); } catch (_) {}
                 return !alreadyDone;
             };
 
-            let changed = false;
             if (slot === 'slot9') {
-                changed = persist(mtSlot9GetState(), mtSlot9SaveState);
-            } else if (slot === 'wordweb') {
-                changed = persist(mtWordWebGetState(), mtWordWebSaveState);
-            } else {
-                const configuredType = mtGetSlotType(slot);
-                if (configuredType && configuredType !== 'normal') {
-                    const n = Number(slot);
-                    changed = persist(mtGetTypedState(n), st => mtSaveTypedState(n, st));
-                } else {
-                    const raw = localStorage.getItem(mtGetSlotStorageKey(slot));
-                    let parsed = raw ? JSON.parse(raw) : null;
-                    if (Array.isArray(parsed)) parsed = { name: `슬롯 ${Number(slot)}`, words: parsed };
-                    if (!parsed || !Array.isArray(parsed.words)) return false;
-                    changed = persist(parsed, next => localStorage.setItem(mtGetSlotStorageKey(slot), JSON.stringify(next)));
-                    if (changed || parsed.completedCardIndexes || parsed.completedMaskKeys) {
-                        // 학습 세션 저장 시 완료 이력이 다시 덮어써지지 않도록 메모리 복사본에도 반영합니다.
-                        mtOriginalSlotData = mtOriginalSlotData || parsed;
-                        mtOriginalSlotData.completedCardIndexes = Array.isArray(parsed.completedCardIndexes) ? parsed.completedCardIndexes.slice() : [];
-                        mtOriginalSlotData.completedMaskKeys = Array.isArray(parsed.completedMaskKeys) ? parsed.completedMaskKeys.slice() : [];
-                        mtOriginalSlotData.completedMaskHistory = { ...mtGetCompletionHistoryObject(parsed) };
-                    }
-                }
+                return persist(mtSlot9GetState(), mtSlot9SaveState);
+            }
+            if (slot === 'wordweb') {
+                return persist(mtWordWebGetState(), mtWordWebSaveState);
             }
 
-            // 저장이 새 완료를 만들었거나, 이전 버전 데이터 구조를 정규화한 뒤라도 화면을 즉시 갱신합니다.
-            mtRefreshSlotProgressUI();
-            return changed;
-        } catch (e) {
-            console.warn('카드 완료 이력 저장 실패:', e);
+            const configuredType = mtGetSlotType(slot);
+            if (configuredType && configuredType !== 'normal') {
+                const n = Number(slot);
+                return persist(mtGetTypedState(n), st => mtSaveTypedState(n, st));
+            }
+
+            const raw = localStorage.getItem(mtGetSlotStorageKey(slot));
+            const st = raw ? JSON.parse(raw) : null;
+            if (!st || !Array.isArray(st.words)) return false;
+            return persist(st, next => localStorage.setItem(mtGetSlotStorageKey(slot), JSON.stringify(next)));
+        } catch (_) {
             return false;
         }
     }
-
     function mtGetGeneratorProgressLabel(words) {
         return `학습카드 수 ${Array.isArray(words) ? words.length : 0}`;
     }
@@ -5915,78 +5876,22 @@ Rules:
     }
 
     function mtSaveSessionState() {
-        if(!mtOriginalSlotData) return;
-
-        const lastSession = {
-            studyWords: mtCurrentStudyWords,
-            currentIndex: mtCurrentIndex
-        };
-        mtOriginalSlotData.lastSession = lastSession;
-
-        if (mtActiveSlotIndex === 'star') {
-            localStorage.setItem('word_slot_star_session', JSON.stringify(lastSession));
-            return;
-        }
-
-        if (mtActiveSlotIndex === 'wordweb') {
-            // 완료 이력은 별도 state에 있으므로 세션 저장이 이를 덮어쓰지 않습니다.
-            mtWordWebSyncLastSession(lastSession);
-            return;
-        }
-
-        if (mtActiveSlotIndex === 'slot9') {
-            const st = mtSlot9GetState();
-            st.lastSession = lastSession;
-            mtSlot9SaveState(st);
-            return;
-        }
-
-        const configuredType = mtGetSlotType(mtActiveSlotIndex);
-        if (configuredType && configuredType !== 'normal') {
-            const st = mtGetTypedState(Number(mtActiveSlotIndex));
-            st.lastSession = lastSession;
-            mtSaveTypedState(Number(mtActiveSlotIndex), st);
-            return;
-        }
-
-        // 일반유형은 mtOriginalSlotData가 학습 시작 시점의 복사본일 수 있습니다.
-        // 완료 이력을 방금 저장한 최신 저장본과 병합한 뒤 세션만 갱신합니다.
-        try {
-            const key = mtGetSlotStorageKey(mtActiveSlotIndex);
-            const raw = localStorage.getItem(key);
-            let persisted = raw ? JSON.parse(raw) : null;
-            if (Array.isArray(persisted)) persisted = { name: mtOriginalSlotData.name || `슬롯 ${Number(mtActiveSlotIndex)}`, words: persisted };
-            if (!persisted || !Array.isArray(persisted.words)) persisted = { ...mtOriginalSlotData };
-
-            persisted.name = mtOriginalSlotData.name || persisted.name || `슬롯 ${Number(mtActiveSlotIndex)}`;
-            persisted.words = persisted.words || mtOriginalSlotData.words || [];
-            persisted.lastSession = lastSession;
-
-            // 완료 이력은 저장본을 우선하고, 현재 메모리에만 있는 값도 잃지 않도록 합집합합니다.
-            const mergedIndexes = new Set([
-                ...mtGetCompletionIndexes(persisted),
-                ...mtGetCompletionIndexes(mtOriginalSlotData)
-            ]);
-            const mergedKeys = new Set([
-                ...mtGetCompletionKeys(persisted),
-                ...mtGetCompletionKeys(mtOriginalSlotData)
-            ]);
-            const mergedHistory = {
-                ...mtGetCompletionHistoryObject(persisted),
-                ...mtGetCompletionHistoryObject(mtOriginalSlotData)
+        if(mtOriginalSlotData) {
+            mtOriginalSlotData.lastSession = {
+                studyWords: mtCurrentStudyWords,
+                currentIndex: mtCurrentIndex
             };
-            persisted.completedCardIndexes = Array.from(mergedIndexes).sort((a,b)=>a-b);
-            persisted.completedMaskKeys = Array.from(mergedKeys);
-            persisted.completedMaskHistory = mergedHistory;
-
-            localStorage.setItem(key, JSON.stringify(persisted));
-            // 다음 저장에서도 같은 완료 이력을 유지하도록 현재 메모리 복사본도 동기화합니다.
-            mtOriginalSlotData.completedCardIndexes = persisted.completedCardIndexes.slice();
-            mtOriginalSlotData.completedMaskKeys = persisted.completedMaskKeys.slice();
-            mtOriginalSlotData.completedMaskHistory = { ...persisted.completedMaskHistory };
-        } catch (e) {
-            console.warn('일반유형 세션 저장 중 완료 이력 병합 실패:', e);
-            localStorage.setItem(mtGetSlotStorageKey(mtActiveSlotIndex), JSON.stringify(mtOriginalSlotData));
+            if (mtActiveSlotIndex === 'star') {
+                localStorage.setItem('word_slot_star_session', JSON.stringify(mtOriginalSlotData.lastSession));
+            } else if (mtActiveSlotIndex === 'wordweb') {
+                mtWordWebSyncLastSession(mtOriginalSlotData.lastSession);
+            } else if (mtActiveSlotIndex === 'slot9') {
+                const st = mtSlot9GetState(); st.lastSession = mtOriginalSlotData.lastSession; mtSlot9SaveState(st);
+            } else if (mtGetSlotType(mtActiveSlotIndex) && mtGetSlotType(mtActiveSlotIndex) !== 'normal') {
+                const st = mtGetTypedState(Number(mtActiveSlotIndex)); st.lastSession = mtOriginalSlotData.lastSession; mtSaveTypedState(Number(mtActiveSlotIndex), st);
+            } else {
+                localStorage.setItem(mtGetSlotStorageKey(mtActiveSlotIndex), JSON.stringify(mtOriginalSlotData));
+            }
         }
     }
 
