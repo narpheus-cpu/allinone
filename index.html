@@ -33,6 +33,12 @@
             --mt-eng-box-width: 0.8em; 
             --mt-eng-box-gap: 4px;     
             --mt-space-width: 0.8em; 
+            --mt-kor-line-height: 1.4;
+            --mt-paren-line-height: 1.4;
+            --mt-mask-line-height: 1.4;
+            --mt-input-line-height: 1.4;
+            --mt-mask-height: 1.2em;
+            --mt-input-height: 54px;
         }
 
         body { 
@@ -684,8 +690,8 @@
         .mt-top-bar { display: flex; justify-content: space-between; margin-bottom: 20px; align-items: center; }
         .mt-progress-text { color: #666; font-size: 14px; font-weight: bold; }
 
-        #mtKorText { font-size: var(--mt-kor-size); font-weight: bold; color: #333; margin-bottom: 30px; line-height: 1.4; text-align: center; }
-        .mt-paren-text { font-size: var(--mt-paren-size); color: #555; }
+        #mtKorText { font-size: var(--mt-kor-size); font-weight: bold; color: #333; margin-bottom: 30px; line-height: var(--mt-kor-line-height); text-align: center; }
+        .mt-paren-text { font-size: var(--mt-paren-size); color: #555; line-height: var(--mt-paren-line-height); }
 
         .mt-mask-container { 
             display: flex; 
@@ -693,6 +699,7 @@
             margin-bottom: 30px; 
             flex-wrap: wrap; 
             gap: 10px 0; 
+            line-height: var(--mt-mask-line-height);
         }
 
         .mt-word-wrapper { 
@@ -703,7 +710,7 @@
 
         .mt-chunk-mask-box {
             display: inline-block;
-            height: 1.05em;
+            height: var(--mt-mask-height);
             min-width: 18px;
             background: #000;
             border-radius: 2px;
@@ -755,7 +762,7 @@
         .mt-input-area { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 20px; }
         #mtStarBtn { font-size: 32px; cursor: pointer; color: #f1c40f; user-select: none; transition: transform 0.1s; }
         #mtStarBtn:active { transform: scale(0.9); }
-        #mtEngInput { font-size: var(--mt-input-size); padding: 12px; width: 70%; max-width: 500px; text-align: center; border: 2px solid var(--border-color); border-radius: 6px; outline: none; font-family: inherit; }
+        #mtEngInput { font-size: var(--mt-input-size); padding: 12px; width: 70%; max-width: 500px; height: var(--mt-input-height); line-height: var(--mt-input-line-height); box-sizing: border-box; text-align: center; border: 2px solid var(--border-color); border-radius: 6px; outline: none; font-family: inherit; }
         #mtEngInput:focus { border-color: #111827; }
 
         .mt-nav-buttons { display: flex; justify-content: center; gap: 15px; margin-bottom: 10px; flex-wrap: wrap;}
@@ -1157,7 +1164,7 @@
             margin-top: 22px;
         }
         #mtEngInput {
-            min-height: 54px;
+            min-height: 0;
             border-radius: 12px;
             border-color: #cbd5e1;
             background: #ffffff;
@@ -2052,10 +2059,40 @@
                     <button onclick="mtAdjustLayout('boxGap', 1)">+</button>
                 </div>
                 <div class="mt-font-ctrl-item">
-                    <span>띄어쓰기</span>
-                    <button onclick="mtAdjustLayout('spaceWidth', -0.1)">-</button>
-                    <input type="text" id="mtSpaceWidthInput" readonly style="width:36px;">
-                    <button onclick="mtAdjustLayout('spaceWidth', 0.1)">+</button>
+                    <span>주문장 줄간격</span>
+                    <button onclick="mtAdjustLayout('korLineHeight', -0.1)">-</button>
+                    <input type="text" id="mtKorLineHeightInput" readonly style="width:42px;">
+                    <button onclick="mtAdjustLayout('korLineHeight', 0.1)">+</button>
+                </div>
+                <div class="mt-font-ctrl-item">
+                    <span>보조문장 줄간격</span>
+                    <button onclick="mtAdjustLayout('parenLineHeight', -0.1)">-</button>
+                    <input type="text" id="mtParenLineHeightInput" readonly style="width:42px;">
+                    <button onclick="mtAdjustLayout('parenLineHeight', 0.1)">+</button>
+                </div>
+                <div class="mt-font-ctrl-item">
+                    <span>마스킹칸 줄간격</span>
+                    <button onclick="mtAdjustLayout('maskLineHeight', -0.1)">-</button>
+                    <input type="text" id="mtMaskLineHeightInput" readonly style="width:42px;">
+                    <button onclick="mtAdjustLayout('maskLineHeight', 0.1)">+</button>
+                </div>
+                <div class="mt-font-ctrl-item">
+                    <span>입력칸 줄간격</span>
+                    <button onclick="mtAdjustLayout('inputLineHeight', -0.1)">-</button>
+                    <input type="text" id="mtInputLineHeightInput" readonly style="width:42px;">
+                    <button onclick="mtAdjustLayout('inputLineHeight', 0.1)">+</button>
+                </div>
+                <div class="mt-font-ctrl-item">
+                    <span>마스킹칸 높이</span>
+                    <button onclick="mtAdjustLayout('maskHeight', -1)">-</button>
+                    <input type="text" id="mtMaskHeightInput" readonly style="width:42px;">
+                    <button onclick="mtAdjustLayout('maskHeight', 1)">+</button>
+                </div>
+                <div class="mt-font-ctrl-item">
+                    <span>입력칸 높이</span>
+                    <button onclick="mtAdjustLayout('inputHeight', -1)">-</button>
+                    <input type="text" id="mtInputHeightInput" readonly style="width:42px;">
+                    <button onclick="mtAdjustLayout('inputHeight', 1)">+</button>
                 </div>
                 <div class="mt-font-ctrl-item">
                     <span>마스킹 방식</span>
@@ -4539,6 +4576,12 @@ Rules:
         boxWidth: 0.8,
         boxGap: 4,
         spaceWidth: 0.8,
+        korLineHeight: 1.4,
+        parenLineHeight: 1.4,
+        maskLineHeight: 1.4,
+        inputLineHeight: 1.4,
+        maskHeight: 1.2,
+        inputHeight: 54,
         maskMode: 'char'
     });
 
@@ -4556,6 +4599,12 @@ Rules:
     let mtEngBoxWidth = mtGetStoredNumber('mtEngBoxWidth', MT_FONT_DEFAULTS.boxWidth, 0.2, 4.0);
     let mtEngBoxGap = mtGetStoredNumber('mtEngBoxGap', MT_FONT_DEFAULTS.boxGap, 0, 30);
     let mtSpaceWidth = mtGetStoredNumber('mtSpaceWidth', MT_FONT_DEFAULTS.spaceWidth, 0.1, 4.0);
+    let mtKorLineHeight = mtGetStoredNumber('mtKorLineHeight', MT_FONT_DEFAULTS.korLineHeight, 1.0, 3.0);
+    let mtParenLineHeight = mtGetStoredNumber('mtParenLineHeight', MT_FONT_DEFAULTS.parenLineHeight, 1.0, 3.0);
+    let mtMaskLineHeight = mtGetStoredNumber('mtMaskLineHeight', MT_FONT_DEFAULTS.maskLineHeight, 1.0, 3.0);
+    let mtInputLineHeight = mtGetStoredNumber('mtInputLineHeight', MT_FONT_DEFAULTS.inputLineHeight, 1.0, 3.0);
+    let mtMaskHeight = mtGetStoredNumber('mtMaskHeight', MT_FONT_DEFAULTS.maskHeight, 0.7, 3.0);
+    let mtInputHeight = mtGetStoredNumber('mtInputHeight', MT_FONT_DEFAULTS.inputHeight, 32, 120);
     let mtMaskMode = localStorage.getItem('mtMaskMode') === 'chunk' ? 'chunk' : 'char';
 
     function mtNormalizeFontSettings(settings = {}) {
@@ -4567,6 +4616,12 @@ Rules:
             boxWidth: Number.isFinite(Number(settings.boxWidth)) ? Math.max(0.2, Math.min(4.0, Number(settings.boxWidth))) : MT_FONT_DEFAULTS.boxWidth,
             boxGap: Number.isFinite(Number(settings.boxGap)) ? Math.max(0, Math.min(30, Number(settings.boxGap))) : MT_FONT_DEFAULTS.boxGap,
             spaceWidth: Number.isFinite(Number(settings.spaceWidth)) ? Math.max(0.1, Math.min(4.0, Number(settings.spaceWidth))) : MT_FONT_DEFAULTS.spaceWidth,
+            korLineHeight: Number.isFinite(Number(settings.korLineHeight)) ? Math.max(1.0, Math.min(3.0, Number(settings.korLineHeight))) : MT_FONT_DEFAULTS.korLineHeight,
+            parenLineHeight: Number.isFinite(Number(settings.parenLineHeight)) ? Math.max(1.0, Math.min(3.0, Number(settings.parenLineHeight))) : MT_FONT_DEFAULTS.parenLineHeight,
+            maskLineHeight: Number.isFinite(Number(settings.maskLineHeight)) ? Math.max(1.0, Math.min(3.0, Number(settings.maskLineHeight))) : MT_FONT_DEFAULTS.maskLineHeight,
+            inputLineHeight: Number.isFinite(Number(settings.inputLineHeight)) ? Math.max(1.0, Math.min(3.0, Number(settings.inputLineHeight))) : MT_FONT_DEFAULTS.inputLineHeight,
+            maskHeight: Number.isFinite(Number(settings.maskHeight)) ? Math.max(0.7, Math.min(3.0, Number(settings.maskHeight))) : MT_FONT_DEFAULTS.maskHeight,
+            inputHeight: Number.isFinite(Number(settings.inputHeight)) ? Math.max(32, Math.min(120, Number(settings.inputHeight))) : MT_FONT_DEFAULTS.inputHeight,
             maskMode: settings.maskMode === 'chunk' ? 'chunk' : 'char'
         };
     }
@@ -4580,6 +4635,12 @@ Rules:
         mtEngBoxWidth = normalized.boxWidth;
         mtEngBoxGap = normalized.boxGap;
         mtSpaceWidth = normalized.spaceWidth;
+        mtKorLineHeight = normalized.korLineHeight;
+        mtParenLineHeight = normalized.parenLineHeight;
+        mtMaskLineHeight = normalized.maskLineHeight;
+        mtInputLineHeight = normalized.inputLineHeight;
+        mtMaskHeight = normalized.maskHeight;
+        mtInputHeight = normalized.inputHeight;
         mtMaskMode = normalized.maskMode;
 
         localStorage.setItem('mtKorSize', String(mtKorSize));
@@ -4589,6 +4650,12 @@ Rules:
         localStorage.setItem('mtEngBoxWidth', String(mtEngBoxWidth));
         localStorage.setItem('mtEngBoxGap', String(mtEngBoxGap));
         localStorage.setItem('mtSpaceWidth', String(mtSpaceWidth));
+        localStorage.setItem('mtKorLineHeight', String(mtKorLineHeight));
+        localStorage.setItem('mtParenLineHeight', String(mtParenLineHeight));
+        localStorage.setItem('mtMaskLineHeight', String(mtMaskLineHeight));
+        localStorage.setItem('mtInputLineHeight', String(mtInputLineHeight));
+        localStorage.setItem('mtMaskHeight', String(mtMaskHeight));
+        localStorage.setItem('mtInputHeight', String(mtInputHeight));
 
         return normalized;
     }
@@ -4603,6 +4670,12 @@ Rules:
             boxWidth: mtEngBoxWidth,
             boxGap: mtEngBoxGap,
             spaceWidth: mtSpaceWidth,
+            korLineHeight: mtKorLineHeight,
+            parenLineHeight: mtParenLineHeight,
+            maskLineHeight: mtMaskLineHeight,
+            inputLineHeight: mtInputLineHeight,
+            maskHeight: mtMaskHeight,
+            inputHeight: mtInputHeight,
             maskMode: mtMaskMode
         });
     }
@@ -4616,6 +4689,12 @@ Rules:
         root.style.setProperty('--mt-eng-box-width', mtEngBoxWidth + 'em');
         root.style.setProperty('--mt-eng-box-gap', mtEngBoxGap + 'px');
         root.style.setProperty('--mt-space-width', mtSpaceWidth + 'em');
+        root.style.setProperty('--mt-kor-line-height', mtKorLineHeight);
+        root.style.setProperty('--mt-paren-line-height', mtParenLineHeight);
+        root.style.setProperty('--mt-mask-line-height', mtMaskLineHeight);
+        root.style.setProperty('--mt-input-line-height', mtInputLineHeight);
+        root.style.setProperty('--mt-mask-height', mtMaskHeight + 'em');
+        root.style.setProperty('--mt-input-height', mtInputHeight + 'px');
 
         if(document.getElementById('mtKorSizeInput')) document.getElementById('mtKorSizeInput').value = mtKorSize;
         if(document.getElementById('mtParenSizeInput')) document.getElementById('mtParenSizeInput').value = mtParenSize;
@@ -4624,6 +4703,12 @@ Rules:
         if(document.getElementById('mtBoxWidthInput')) document.getElementById('mtBoxWidthInput').value = mtEngBoxWidth.toFixed(2);
         if(document.getElementById('mtBoxGapInput')) document.getElementById('mtBoxGapInput').value = mtEngBoxGap;
         if(document.getElementById('mtSpaceWidthInput')) document.getElementById('mtSpaceWidthInput').value = mtSpaceWidth.toFixed(2);
+        if(document.getElementById('mtKorLineHeightInput')) document.getElementById('mtKorLineHeightInput').value = mtKorLineHeight.toFixed(1);
+        if(document.getElementById('mtParenLineHeightInput')) document.getElementById('mtParenLineHeightInput').value = mtParenLineHeight.toFixed(1);
+        if(document.getElementById('mtMaskLineHeightInput')) document.getElementById('mtMaskLineHeightInput').value = mtMaskLineHeight.toFixed(1);
+        if(document.getElementById('mtInputLineHeightInput')) document.getElementById('mtInputLineHeightInput').value = mtInputLineHeight.toFixed(1);
+        if(document.getElementById('mtMaskHeightInput')) document.getElementById('mtMaskHeightInput').value = mtMaskHeight.toFixed(1) + 'em';
+        if(document.getElementById('mtInputHeightInput')) document.getElementById('mtInputHeightInput').value = Math.round(mtInputHeight) + 'px';
         if(document.getElementById('mtMaskModeSelect')) document.getElementById('mtMaskModeSelect').value = mtMaskMode;
     }
 
@@ -4665,6 +4750,24 @@ Rules:
         } else if(type === 'spaceWidth') {
             mtSpaceWidth = Math.max(0.1, Math.min(4.0, mtSpaceWidth + delta));
             localStorage.setItem('mtSpaceWidth', mtSpaceWidth.toFixed(2));
+        } else if(type === 'korLineHeight') {
+            mtKorLineHeight = Math.max(1.0, Math.min(3.0, mtKorLineHeight + delta));
+            localStorage.setItem('mtKorLineHeight', mtKorLineHeight.toFixed(1));
+        } else if(type === 'parenLineHeight') {
+            mtParenLineHeight = Math.max(1.0, Math.min(3.0, mtParenLineHeight + delta));
+            localStorage.setItem('mtParenLineHeight', mtParenLineHeight.toFixed(1));
+        } else if(type === 'maskLineHeight') {
+            mtMaskLineHeight = Math.max(1.0, Math.min(3.0, mtMaskLineHeight + delta));
+            localStorage.setItem('mtMaskLineHeight', mtMaskLineHeight.toFixed(1));
+        } else if(type === 'inputLineHeight') {
+            mtInputLineHeight = Math.max(1.0, Math.min(3.0, mtInputLineHeight + delta));
+            localStorage.setItem('mtInputLineHeight', mtInputLineHeight.toFixed(1));
+        } else if(type === 'maskHeight') {
+            mtMaskHeight = Math.max(0.7, Math.min(3.0, mtMaskHeight + delta));
+            localStorage.setItem('mtMaskHeight', mtMaskHeight.toFixed(1));
+        } else if(type === 'inputHeight') {
+            mtInputHeight = Math.max(32, Math.min(120, mtInputHeight + delta));
+            localStorage.setItem('mtInputHeight', Math.round(mtInputHeight));
         }
         mtApplyFontSettings();
     }
