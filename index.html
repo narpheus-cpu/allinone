@@ -8568,6 +8568,56 @@ Return JSON only.`;
 
     // 전자책에서는 '모든 마스킹이 해제된 상태'를 카드 완료로 봅니다.
     // 직접 타이핑 완료뿐 아니라 마스킹 박스/청크를 모두 힌트로 공개한 경우도 포함합니다.
+    function mtRevealNextMaskSegment() {
+        const currentWord = mtCurrentStudyWords[mtCurrentIndex];
+        if (!currentWord) return false;
+        const target = String(currentWord.eng || '');
+        if (!target) return false;
+        const input = document.getElementById('mtEngInput');
+        if (!input) return false;
+
+        // 입력 커서가 문장 맨 끝에 있을 때만 Tab 해제를 허용합니다.
+        const atEnd = input.selectionStart === input.value.length && input.selectionEnd === input.value.length;
+        if (!atEnd) return false;
+
+        if (mtMaskMode === 'chunk') {
+            const tokenRegex = /\S+/g;
+            let match;
+            while ((match = tokenRegex.exec(target)) !== null) {
+                const start = match.index;
+                const end = match.index + match[0].length;
+                // 이미 직접 입력된 영역은 제외합니다.
+                if (input.value.length >= end) continue;
+                let hasUnrevealed = false;
+                for (let i = start; i < end; i++) {
+                    if (!mtRevealedSet.has(i)) { hasUnrevealed = true; break; }
+                }
+                if (!hasUnrevealed) continue;
+                mtRecordRevealedWordAtPosition(target, start);
+                for (let i = start; i < end; i++) mtRevealedSet.add(i);
+                mtRenderMask(input.value);
+                input.focus();
+                input.setSelectionRange(input.value.length, input.value.length);
+                return true;
+            }
+            return false;
+        }
+
+        // 글자별 마스킹에서는 첫 번째 미해제 영문/숫자 마스크 한 칸만 공개합니다.
+        for (let i = 0; i < target.length; i++) {
+            if (!/[a-zA-Z0-9]/.test(target[i])) continue;
+            if (i < input.value.length) continue;
+            if (mtRevealedSet.has(i)) continue;
+            mtRecordRevealedWordAtPosition(target, i);
+            mtRevealedSet.add(i);
+            mtRenderMask(input.value);
+            input.focus();
+            input.setSelectionRange(input.value.length, input.value.length);
+            return true;
+        }
+        return false;
+    }
+
     function mtIsCurrentMaskFullyUnmasked() {
         const currentWord = mtCurrentStudyWords[mtCurrentIndex];
         if (!currentWord) return false;
@@ -8992,6 +9042,12 @@ Return JSON only.`;
             });
 
             mtInputEl.addEventListener('keydown', function(e) {
+                if (e.key === 'Tab') {
+                    if (mtRevealNextMaskSegment()) {
+                        e.preventDefault();
+                    }
+                    return;
+                }
                 if (e.key === 'Enter') {
                     e.preventDefault();
                     let target = mtCurrentStudyWords[mtCurrentIndex].eng;
