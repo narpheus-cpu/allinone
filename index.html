@@ -5307,16 +5307,18 @@ Rules:
         const exportData = words.map((w, i) => [
             i + 1,
             w && w.starred ? '★' : '',
-            w && w.kor ? String(w.kor) : '',
-            w && w.eng ? String(w.eng) : ''
+            w && (w.kor ?? w.meaning) ? String(w.kor ?? w.meaning) : '',
+            w && (w.eng ?? w.english) ? String(w.eng ?? w.english) : '',
+            w && (w.subKor ?? w.hint) ? String(w.subKor ?? w.hint) : ''
         ]);
-        exportData.unshift(['NO', '중요', '한국어', '영어']);
+        exportData.unshift(['NO', '중요', '한국어', '영어', '한국어청크']);
 
         const ws = XLSX.utils.aoa_to_sheet(exportData);
         ws['!cols'] = [
             { wch: 8 },
             { wch: 8 },
             { wch: 45 },
+            { wch: 70 },
             { wch: 70 }
         ];
 
