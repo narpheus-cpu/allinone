@@ -2418,10 +2418,10 @@
 
 <script>
     // ============================================================================
-    // ★ 최근 코드 업데이트 시각: 202608220220
+    // ★ 최근 코드 업데이트 시각: 202608220300
     // ★ ※ 코드를 직접 수정할 때마다 위 시간값도 변경하세요.
     // ============================================================================
-    const APP_BUILD_TIMESTAMP = '202608220220';
+    const APP_BUILD_TIMESTAMP = '202608220300';
     
         /* ========================================== */
     /* [신규 기능] AI 도움 프롬프트 통합 템플릿 관리   */
@@ -5090,6 +5090,47 @@ Rules:
 
     function mtGetSlotStorageKey(slotIndex) {
         return slotIndex === 'naver' ? MT_NAVER_STORAGE_KEY : 'word_slot_' + slotIndex;
+    }
+
+    // localStorage는 같은 키를 교체할 때도 새 값의 용량만큼 추가 공간을 잠시 요구할 수 있습니다.
+    // 특히 대용량 일반유형 슬롯을 덮어쓸 때 QUOTA_EXCEEDED_ERR가 발생하므로,
+    // 1차 저장이 실패하면 기존 동일 키를 잠깐 제거한 뒤 재시도하고, 실패하면 기존 값을 복원합니다.
+    function mtSetLocalStorageQuotaSafe(key, value) {
+        const storageKey = String(key);
+        const newValue = String(value ?? '');
+        const oldValue = localStorage.getItem(storageKey);
+
+        try {
+            localStorage.setItem(storageKey, newValue);
+            return true;
+        } catch (firstError) {
+            const isQuotaError = firstError && (
+                firstError.name === 'QuotaExceededError' ||
+                firstError.code === 22 ||
+                String(firstError.message || '').toLowerCase().includes('quota')
+            );
+            if (!isQuotaError) throw firstError;
+
+            // 동일 키를 교체하는 상황이라면 기존 값을 제거한 뒤 새 값을 저장할 공간이 생길 수 있습니다.
+            if (oldValue !== null && oldValue !== newValue) {
+                localStorage.removeItem(storageKey);
+                try {
+                    localStorage.setItem(storageKey, newValue);
+                    return true;
+                } catch (secondError) {
+                    // 새 값 저장에도 실패하면 기존 데이터를 최대한 복구합니다.
+                    try {
+                        localStorage.setItem(storageKey, oldValue);
+                    } catch (_) {
+                        console.error('[localStorage] 기존 데이터 복원도 실패했습니다:', storageKey);
+                    }
+                    const detail = String(secondError?.message || secondError || '저장공간 부족');
+                    throw new Error(`브라우저 저장공간이 부족하여 슬롯 데이터를 저장하지 못했습니다.\n${detail}`);
+                }
+            }
+
+            throw new Error('브라우저 저장공간이 부족하여 슬롯 데이터를 저장하지 못했습니다. 기존 데이터를 유지했습니다.');
+        }
     }
 
     function mtGetNaverPattern() {
@@ -8077,7 +8118,7 @@ Return JSON only.`;
                 ? (normalize(fixedRows[0]?.[0])||`슬롯 ${slot+1}`)
                 : (String(rawName).replace(/\.[^/.]+$/,'').trim()||`슬롯 ${slot+1}`);
             const stored={name:displayName,words,lastSession:null,type:'normal',completedMaskKeys:[],columnPattern:{mainKorCol:mainIdx+1,subKorCol:subIdx>=0?subIdx+1:null,engCol:engIdx+1}};
-            localStorage.setItem(mtGetSlotStorageKey(slot),JSON.stringify(stored));
+            mtSetLocalStorageQuotaSafe(mtGetSlotStorageKey(slot), JSON.stringify(stored));
             mtSetSlotType(slot,'normal');
             mtNormalColumnTemp=null;
             const modal=document.getElementById('mtNormalColumnSelectModal'); if(modal) modal.style.display='none';
