@@ -5372,6 +5372,40 @@ Rules:
         const ws=XLSX.utils.aoa_to_sheet(exportData); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'★단어장'); XLSX.writeFile(wb,'[마스킹타이핑]_★모아보기.xlsx');
     }
 
+    function mtNormalizeCompletionKey(word, index) {
+        const w = word || {};
+        const serial = String(w.serial ?? '').trim();
+        const eng = String(w.eng ?? w.english ?? '').trim().toLowerCase();
+        const kor = String(w.kor ?? w.meaning ?? '').trim();
+        const sub = String(w.subKor ?? w.literalKor ?? w.hint ?? '').trim();
+        return serial || `${index}|${kor}|${eng}|${sub}`;
+    }
+
+    function mtGetPersistentCompletedSet(slotIndex, slotData, type='normal') {
+        try {
+            if (type === 'ebook') {
+                const st = mtGetTypedState(Number(slotIndex));
+                return new Set((st.ebookReadIndexes || []).map(Number));
+            }
+            if (slotIndex === 'slot9') {
+                const st = mtSlot9GetState();
+                return new Set((st.completedMaskKeys || []).map(String));
+            }
+            if (slotIndex === 'wordweb') {
+                const st = mtWordWebGetState();
+                return new Set((st.completedMaskKeys || []).map(String));
+            }
+            const configuredType = mtGetSlotType(slotIndex);
+            if (configuredType && configuredType !== 'normal') {
+                const st = mtGetTypedState(Number(slotIndex));
+                return new Set((st.completedMaskKeys || []).map(String));
+            }
+            return new Set((slotData?.completedMaskKeys || []).map(String));
+        } catch (_) {
+            return new Set();
+        }
+    }
+
     function mtGetSlotLearningProgress(slotIndex, slotData, type='normal') {
         const total = Array.isArray(slotData?.words) ? slotData.words.length : 0;
         if (type === 'ebook') {
@@ -5380,15 +5414,62 @@ Rules:
             const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
             return `진행률 ${pct}% (${done}/${total})`;
         }
-        const last = slotData?.lastSession;
-        if (last && Array.isArray(last.studyWords) && last.studyWords.length) {
-            const sessionTotal = last.studyWords.length;
-            const idx = Math.max(0, Math.min(Number(last.currentIndex || 0), sessionTotal));
-            const done = Math.min(sessionTotal, idx);
-            const pct = sessionTotal > 0 ? Math.min(100, Math.round((done / sessionTotal) * 100)) : 0;
-            return `진행률 ${pct}% (${done}/${sessionTotal})`;
+
+        // 진행률은 '현재 학습 세션'이 아니라 슬롯 전체 카드의 영구 완료 이력으로 계산합니다.
+        const completedSet = mtGetPersistentCompletedSet(slotIndex, slotData, type);
+        let done = 0;
+        for (let i = 0; i < total; i++) {
+            const word = slotData.words[i];
+            const key = mtNormalizeCompletionKey(word, i);
+            if (completedSet.has(key)) done++;
         }
-        return `진행률 0% (0/${total})`;
+        done = Math.min(done, total);
+        const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
+        return `진행률 ${pct}% (${done}/${total})`;
+    }
+
+    function mtRecordPersistentCardCompletion() {
+        if (!mtCurrentStudyWords || !mtCurrentStudyWords.length) return false;
+        const currentWord = mtCurrentStudyWords[mtCurrentIndex];
+        if (!currentWord || !mtIsCurrentMaskFullyUnmasked()) return false;
+
+        const slot = mtActiveSlotIndex;
+        const key = mtNormalizeCompletionKey(currentWord, Number(currentWord.originalIndex ?? mtCurrentIndex));
+        try {
+            if (mtEbookTypingActive) return false; // 전자책은 기존 ebookReadIndexes가 기준입니다.
+            if (slot === 'slot9') {
+                const st = mtSlot9GetState();
+                const set = new Set((st.completedMaskKeys || []).map(String));
+                if (set.has(key)) return false;
+                set.add(key); st.completedMaskKeys = Array.from(set); mtSlot9SaveState(st);
+                return true;
+            }
+            if (slot === 'wordweb') {
+                const st = mtWordWebGetState();
+                const set = new Set((st.completedMaskKeys || []).map(String));
+                if (set.has(key)) return false;
+                set.add(key); st.completedMaskKeys = Array.from(set); mtWordWebSaveState(st);
+                return true;
+            }
+            const configuredType = mtGetSlotType(slot);
+            if (configuredType && configuredType !== 'normal') {
+                const st = mtGetTypedState(Number(slot));
+                const set = new Set((st.completedMaskKeys || []).map(String));
+                if (set.has(key)) return false;
+                set.add(key); st.completedMaskKeys = Array.from(set); mtSaveTypedState(Number(slot), st);
+                return true;
+            }
+            const raw = localStorage.getItem(mtGetSlotStorageKey(slot));
+            const st = raw ? JSON.parse(raw) : null;
+            if (!st || !Array.isArray(st.words)) return false;
+            const set = new Set((st.completedMaskKeys || []).map(String));
+            if (set.has(key)) return false;
+            set.add(key); st.completedMaskKeys = Array.from(set);
+            localStorage.setItem(mtGetSlotStorageKey(slot), JSON.stringify(st));
+            return true;
+        } catch (_) {
+            return false;
+        }
     }
     function mtGetGeneratorProgressLabel(words) {
         return `학습카드 수 ${Array.isArray(words) ? words.length : 0}`;
@@ -7888,7 +7969,7 @@ Return JSON only.`;
         } else {
             displayName=String(rawName||'').replace(/\.[^/.]+$/,'').trim()||`슬롯 ${Number(slot)+1}`;
         }
-        const stored={name:displayName,words,lastSession:null,type:'normal',columnPattern:{mainKorCol:mainIdx+1,subKorCol:subIdx+1,engCol:engIdx+1}};
+        const stored={name:displayName,words,lastSession:null,type:'normal',completedMaskKeys:[],columnPattern:{mainKorCol:mainIdx+1,subKorCol:subIdx+1,engCol:engIdx+1}};
         localStorage.setItem(mtGetSlotStorageKey(slot),JSON.stringify(stored));
         mtSetSlotType(slot,'normal');
         mtNormalColumnTemp=null;
@@ -9107,6 +9188,7 @@ Return JSON only.`;
                             mtRecordRevealedWordAtPosition(targetStr, barStart);
                             for (let i = barStart; i < barEnd; i++) mtRevealedSet.add(i);
                             mtRenderMask(document.getElementById('mtEngInput').value);
+                            mtRecordPersistentCardCompletion();
                             document.getElementById('mtEngInput').focus();
                         };
                         row.appendChild(bar);
@@ -9174,6 +9256,7 @@ Return JSON only.`;
                         mtRecordRevealedWordAtPosition(targetStr, i);
                         mtRevealedSet.add(i);
                         mtRenderMask(document.getElementById('mtEngInput').value);
+                        mtRecordPersistentCardCompletion();
                         document.getElementById('mtEngInput').focus();
                     };
                 }
@@ -9284,12 +9367,14 @@ Return JSON only.`;
                 if (this.value.length > 0) mtCardHadDirectTyping = true;
                 mtRecordTypedCompletedWords(this.value, target);
                 mtRenderMask(this.value);
+                mtRecordPersistentCardCompletion();
             });
 
             mtInputEl.addEventListener('keydown', function(e) {
                 if (e.key === 'Tab') {
                     if (mtRevealNextMaskSegment()) {
                         e.preventDefault();
+                        mtRecordPersistentCardCompletion();
                     }
                     return;
                 }
