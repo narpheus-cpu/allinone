@@ -4631,11 +4631,18 @@ Rules:
         korMarginTop: 10,
         korMarginBottom: 28,
         maskMarginTop: 0,
-        maskMarginBottom: 30,
+        maskMarginBottom: 0,
         inputMarginTop: 22,
         inputMarginBottom: 20,
         maskMode: 'char'
     });
+
+    // 마스킹 섹터 여백 기본값을 0px로 리셋하는 1회성 마이그레이션
+    if (localStorage.getItem('mtMaskMarginDefaultsV2') !== '1') {
+        localStorage.setItem('mtMaskMarginTop', '0');
+        localStorage.setItem('mtMaskMarginBottom', '0');
+        localStorage.setItem('mtMaskMarginDefaultsV2', '1');
+    }
 
     function mtGetStoredNumber(key, fallback, min, max) {
         const raw = localStorage.getItem(key);
@@ -4680,12 +4687,12 @@ Rules:
             inputLineHeight: Number.isFinite(Number(settings.inputLineHeight)) ? Math.max(1.0, Math.min(3.0, Number(settings.inputLineHeight))) : MT_FONT_DEFAULTS.inputLineHeight,
             maskHeight: Number.isFinite(Number(settings.maskHeight)) ? Math.max(0.7, Math.min(3.0, Number(settings.maskHeight))) : MT_FONT_DEFAULTS.maskHeight,
             inputHeight: Number.isFinite(Number(settings.inputHeight)) ? Math.max(32, Math.min(120, Number(settings.inputHeight))) : MT_FONT_DEFAULTS.inputHeight,
-            korMarginTop: Number.isFinite(Number(settings.korMarginTop)) ? Math.max(0, Math.min(60, Number(settings.korMarginTop))) : MT_FONT_DEFAULTS.korMarginTop,
-            korMarginBottom: Number.isFinite(Number(settings.korMarginBottom)) ? Math.max(0, Math.min(60, Number(settings.korMarginBottom))) : MT_FONT_DEFAULTS.korMarginBottom,
-            maskMarginTop: Number.isFinite(Number(settings.maskMarginTop)) ? Math.max(0, Math.min(60, Number(settings.maskMarginTop))) : MT_FONT_DEFAULTS.maskMarginTop,
-            maskMarginBottom: Number.isFinite(Number(settings.maskMarginBottom)) ? Math.max(0, Math.min(60, Number(settings.maskMarginBottom))) : MT_FONT_DEFAULTS.maskMarginBottom,
-            inputMarginTop: Number.isFinite(Number(settings.inputMarginTop)) ? Math.max(0, Math.min(60, Number(settings.inputMarginTop))) : MT_FONT_DEFAULTS.inputMarginTop,
-            inputMarginBottom: Number.isFinite(Number(settings.inputMarginBottom)) ? Math.max(0, Math.min(60, Number(settings.inputMarginBottom))) : MT_FONT_DEFAULTS.inputMarginBottom,
+            korMarginTop: Number.isFinite(Number(settings.korMarginTop)) ? Math.max(-60, Math.min(60, Number(settings.korMarginTop))) : MT_FONT_DEFAULTS.korMarginTop,
+            korMarginBottom: Number.isFinite(Number(settings.korMarginBottom)) ? Math.max(-60, Math.min(60, Number(settings.korMarginBottom))) : MT_FONT_DEFAULTS.korMarginBottom,
+            maskMarginTop: Number.isFinite(Number(settings.maskMarginTop)) ? Math.max(-60, Math.min(60, Number(settings.maskMarginTop))) : MT_FONT_DEFAULTS.maskMarginTop,
+            maskMarginBottom: Number.isFinite(Number(settings.maskMarginBottom)) ? Math.max(-60, Math.min(60, Number(settings.maskMarginBottom))) : MT_FONT_DEFAULTS.maskMarginBottom,
+            inputMarginTop: Number.isFinite(Number(settings.inputMarginTop)) ? Math.max(-60, Math.min(60, Number(settings.inputMarginTop))) : MT_FONT_DEFAULTS.inputMarginTop,
+            inputMarginBottom: Number.isFinite(Number(settings.inputMarginBottom)) ? Math.max(-60, Math.min(60, Number(settings.inputMarginBottom))) : MT_FONT_DEFAULTS.inputMarginBottom,
             maskMode: settings.maskMode === 'chunk' ? 'chunk' : 'char'
         };
     }
@@ -4863,22 +4870,22 @@ Rules:
             mtInputHeight = Math.max(32, Math.min(120, mtInputHeight + delta));
             localStorage.setItem('mtInputHeight', Math.round(mtInputHeight));
         } else if(type === 'korMarginTop') {
-            mtKorMarginTop = Math.max(0, Math.min(60, mtKorMarginTop + delta));
+            mtKorMarginTop = Math.max(-60, Math.min(60, mtKorMarginTop + delta));
             localStorage.setItem('mtKorMarginTop', Math.round(mtKorMarginTop));
         } else if(type === 'korMarginBottom') {
-            mtKorMarginBottom = Math.max(0, Math.min(60, mtKorMarginBottom + delta));
+            mtKorMarginBottom = Math.max(-60, Math.min(60, mtKorMarginBottom + delta));
             localStorage.setItem('mtKorMarginBottom', Math.round(mtKorMarginBottom));
         } else if(type === 'maskMarginTop') {
-            mtMaskMarginTop = Math.max(0, Math.min(60, mtMaskMarginTop + delta));
+            mtMaskMarginTop = Math.max(-60, Math.min(60, mtMaskMarginTop + delta));
             localStorage.setItem('mtMaskMarginTop', Math.round(mtMaskMarginTop));
         } else if(type === 'maskMarginBottom') {
-            mtMaskMarginBottom = Math.max(0, Math.min(60, mtMaskMarginBottom + delta));
+            mtMaskMarginBottom = Math.max(-60, Math.min(60, mtMaskMarginBottom + delta));
             localStorage.setItem('mtMaskMarginBottom', Math.round(mtMaskMarginBottom));
         } else if(type === 'inputMarginTop') {
-            mtInputMarginTop = Math.max(0, Math.min(60, mtInputMarginTop + delta));
+            mtInputMarginTop = Math.max(-60, Math.min(60, mtInputMarginTop + delta));
             localStorage.setItem('mtInputMarginTop', Math.round(mtInputMarginTop));
         } else if(type === 'inputMarginBottom') {
-            mtInputMarginBottom = Math.max(0, Math.min(60, mtInputMarginBottom + delta));
+            mtInputMarginBottom = Math.max(-60, Math.min(60, mtInputMarginBottom + delta));
             localStorage.setItem('mtInputMarginBottom', Math.round(mtInputMarginBottom));
         }
         mtApplyFontSettings();
