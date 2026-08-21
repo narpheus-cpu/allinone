@@ -73,8 +73,9 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 22px;
-            gap: 12px;
-            flex-wrap: wrap;
+            gap: 10px;
+            flex-wrap: nowrap;
+            min-width: 0;
         }
 
         .header-container h1 { 
@@ -83,24 +84,36 @@
             font-size: 24px; 
             font-weight: 700; 
             letter-spacing: -0.5px; 
-            flex: 1;
+            flex: 1 1 auto;
+            min-width: 0;
+            white-space: nowrap;
         }
         .header-container h1 small { 
-            display: block; 
-            font-size: 13px; 
+            display: inline;
+            font-size: 11px; 
             color: #64748b; 
-            margin-top: 6px; 
+            margin-left: 8px; 
             font-weight: 400; 
+            white-space: nowrap;
         }
 
         .header-buttons {
             display: flex;
-            gap: 8px;
+            gap: 5px;
             align-items: center;
-            flex-shrink: 0;
+            flex: 0 0 auto;
             position: relative;
-            flex-wrap: wrap;
+            flex-wrap: nowrap;
             justify-content: flex-end;
+        }
+        .header-buttons > .btn-excel,
+        .header-buttons > .file-open-btn {
+            min-height: 28px;
+            height: 28px;
+            padding: 4px 8px;
+            font-size: 10px;
+            border-radius: 0;
+            line-height: 1;
         }
         .header-buttons button.file-sync-btn { background: #059669; color: white; padding: 8px 14px; font-size: 12px; border-radius: 6px; transition: background 0.3s; }
         .header-buttons button.file-sync-btn:hover { background: #047857; }
@@ -923,24 +936,30 @@
         }
 
         .header-container {
-            padding: 2px 2px 16px;
-            margin-bottom: 16px;
+            padding: 2px 2px 12px;
+            margin-bottom: 12px;
             border-bottom: 1px solid #eef2f7;
-            align-items: flex-end;
+            align-items: center;
         }
         .header-container h1 {
             font-size: 23px;
             letter-spacing: -0.7px;
+            white-space: nowrap;
         }
         .header-container h1 small {
             color: var(--app-text-soft);
-            font-size: 12px;
+            font-size: 11px;
+            margin-left: 8px;
         }
         .header-buttons {
-            gap: 6px;
+            gap: 5px;
+            flex-wrap: nowrap;
         }
         .header-buttons button {
-            min-height: 34px;
+            min-height: 28px;
+            height: 28px;
+            padding: 4px 8px;
+            font-size: 10px;
         }
         .header-buttons button.file-sync-btn {
             box-shadow: 0 2px 8px rgba(5, 150, 105, 0.16);
@@ -1293,6 +1312,63 @@
         .mt-type-option-desc { max-width:62ch; }
         @media (max-width:700px){ .mt-type-modal-card{width:calc(100vw - 20px); padding:16px;} .mt-type-option{padding:12px;} }
 
+
+        /* ===== 메인화면 미니멀 블랙&화이트 리디자인 ===== */
+        .mt-main-menu-minimal { background:#fff; padding:0; border:0; border-radius:0; text-align:center; }
+        .mt-header-stats { display:flex; align-items:center; justify-content:flex-end; gap:6px; margin:0 2px 0 0; padding:0; font-size:11px; line-height:1; color:#111; white-space:nowrap; }
+        .mt-header-stats #mtDailyStatsText { font-weight:700; letter-spacing:-0.2px; }
+        .mt-header-stats .btn-excel { min-height:28px; padding:4px 7px; border:1px solid #111; border-radius:0; background:#fff; color:#111; font-size:10px; font-weight:800; }
+        .mt-header-stats .btn-excel:hover { background:#111; color:#fff; }
+
+        /* 메뉴 섹션: 순백색 바탕 + 얇은 검정 기준선 */
+        .tabs {
+            gap:0 !important;
+            margin:0 0 10px !important;
+            padding:0 !important;
+            border:0 !important;
+            border-bottom:1px solid #111 !important;
+            border-radius:0 !important;
+            background:#fff !important;
+            box-shadow:none !important;
+        }
+        .tab-btn, .tab-btn.active, .tab-btn:hover {
+            padding:6px 10px !important;
+            min-height:30px;
+            border:0 !important;
+            border-radius:0 !important;
+            background:#fff !important;
+            box-shadow:none !important;
+            color:#777 !important;
+            font-size:12px !important;
+            font-weight:700;
+            margin:0 !important;
+        }
+        .tab-btn:hover { color:#111 !important; }
+        .tab-btn.active {
+            color:#111 !important;
+            border-bottom:4px solid #111 !important;
+            margin-bottom:-1px !important;
+            font-weight:900;
+        }
+        .tab-btn:focus-visible { outline:2px solid #111; outline-offset:-2px; }
+
+        #mtSlotsGrid.mt-slots-grid, .mt-slots-grid { margin-top:0 !important; }
+        .mt-slot { min-height:132px; padding:12px; border-radius:8px; box-shadow:none; }
+        .mt-slot:hover { box-shadow:none !important; transform:none !important; }
+        .mt-slot.has-data { background:#fff; }
+        .mt-slot-progress-row { min-height:24px; margin-bottom:7px; }
+        .mt-slot-title { margin-bottom:6px; }
+        .mt-slot-stat-row { margin-bottom:7px; }
+        .mt-slot-actions-row .mt-slot-meta-badge { min-height:24px !important; }
+
+        @media (max-width:720px) {
+            .header-buttons { gap:4px !important; }
+            .mt-header-stats { order:2; justify-content:flex-start; width:auto; flex:0 1 auto; }
+            .header-buttons button { min-height:28px !important; }
+            .tabs { margin-bottom:8px !important; }
+            .tab-btn, .tab-btn.active { min-height:30px; padding:6px 7px !important; }
+            .mt-slot { min-height:118px; padding:10px; }
+        }
 </style>
 </head>
 <body>
@@ -1300,9 +1376,15 @@
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템<small>최근 업데이트 시각 <span id="appUpdateTimestamp">-</span></small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템</h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
+
+            <!-- 메인화면 통계: API 키 설정 바로 왼쪽 -->
+            <div id="mtDailyStatsBar" class="mt-header-stats">
+                <span id="mtDailyStatsText">한국시간 기준 일일 통계를 불러오는 중…</span>
+                <button class="btn-excel" type="button" onclick="mtOpenStatsModal()">상세통계</button>
+            </div>
 
             <!-- 글꼴 링크 & API 설정 토글 버튼 -->
             <button class="btn-excel" onclick="toggleApiKeyInput()">API 키 설정</button>
@@ -1581,11 +1663,7 @@
     <!-- ========================================== -->
     <div id="maskingTypingTab" class="tab-content active">
         <!-- 메인 화면 -->
-        <div id="mt-main-menu" style="background: white; padding: 30px; border-radius: 12px; border: 1px solid var(--border-color); text-align: center;">
-            <div id="mtDailyStatsBar" style="display:flex; justify-content:center; align-items:center; gap:8px; flex-wrap:wrap; margin:0 0 20px; font-size:13px; color:#4b5563;">
-                <span id="mtDailyStatsText">한국시간 기준 일일 통계를 불러오는 중…</span>
-                <button class="btn-excel" type="button" onclick="mtOpenStatsModal()" style="padding:5px 10px; font-size:12px;">상세통계</button>
-            </div>
+        <div id="mt-main-menu" class="mt-main-menu-minimal">
             <div class="mt-slots-grid" id="mtSlotsGrid"></div>
             <input type="file" id="mtFileUpload" style="display:none;" accept=".xlsx, .xls, .txt" />
         </div>
@@ -2417,11 +2495,6 @@
 </div>
 
 <script>
-    // ============================================================================
-    // ★ 최근 코드 업데이트 시각: 202608220821
-    // ★ ※ 코드를 직접 수정할 때마다 위 시간값도 변경하세요.
-    // ============================================================================
-    const APP_BUILD_TIMESTAMP = '202608220821';
     
         /* ========================================== */
     /* [신규 기능] AI 도움 프롬프트 통합 템플릿 관리   */
@@ -2748,6 +2821,7 @@
             if (typeof mtWordWebStartAutoTrigger === 'function') mtWordWebStartAutoTrigger(false);
             if (typeof mtSlot9StartAutoTrigger === 'function') mtSlot9StartAutoTrigger(false);
             mtRenderDailyStats();
+            setInterval(() => { try { mtRenderDailyStats(); } catch (_) {} }, 5 * 60 * 1000);
 
             const reminder = document.getElementById('saveReminder');
             if (reminder) reminder.style.display = 'none';
@@ -9121,7 +9195,14 @@ Return JSON only.`;
         const key = mtGetKoreaDateKey();
         const stat = mtGetDailyStatForKey(key);
         const [y,m,d] = key.split('-');
-        el.textContent = `오늘 ${y}.${m}.${d}(${mtGetKoreaWeekday()}) · 성공 카드 ${Number(stat.cards || 0)}개 · 성공 단어 ${Number(stat.words || 0)}개`;
+        const now = new Date();
+        const formatter = new Intl.DateTimeFormat('ko-KR', {
+            timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', hour12: false, weekday: 'short'
+        });
+        const parts = Object.fromEntries(formatter.formatToParts(now).map(({type, value}) => [type, value]));
+        const dateTimeText = `${parts.year}.${parts.month}.${parts.day}(${parts.weekday}) ${parts.hour}:${parts.minute} 현재`;
+        el.textContent = `${dateTimeText} · 성공 카드 ${Number(stat.cards || 0)}개 · 성공 단어 ${Number(stat.words || 0)}개`;
     }
 
     function mtParseDateKey(key) {
@@ -10548,19 +10629,8 @@ Return JSON only.`;
         copyToClipboard(finalPrompt);
     }
 
-
-    /* ========================================== */
-    /* [실행] 통합 앱 초기화 로직                 */
-    /* ========================================== */
-    function mtSetAppUpdateTimestamp() {
-        const el = document.getElementById('appUpdateTimestamp');
-        if (!el) return;
-        el.textContent = APP_BUILD_TIMESTAMP;
-    }
-
     (async function initApp() {
         try {
-            mtSetAppUpdateTimestamp();
             mtRenderDailyStats();
             // 공통 / 영작 시스템 초기화
             loadCustomFontFromStorage();
