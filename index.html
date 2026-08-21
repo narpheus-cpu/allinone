@@ -5328,7 +5328,7 @@ Rules:
 
         const fallbackName = `슬롯_${slotIndex}`;
         const safeName = String(parsed.name || fallbackName).replace(/[\\/:*?"<>|]/g, '').trim() || fallbackName;
-        XLSX.writeFile(wb, `[마스킹타이핑]_요약_${safeName}.xlsx`);
+        XLSX.writeFile(wb, `[마스킹타이핑] ${safeName}.xlsx`);
     }
 
     function mtCollectAllStarredWords() {
