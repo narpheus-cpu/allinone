@@ -7836,9 +7836,16 @@ STRICT RULES:
 3. Preserve the meaning exactly. Do not add names, greetings, dates, time expressions, farewells, or unrelated information.
 4. English must be natural everyday CEFR A2 English.
 5. korean must be a natural Korean sentence matching the English meaning.
-6. literal_korean must contain 2-8 Korean-only bracket chunks in the English phrase order.
-7. Return ONLY a JSON array. No markdown or explanation.
-8. Return exactly these keys: source_korean, english, korean, literal_korean.
+6. Decide the output format according to the ORIGINAL text type:
+   A) If ORIGINAL is a single-word or single-token sentence, return exactly ONE Korean chunk. Do not force 2-8 chunks.
+   B) If ORIGINAL contains both Korean and English, keep the meaning of the whole original and produce natural A2 English. The Korean direct-reading result may contain 1 chunk when the meaning is only one short unit; otherwise use 2-8 meaningful Korean chunks.
+   C) If ORIGINAL is English-only, DO NOT copy the original English sentence. Rewrite it as a DIFFERENT, natural CEFR A2 everyday English sentence with the same meaning. Then provide natural Korean and Korean direct-reading chunks.
+   D) For ordinary multiword Korean sentences, use 2-8 Korean-only phrase chunks in the English phrase order.
+7. Do NOT include square brackets inside literal_korean_chunks.
+8. literal_korean_chunks must contain Korean only. No English letters.
+9. For a single-token original, the single chunk should normally be a single Korean word/unit.
+10. Return ONLY a JSON array. No markdown or explanation.
+11. Return exactly these keys: source_korean, english, korean, literal_korean_chunks.
 
 INPUT:
 ${JSON.stringify(batch)}
@@ -7856,9 +7863,9 @@ ${JSON.stringify(batch)}
                             source_korean:{type:'STRING'},
                             english:{type:'STRING'},
                             korean:{type:'STRING'},
-                            literal_korean:{type:'STRING'}
+                            literal_korean_chunks:{type:'ARRAY',items:{type:'STRING'},minItems:1,maxItems:8}
                         },
-                        required:['source_korean','english','korean','literal_korean']
+                        required:['source_korean','english','korean','literal_korean_chunks']
                     }
                 },
                 wrappedAiConfig
@@ -7900,15 +7907,46 @@ ${JSON.stringify(batch)}
                 source_korean: normalize(item?.source_korean),
                 english: normalize(item?.english),
                 korean: normalize(item?.korean),
-                literal_korean: String(item?.literal_korean || '').trim()
+                literal_korean_chunks: Array.isArray(item?.literal_korean_chunks) ? item.literal_korean_chunks.map(x=>String(x??'').normalize('NFC').replace(/\s+/g,' ').trim()).filter(Boolean) : []
             }));
 
             for (let i=0; i<normalized.length; i++) {
                 const item = normalized[i];
                 if (item.source_korean !== normalize(batch[i])) throw new Error(`${i+1}번 원문 보존 검증 실패`);
                 if (item.english.length < 2 || item.korean.length < 2) throw new Error(`${i+1}번 영어/한국어가 비어 있습니다.`);
-                if (looksSuspiciousKorean(item.english, item.korean)) throw new Error(`${i+1}번 한국어 결과가 비정상 패턴입니다.`);
-                if (!isKoreanOnlyChunkList(item.literal_korean)) throw new Error(`${i+1}번 직독직해 형식이 올바르지 않습니다.`);
+                if (looksSuspiciousKorean(item.english, item.korean)) throw new Error(`${i+1}번 한국어 결과가 비정상 패턴입니다. 원문=${JSON.stringify(batch[i])} / 영어=${JSON.stringify(item.english)} / 한국어=${JSON.stringify(item.korean)}`);
+                const chunks = Array.isArray(item.literal_korean_chunks) ? item.literal_korean_chunks : [];
+                const sourceText = normalize(batch[i]);
+                const sourceHasHangul = /[가-힣]/.test(sourceText);
+                const sourceHasLatin = /[A-Za-z]/.test(sourceText);
+                const sourceTokens = sourceText.split(/\s+/).filter(Boolean);
+                const isSingleTokenOriginal = sourceTokens.length === 1;
+                const isEnglishOnlyOriginal = sourceHasLatin && !sourceHasHangul;
+                const isMixedOriginal = sourceHasLatin && sourceHasHangul;
+                const minChunks = isSingleTokenOriginal ? 1 : 2;
+                if (chunks.length < minChunks || chunks.length > 8) {
+                    throw new Error(`${i+1}번 직독직해 청크 수가 올바르지 않습니다. ${isSingleTokenOriginal ? '(한 단어 원문은 1개 허용)' : '(2~8개 필요)'} 실제=${chunks.length} / 원문=${JSON.stringify(sourceText)} / 반환값=${JSON.stringify(chunks)}`);
+                }
+                if (chunks.some(chunk => !chunk || /[A-Za-z]/.test(chunk) || !/[가-힣]/.test(chunk) || /[\[\]]/.test(chunk))) {
+                    throw new Error(`${i+1}번 직독직해 청크에 한국어 외 문자 또는 대괄호가 포함되어 있습니다. 원문=${JSON.stringify(sourceText)} / 반환값=${JSON.stringify(chunks)}`);
+                }
+                if (isSingleTokenOriginal && chunks.length !== 1) {
+                    throw new Error(`${i+1}번 한 단어 원문은 직독직해도 정확히 1개 청크여야 합니다. 원문=${JSON.stringify(sourceText)} / 반환값=${JSON.stringify(chunks)}`);
+                }
+                if (isEnglishOnlyOriginal && sourceTokens.length > 1) {
+                    const originalComparable = sourceText.toLowerCase().replace(/[“”‘’"'.,!?;:()\[\]{}\-]/g,'').replace(/\s+/g,' ').trim();
+                    const englishComparable = item.english.toLowerCase().replace(/[“”‘’"'.,!?;:()\[\]{}\-]/g,'').replace(/\s+/g,' ').trim();
+                    if (englishComparable === originalComparable) {
+                        throw new Error(`${i+1}번 영어 원문은 그대로 복사하지 말고 A2 수준의 다른 표현으로 바꿔야 합니다. 원문=${JSON.stringify(sourceText)} / 영어=${JSON.stringify(item.english)}`);
+                    }
+                }
+                if (isMixedOriginal && !sourceHasHangul) {
+                    throw new Error(`${i+1}번 혼합 원문 판별 오류`);
+                }
+                item.literal_korean = chunks.map(chunk => `[${chunk}]`).join(' ');
+                if (!isKoreanOnlyChunkList(item.literal_korean)) {
+                    throw new Error(`${i+1}번 직독직해 형식 생성에 실패했습니다.`);
+                }
             }
 
             // 성공한 전체 배치를 메모리에 반영한 후 딱 한 번 저장합니다.
