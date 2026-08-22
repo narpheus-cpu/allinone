@@ -7878,10 +7878,12 @@ ${JSON.stringify(batch)}
             }
 
             const normalize = value => String(value ?? '').normalize('NFC').replace(/\s+/g, ' ').trim();
-            const isKoreanOnlyChunkList = literal => {
+            const isKoreanOnlyChunkList = (literal, options = {}) => {
                 const text = String(literal || '').trim();
                 const chunks = text.match(/\[[^\[\]]+\]/g) || [];
-                if (!text || chunks.length < 2 || chunks.length > 8) return false;
+                const minChunks = Number.isInteger(options.minChunks) ? options.minChunks : 1;
+                const maxChunks = Number.isInteger(options.maxChunks) ? options.maxChunks : 8;
+                if (!text || chunks.length < minChunks || chunks.length > maxChunks) return false;
                 if (text.replace(/\[[^\[\]]+\]/g, '').trim() !== '') return false;
                 return chunks.every(chunk => {
                     const inside = chunk.slice(1,-1).trim();
@@ -7944,8 +7946,8 @@ ${JSON.stringify(batch)}
                     throw new Error(`${i+1}번 혼합 원문 판별 오류`);
                 }
                 item.literal_korean = chunks.map(chunk => `[${chunk}]`).join(' ');
-                if (!isKoreanOnlyChunkList(item.literal_korean)) {
-                    throw new Error(`${i+1}번 직독직해 형식 생성에 실패했습니다.`);
+                if (!isKoreanOnlyChunkList(item.literal_korean, { minChunks, maxChunks: 8 })) {
+                    throw new Error(`${i+1}번 직독직해 형식 생성에 실패했습니다. 원문=${JSON.stringify(sourceText)} / 청크=${JSON.stringify(chunks)}`);
                 }
             }
 
