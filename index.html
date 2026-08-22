@@ -1029,22 +1029,25 @@
         .mt-slot {
             min-height: 168px;
             padding: 16px;
-            border: 1px solid #dbe3ec;
-            border-radius: 14px;
+            border: none;
+            border-radius: 12px;
             background: #ffffff;
             align-items: stretch;
             justify-content: flex-start;
-            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+            box-shadow: 3px 3px 0 rgba(17, 24, 39, 0.10),
+                        6px 6px 12px rgba(17, 24, 39, 0.08);
+            transition: box-shadow 0.2s ease, transform 0.2s ease, background 0.2s ease;
         }
         .mt-slot:hover {
-            border-color: #94a3b8;
+            border: none;
             background: #ffffff;
-            box-shadow: 0 6px 18px rgba(15, 23, 42, 0.07);
-            transform: translateY(-1px);
+            box-shadow: 4px 4px 0 rgba(17, 24, 39, 0.13),
+                        8px 8px 16px rgba(17, 24, 39, 0.10);
+            transform: translate(-1px, -1px);
         }
         .mt-slot.has-data {
-            border-color: #cbd5e1;
-            background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+            border: none;
+            background: linear-gradient(180deg, #ffffff 0%, #fcfcfc 100%);
         }
         .mt-slot-title {
             margin-bottom: 9px;
@@ -1359,13 +1362,54 @@
         .tab-btn:focus-visible { outline:2px solid #111; outline-offset:-2px; }
 
         #mtSlotsGrid.mt-slots-grid, .mt-slots-grid { margin-top:0 !important; }
-        .mt-slot { min-height:132px; padding:12px; border-radius:8px; box-shadow:none; }
-        .mt-slot:hover { box-shadow:none !important; transform:none !important; }
-        .mt-slot.has-data { background:#fff; }
-        .mt-slot-progress-row { min-height:24px; margin-bottom:7px; }
-        .mt-slot-title { margin-bottom:6px; }
-        .mt-slot-stat-row { margin-bottom:7px; }
-        .mt-slot-actions-row .mt-slot-meta-badge { min-height:24px !important; }
+
+        /* 슬롯 카드: 미니멀한 우측/하단 엣지만 남긴 입체형 디자인 */
+        .mt-slots-grid {
+            gap: 20px;
+            margin-top: 14px;
+            padding-right: 4px;
+            padding-bottom: 4px;
+        }
+        .mt-slot {
+            position: relative;
+            min-height: 132px;
+            padding: 14px 16px;
+            border: 0 !important;
+            /* 오른쪽 끝을 확실히 둥글게, 왼쪽은 단정하게 유지 */
+            border-radius: 10px 28px 18px 10px !important;
+            /* 슬롯 본체는 항상 순백색 */
+            background: #ffffff !important;
+            /* 회색 그라데이션 없이 오른쪽/아래쪽으로만 짙은 검정 엣지 */
+            box-shadow: 5px 5px 0 #161616 !important;
+            overflow: visible !important;
+            transform: none !important;
+            transition: transform .18s ease, box-shadow .18s ease;
+        }
+        .mt-slot:hover {
+            transform: translate(-1px, -1px) !important;
+            background: #ffffff !important;
+            box-shadow: 6px 6px 0 #0b0b0b !important;
+        }
+        .mt-slot.has-data {
+            background: #ffffff !important;
+        }
+        .mt-slot.has-data:hover {
+            background: #ffffff !important;
+        }
+        .mt-slot-title {
+            margin-bottom: 6px;
+            font-size: 13px;
+            line-height: 1.35;
+            font-weight: 800;
+            color: #111827;
+            text-align: left;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .mt-slot-progress-row { min-height: 24px; margin-bottom: 7px; }
+        .mt-slot-stat-row { margin-bottom: 7px; }
+        .mt-slot-actions-row .mt-slot-meta-badge { min-height: 24px !important; }
 
         @media (max-width:720px) {
             .header-buttons { gap:4px !important; }
