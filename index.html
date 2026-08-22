@@ -3887,12 +3887,9 @@ body { background: var(--bench-v2-bg) !important; }
         );
         if (duplicate) return duplicate;
         const entry = {
-            timestampKST,
-            timestampMs: now,
-            slotKey: key,
+            timestampKST, timestampMs: now, slotKey: key,
             slotLabel: String(detail.slotLabel || key),
-            model,
-            httpStatus: detail.httpStatus ?? null,
+            model, httpStatus: detail.httpStatus ?? null,
             finishReason: detail.finishReason || '',
             promptFeedback: detail.promptFeedback ?? null,
             contentParts: detail.contentParts ?? null,
@@ -3903,13 +3900,35 @@ body { background: var(--bench-v2-bg) !important; }
         logs.sort((a,b)=>Number(a.timestampMs||0)-Number(b.timestampMs||0));
         logs = logs.slice(-MT_GENERATOR_ERROR_LOG_MAX);
         logs.forEach((item, idx)=>{ item.seq = idx + 1; });
-        // 로그는 매우 작게 유지하고, 본체 생성 데이터와 분리합니다.
-        try { localStorage.setItem(mtGeneratorLogKey(key), JSON.stringify(logs)); } catch (e) { console.warn('[생성형 오류로그 저장]', e); }
         try {
             window.__mtGeneratorErrorLogMemory = window.__mtGeneratorErrorLogMemory || {};
             window.__mtGeneratorErrorLogMemory[key] = logs.slice();
         } catch (_) {}
+        // IndexedDB가 오류 로그의 영구 저장소입니다. 생성 데이터 크기와 완전히 분리합니다.
+        try {
+            if (typeof mtWithGeneratorStore === 'function') {
+                mtWithGeneratorStore('readwrite', store => {
+                    store.put(logs, MT_GENERATOR_ERROR_LOG_IDB_PREFIX + key);
+                }).catch(e => console.warn('[생성형 오류로그 IndexedDB 저장]', e));
+            }
+        } catch (e) { console.warn('[생성형 오류로그 IndexedDB 저장]', e); }
+        // 구버전 호환용 localStorage는 최선 시도만 합니다. 실패해도 로그 기록 자체는 유지됩니다.
+        try { localStorage.setItem(mtGeneratorLogKey(key), JSON.stringify(logs)); } catch (_) {}
         return entry;
+    }
+    async function mtGetGeneratorErrorLogsAsync(slotKey) {
+        const key = String(slotKey);
+        try {
+            if (typeof mtWithGeneratorStore === 'function') {
+                const logs = await mtWithGeneratorStore('readonly', store => new Promise(resolve => {
+                    const q = store.get(MT_GENERATOR_ERROR_LOG_IDB_PREFIX + key);
+                    q.onsuccess = () => resolve(Array.isArray(q.result) ? q.result : []);
+                    q.onerror = () => resolve([]);
+                }));
+                if (Array.isArray(logs) && logs.length) return logs.slice(-MT_GENERATOR_ERROR_LOG_MAX);
+            }
+        } catch (_) {}
+        return mtGetGeneratorErrorLogs(key);
     }
     function mtFormatGeneratorErrorEntry(entry) {
         return [
@@ -3928,9 +3947,9 @@ body { background: var(--bench-v2-bg) !important; }
             ''
         ].join('\n');
     }
-    function mtDownloadGeneratorErrorLog(event, slotKey, slotLabel) {
+    async function mtDownloadGeneratorErrorLog(event, slotKey, slotLabel) {
         if (event) event.stopPropagation();
-        let logs = mtGetGeneratorErrorLogs(slotKey).sort((a,b)=>Number(b.timestampMs||0)-Number(a.timestampMs||0));
+        let logs = (await mtGetGeneratorErrorLogsAsync(slotKey)).sort((a,b)=>Number(b.timestampMs||0)-Number(a.timestampMs||0));
         if (!logs.length) {
             try {
                 let fallback = null;
@@ -4012,6 +4031,7 @@ body { background: var(--bench-v2-bg) !important; }
 
     // 슬롯9 AI 오류 진단 로그
     const MT_SLOT9_ERROR_LOG_KEY = 'mt_slot9_error_log_v1';
+    const MT_GENERATOR_ERROR_LOG_IDB_PREFIX = 'errorlog::';
     const MT_SLOT9_ERROR_LOG_MAX = 10;
     function mtGetSeoulTimestamp() {
         return new Intl.DateTimeFormat('sv-SE', {
@@ -4040,34 +4060,25 @@ body { background: var(--bench-v2-bg) !important; }
         ];
         return lines.join('\n');
     }
-    function mtDownloadSlot9ErrorLog(event) {
-        if (event) event.stopPropagation();
-        let logs = [];
-        try { logs = JSON.parse(localStorage.getItem(MT_SLOT9_ERROR_LOG_KEY) || '[]'); } catch (e) {}
-        if (Array.isArray(logs)) logs = logs.slice(-MT_SLOT9_ERROR_LOG_MAX);
-        if (!Array.isArray(logs) || !logs.length) {
-            alert('저장된 슬롯9 오류 로그가 없습니다.');
-            return;
-        }
-        const latestTimestamp = logs.length ? (logs[0].timestampKST || '') : '';
+    async function mtDownloadSlot9ErrorLog(event) {
+        event?.stopPropagation();
+        const logs = (await mtGetGeneratorErrorLogsAsync('slot9')).sort((a,b)=>Number(b.timestampMs||0)-Number(a.timestampMs||0));
+        if (!logs.length) { alert('저장된 슬롯9 오류 로그가 없습니다.'); return; }
+        const latestTimestamp = logs[0]?.timestampKST || '없음';
         const text = [
             '[마스킹타이핑] 슬롯9 오류 로그',
             `로그 파일 생성시각(KST): ${mtGetSeoulTimestamp()}`,
-            `가장 최근 오류 기록시각(KST): ${latestTimestamp || '없음'}`,
+            `가장 최근 실제 오류 기록시각(KST): ${latestTimestamp}`,
             `총 오류 수: ${logs.length}`,
-            '',
-            '[최신 오류 → 과거 오류 순]',
-            '',
-            ...logs.map(mtFormatSlot9ErrorEntry)
+            '', '[최신 오류 → 과거 오류 순]', '',
+            ...logs.map(mtFormatGeneratorErrorEntry)
         ].join('\n');
         const blob = new Blob([text], {type:'text/plain;charset=utf-8'});
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
         a.download = `[마스킹타이핑]_슬롯9_오류로그_${mtGetSeoulTimestamp().replace(/[-:T]/g,'')}.txt`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
+        document.body.appendChild(a); a.click(); a.remove();
         setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
     function mtRecordSlot9ApiDiagnostic(detail) {
@@ -9237,7 +9248,7 @@ Return JSON only.`;
         const displayTitle = mtGetDisplayFileTitle(state.fileName || `슬롯 ${Number(slotIndex)}`);
         const displayBadge = mtGetSlotTypeLabel(type);
         const badgeClass = type === 'reference_generate' ? 'success' : (type === 'ebook' ? 'book' : (type === 'self_generate' ? 'ai' : ''));
-        div.innerHTML = `<div class="mt-slot-title">${mtEscapeHTML(displayTitle)}</div><div class="mt-slot-stat-row"><div><div class="mt-slot-count">${words.length}</div></div><div style="display:flex;align-items:center;gap:6px;"><div class="mt-slot-star-count">★ ${star}</div>${type!=='normal'?`<button class="btn-excel" style="padding:4px 8px;font-size:10px;" onclick="mtDownloadGeneratorErrorLog(event,'typed_${slotIndex}',${JSON.stringify(displayBadge)})">오류로그</button>`:''}</div></div>${type==='self_generate'||type==='reference_generate'?'':mtSlotProgressRow(mtGetSlotLearningProgress(slotIndex, mtTypedBuildSlotData(slotIndex), type))}<div class="mt-slot-actions-row"><span class="mt-slot-meta-badge ${badgeClass}">${displayBadge}</span>${hasData?`<button class="btn-download" onclick="mtTypedExport(event,${slotIndex})">내보내기</button><button class="mt-btn-delete" onclick="mtDeleteSlot(event,${slotIndex})">삭제</button>`:''}</div>${type!=='normal'?`<div id="mtTypedStatus_${slotIndex}" class="mt-wordweb-status"></div>`:''}`;
+        div.innerHTML = `<div class="mt-slot-title">${mtEscapeHTML(displayTitle)}</div><div class="mt-slot-stat-row"><div><div class="mt-slot-count">${words.length}</div></div><div style="display:flex;align-items:center;gap:6px;"><div class="mt-slot-star-count">★ ${star}</div>${['self_generate','reference_generate'].includes(type)?`<button class="btn-excel" style="padding:4px 8px;font-size:10px;" onclick="mtDownloadGeneratorErrorLog(event,'typed_${slotIndex}',${JSON.stringify(displayBadge)})">오류로그</button>`:''}</div></div>${type==='self_generate'||type==='reference_generate'?'':mtSlotProgressRow(mtGetSlotLearningProgress(slotIndex, mtTypedBuildSlotData(slotIndex), type))}<div class="mt-slot-actions-row"><span class="mt-slot-meta-badge ${badgeClass}">${displayBadge}</span>${hasData?`<button class="btn-download" onclick="mtTypedExport(event,${slotIndex})">내보내기</button><button class="mt-btn-delete" onclick="mtDeleteSlot(event,${slotIndex})">삭제</button>`:''}</div>${type!=='normal'?`<div id="mtTypedStatus_${slotIndex}" class="mt-wordweb-status"></div>`:''}`;
         div.onclick = () => {
             if (!hasData) mtOpenConfiguredEmptySlotModal(slotIndex);
             else if (type === 'ebook') mtOpenEbookViewer(Number(slotIndex));
