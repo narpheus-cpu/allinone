@@ -3537,6 +3537,18 @@ body { background: var(--bench-v2-bg) !important; }
             await saveSlotsToDatabase();
             await saveWordsToDatabase();
 
+            // 생성형 상태를 백업하기 전에 반드시 현재 메모리 상태를 IndexedDB와 동기화합니다.
+            // 초기화 전이라면 먼저 IndexedDB에서 복원하고, 이미 초기화됐다면 현재 상태를 flush합니다.
+            try {
+                if (!mtGeneratorStoreLoaded && typeof mtInitGeneratorStates === 'function') {
+                    await mtInitGeneratorStates();
+                } else if (mtGeneratorStoreLoaded && typeof mtPersistGeneratorStates === 'function') {
+                    await mtPersistGeneratorStates();
+                }
+            } catch (e) {
+                console.warn('[PC 백업] 생성형 상태 동기화 실패:', e);
+            }
+
             const mtBackupData = {};
             // 일반 슬롯 1~8은 기존 키, 슬롯9/10은 전용 저장 키를 사용합니다.
             // PC 백업에 실제 저장소의 원본 JSON을 그대로 담아 복원 시 카드 수/내용/별표/세션을 100% 유지합니다.
@@ -3644,20 +3656,35 @@ body { background: var(--bench-v2-bg) !important; }
                 }
 
                 if (Object.prototype.hasOwnProperty.call(parsed.mtBackupData, 'slot9_conversation')) {
-                    try { mtSlot9StateCache = parsed.mtBackupData['slot9_conversation'] ? JSON.parse(parsed.mtBackupData['slot9_conversation']) : mtSlot9DefaultState(); } catch (_) { mtSlot9StateCache = mtSlot9DefaultState(); }
-                    // 백업에 기록된 nextRun이 이미 지난 시각이면 복원 직후 즉시 생성이 돌지 않도록
-                    // 다음 자동 실행을 5분 후로 재설정합니다. 기존 결과 데이터는 그대로 보존합니다.
-                    if (mtSlot9StateCache && mtSlot9StateCache.fileName && Number(mtSlot9StateCache.nextRun) <= Date.now()) {
-                        mtSlot9StateCache.nextRun = Date.now() + MT_SLOT9_INTERVAL_MS;
+                    const rawSlot9 = parsed.mtBackupData['slot9_conversation'];
+                    try {
+                        const parsedSlot9 = rawSlot9 ? JSON.parse(rawSlot9) : mtSlot9DefaultState();
+                        if (!parsedSlot9 || typeof parsedSlot9 !== 'object' || Array.isArray(parsedSlot9)) {
+                            throw new Error('슬롯9 백업 상태 형식이 올바르지 않습니다.');
+                        }
+                        // 유효한 상태만 교체합니다. 파싱/형식 오류가 기존 정상 데이터를 빈 상태로 덮어쓰지 않게 합니다.
+                        mtSlot9StateCache = parsedSlot9;
+                        if (mtSlot9StateCache.fileName && Number(mtSlot9StateCache.nextRun) <= Date.now()) {
+                            mtSlot9StateCache.nextRun = Date.now() + MT_SLOT9_INTERVAL_MS;
+                        }
+                    } catch (e) {
+                        console.warn('[백업 복원] 슬롯9 상태 파싱 실패 — 기존 상태를 유지합니다.', e);
                     }
                 }
                 if(parsed.mtBackupData['star_session']) {
                     localStorage.setItem('word_slot_star_session', parsed.mtBackupData['star_session']);
                 }
-                if (parsed.mtBackupData['wordweb_conversation']) {
-                    try { mtWordWebStateCache = JSON.parse(parsed.mtBackupData['wordweb_conversation']); } catch (_) { mtWordWebStateCache = mtWordWebDefaultState(); }
-                } else {
-                    mtWordWebStateCache = mtWordWebDefaultState();
+                if (Object.prototype.hasOwnProperty.call(parsed.mtBackupData, 'wordweb_conversation')) {
+                    const rawWordWeb = parsed.mtBackupData['wordweb_conversation'];
+                    try {
+                        const parsedWordWeb = rawWordWeb ? JSON.parse(rawWordWeb) : mtWordWebDefaultState();
+                        if (!parsedWordWeb || typeof parsedWordWeb !== 'object' || Array.isArray(parsedWordWeb)) {
+                            throw new Error('슬롯10 백업 상태 형식이 올바르지 않습니다.');
+                        }
+                        mtWordWebStateCache = parsedWordWeb;
+                    } catch (e) {
+                        console.warn('[백업 복원] 슬롯10 상태 파싱 실패 — 기존 상태를 유지합니다.', e);
+                    }
                 }
                 if (mtWordWebStateCache && mtWordWebStateCache.fileName && Number(mtWordWebStateCache.nextRun) <= Date.now()) {
                     mtWordWebStateCache.nextRun = Date.now() + MT_WORDWEB_INTERVAL_MS;
@@ -7298,14 +7325,13 @@ Rules:
                 }catch(_){}
             }
 
-            const hasLoadedState = !!mtSlot9StateCache || !!mtWordWebStateCache;
-            if(hasLoadedState){
-                mtGeneratorStoreLoaded = true;
-                if(migratedSlot9 || migratedWordWeb){
-                    await mtPersistGeneratorStates();
-                    if(migratedSlot9) try{ localStorage.removeItem(MT_SLOT9_LEGACY_STORAGE_KEY); }catch(_){}
-                    if(migratedWordWeb) try{ localStorage.removeItem(MT_WORDWEB_STORAGE_KEY); }catch(_){}
-                }
+            // IndexedDB 읽기 트랜잭션 자체가 성공했다면 저장소 사용 가능 상태로 확정합니다.
+            // 데이터가 비어 있더라도 이후 새로 생성/편집된 생성형 상태는 정상 저장되어야 합니다.
+            mtGeneratorStoreLoaded = true;
+            if(migratedSlot9 || migratedWordWeb){
+                await mtPersistGeneratorStates();
+                if(migratedSlot9) try{ localStorage.removeItem(MT_SLOT9_LEGACY_STORAGE_KEY); }catch(_){}
+                if(migratedWordWeb) try{ localStorage.removeItem(MT_WORDWEB_STORAGE_KEY); }catch(_){}
             }
 
             if(!mtSlot9StateCache) mtSlot9StateCache=mtSlot9DefaultState();
@@ -8929,10 +8955,14 @@ Return JSON only.`;
         const label = slotIndex === 'naver' ? '네이버영어회화의 모든 누적 데이터를' : (slotIndex === 'wordweb' ? '워드웹회화의 모든 데이터를' : `슬롯 ${slotIndex}의 데이터`);
         if(confirm(`${label} 삭제하시겠습니까?`)) {
             if (slotIndex === 'wordweb') {
+                if (mtGeneratorSaveTimer) { clearTimeout(mtGeneratorSaveTimer); mtGeneratorSaveTimer = null; }
                 localStorage.removeItem(MT_WORDWEB_STORAGE_KEY);
                 if (mtWordWebTimerId) clearTimeout(mtWordWebTimerId);
                 mtWordWebTimerId = null;
             } else if (slotIndex === 'slot9') {
+                // 진행 중인 저장 예약과 자동실행을 모두 끊은 뒤 IndexedDB의 slot9 레코드를 삭제합니다.
+                // 삭제 직후 남아 있던 저장 예약이 빈 기본 상태를 다시 기록하는 경합을 방지합니다.
+                if (mtGeneratorSaveTimer) { clearTimeout(mtGeneratorSaveTimer); mtGeneratorSaveTimer = null; }
                 mtSlot9StateCache = mtSlot9DefaultState();
                 if (mtSlot9TimerId) clearTimeout(mtSlot9TimerId);
                 mtSlot9TimerId = null;
