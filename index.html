@@ -2201,6 +2201,21 @@ body { background: var(--bench-v2-bg) !important; }
     background: #18181b !important;
     box-shadow: 0 10px 30px -10px rgba(0,0,0,.10) !important;
 }
+
+/* 저장 알림: 헤더 레이아웃/오버플로와 무관하게 화면 위에 표시 */
+#saveReminder.save-reminder {
+    position: fixed !important;
+    top: 88px !important;
+    right: 24px !important;
+    display: none !important;
+    z-index: 99999 !important;
+    background: #dc2626 !important;
+    color: #fff !important;
+    border: 1px solid #b91c1c !important;
+    border-radius: 10px !important;
+    box-shadow: 0 10px 28px rgba(0,0,0,.16) !important;
+}
+#saveReminder.save-reminder.is-visible { display: block !important; }
 </style>
 </head>
 <body>
@@ -2873,6 +2888,8 @@ body { background: var(--bench-v2-bg) !important; }
                         <option value="sequential">일련번호순</option>
                         <option value="reverse">역순</option>
                         <option value="random">무작위</option>
+                        <option value="success_desc">성공 횟수 많은 순</option>
+                        <option value="success_asc">성공 횟수 적은 순</option>
                         <option value="starred">★표시카드만</option>
                     </select>
                 </div>
@@ -3559,9 +3576,10 @@ body { background: var(--bench-v2-bg) !important; }
             await writable.close();
 
             const reminder = document.getElementById('saveReminder');
-            if (reminder) reminder.style.display = 'none';
+            if (reminder) { reminder.classList.remove('is-visible'); reminder.style.removeProperty('display'); }
 
             alert("내 PC 파일에 전체 데이터(게시판, 타이핑to언마스크 포함)가 성공적으로 덮어쓰기 저장되었습니다!");
+            if (typeof mtStartSaveReminderTimer === 'function') mtStartSaveReminderTimer(true);
         } catch (err) {
             if (err.name !== 'AbortError') { alert("저장 중 오류가 발생했습니다: " + err.message); }
         }
@@ -3670,7 +3688,7 @@ body { background: var(--bench-v2-bg) !important; }
             setInterval(() => { try { mtRenderDailyStats(); } catch (_) {} }, 5 * 60 * 1000);
 
             const reminder = document.getElementById('saveReminder');
-            if (reminder) reminder.style.display = 'none';
+            if (reminder) { reminder.classList.remove('is-visible'); reminder.style.removeProperty('display'); }
 
             alert("전체 데이터(게시판, 타이핑to언마스크 포함)를 성공적으로 불러왔습니다! 이제 '덮어쓰기 저장'을 누르면 이 파일에 즉시 기록됩니다.");
         } catch (err) {
@@ -3678,10 +3696,19 @@ body { background: var(--bench-v2-bg) !important; }
         }
     }
 
-    setInterval(() => {
+    const MT_SAVE_REMINDER_INTERVAL_MS = 30 * 60 * 1000;
+    let mtSaveReminderTimerId = null;
+    function mtStartSaveReminderTimer(reset=false) {
+        if (mtSaveReminderTimerId) { clearTimeout(mtSaveReminderTimerId); mtSaveReminderTimerId = null; }
         const reminder = document.getElementById('saveReminder');
-        if (reminder) { reminder.style.display = 'block'; }
-    }, 30 * 60 * 1000); 
+        if (reminder) reminder.classList.remove('is-visible');
+        mtSaveReminderTimerId = setTimeout(() => {
+            const el = document.getElementById('saveReminder');
+            if (el) el.classList.add('is-visible');
+            mtSaveReminderTimerId = null;
+        }, MT_SAVE_REMINDER_INTERVAL_MS);
+    }
+    mtStartSaveReminderTimer(true);
 
     /* ========================================== */
     /* [공통/영작] 상태 및 초기화 관리             */
@@ -5640,6 +5667,7 @@ Rules:
     // 마스킹 박스/청크를 클릭해 공개한 단어의 중복 집계를 막습니다.
     let mtRevealedWordCompletionSet = new Set();
     let mtCardCompletionRecorded = false;
+    let mtCardSuccessCountRecorded = false;
 
     // 타이핑 to 언마스크 전용 글꼴/레이아웃 상태
     // CSS 기본값과 동일한 값을 사용하고, 이전 저장값이 있으면 복원합니다.
@@ -6558,6 +6586,35 @@ Rules:
         return { ...history };
     }
 
+    function mtGetSuccessCountsObject(state) {
+        const counts = state && state.successCounts && typeof state.successCounts === 'object'
+            ? state.successCounts : {};
+        return { ...counts };
+    }
+
+    function mtGetCardSuccessCountFromState(state, word, index=0) {
+        if (!state) return 0;
+        const key = mtNormalizeCompletionKey(word, index);
+        const counts = mtGetSuccessCountsObject(state);
+        return Math.max(0, Number(counts[key] || 0));
+    }
+
+    function mtGetPersistentStateForSlot(slotIndex) {
+        try {
+            if (slotIndex === 'slot9') return mtSlot9GetState();
+            if (slotIndex === 'wordweb') return mtWordWebGetState();
+            const configuredType = mtGetSlotType(slotIndex);
+            if (configuredType && configuredType !== 'normal') return mtGetTypedState(Number(slotIndex));
+            const direct = mtGetNormalSlotSync(slotIndex);
+            if (Array.isArray(direct)) return { words: direct };
+            return direct || null;
+        } catch (_) { return null; }
+    }
+
+    function mtGetCardSuccessCount(slotIndex, word, index=0) {
+        return mtGetCardSuccessCountFromState(mtGetPersistentStateForSlot(slotIndex), word, index);
+    }
+
     function mtGetCompletionIndexes(state) {
         return new Set(
             Array.isArray(state?.completedCardIndexes)
@@ -6632,6 +6689,9 @@ Rules:
         const key = mtNormalizeCompletionKey(currentWord, originalIndex);
         const completedAt = new Date().toISOString();
 
+        // 한 번의 학습 시도에서 같은 카드가 여러 input 이벤트를 발생시켜도 성공 횟수는 1회만 올립니다.
+        if (mtCardSuccessCountRecorded) return false;
+
         try {
             // 전자책은 기존의 카드별 ebookReadIndexes가 단일 기준입니다.
             if (mtEbookTypingActive) return false;
@@ -6642,6 +6702,7 @@ Rules:
                 const indexSet = mtGetCompletionIndexes(st);
                 const keySet = mtGetCompletionKeys(st);
                 const history = mtGetCompletionHistoryObject(st);
+                const successCounts = mtGetSuccessCountsObject(st);
                 const alreadyDone = indexSet.has(originalIndex) || keySet.has(key);
 
                 indexSet.add(originalIndex);
@@ -6651,11 +6712,13 @@ Rules:
                     completedAt
                 };
 
+                successCounts[key] = Math.max(0, Number(successCounts[key] || 0)) + 1;
                 st.completedCardIndexes = Array.from(indexSet).sort((a,b)=>a-b);
                 st.completedMaskKeys = Array.from(keySet);
                 st.completedMaskHistory = history;
+                st.successCounts = successCounts;
                 saveFn(st);
-                return !alreadyDone;
+                return true;
             };
 
             let changed = false;
@@ -6683,6 +6746,8 @@ Rules:
                     }
                 }
             }
+
+            if (changed) mtCardSuccessCountRecorded = true;
 
             // 저장이 새 완료를 만들었거나, 이전 버전 데이터 구조를 정규화한 뒤라도 화면을 즉시 갱신합니다.
             mtRefreshSlotProgressUI();
@@ -9932,6 +9997,26 @@ Return JSON only.`;
         document.getElementById('mtOptionsModal').style.display = 'none';
     }
 
+    function mtGetOrderedBySuccessCount(slotIndex, words, descending) {
+        const groups = new Map();
+        words.forEach((word, idx) => {
+            const count = mtGetCardSuccessCount(slotIndex, word, Number.isInteger(Number(word.originalIndex)) ? Number(word.originalIndex) : idx);
+            if (!groups.has(count)) groups.set(count, []);
+            groups.get(count).push({ word, originalOrder: idx });
+        });
+        const counts = Array.from(groups.keys()).sort((a,b) => descending ? b-a : a-b);
+        const result = [];
+        for (const count of counts) {
+            const group = groups.get(count) || [];
+            for (let i = group.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [group[i], group[j]] = [group[j], group[i]];
+            }
+            group.forEach(item => result.push(item.word));
+        }
+        return result;
+    }
+
     function mtApplyOptionsAndStart() {
         let totalLen = mtOriginalSlotData.words.length;
 
@@ -9963,6 +10048,10 @@ Return JSON only.`;
                 const j = Math.floor(Math.random() * (i + 1));
                 [selected[i], selected[j]] = [selected[j], selected[i]];
             }
+        } else if (mode === 'success_desc') {
+            selected = mtGetOrderedBySuccessCount(mtActiveSlotIndex, selected, true);
+        } else if (mode === 'success_asc') {
+            selected = mtGetOrderedBySuccessCount(mtActiveSlotIndex, selected, false);
         }
 
         mtCurrentStudyWords = selected;
@@ -10189,6 +10278,7 @@ Return JSON only.`;
         mtTypedWordCompletionSet = new Set();
         mtRevealedWordCompletionSet = new Set();
         mtCardCompletionRecorded = false;
+        mtCardSuccessCountRecorded = false;
         // 별표 클릭 여부와 통계는 완전히 독립적으로 관리합니다.
         // 이 카드에서 실제 키보드 입력이 있었는지만 별도로 추적합니다.
         mtCardHadDirectTyping = false;
@@ -10697,6 +10787,7 @@ Return JSON only.`;
     }
 
     document.addEventListener("DOMContentLoaded", function() {
+        if (typeof mtStartSaveReminderTimer === 'function' && !mtSaveReminderTimerId) mtStartSaveReminderTimer(true);
         const mtInputEl = document.getElementById('mtEngInput');
         if (mtInputEl) {
             mtInputEl.addEventListener('input', function(e) {
