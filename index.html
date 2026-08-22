@@ -2140,6 +2140,68 @@ body { background: var(--bench-v2-bg) !important; }
     }
 }
 </style>
+
+<style id="emptySlotOutlineFixV10">
+/* 슬롯 표면 정리 V10
+   - 데이터 있음: 외곽선 없음
+   - 데이터 없음: 회색 점선 + 페이지 배경 그대로 노출
+   - 빈 슬롯 내부 텍스트/배지는 검정 계열
+   - 모아보기(프리미엄) 반전 카드는 별도 유지
+*/
+.mt-slot:not(.mt-premium-slot) {
+    border: none !important;
+}
+
+.mt-slot.has-data:not(.mt-premium-slot) {
+    border: none !important;
+    background: #fff !important;
+}
+
+.mt-slot:not(.has-data):not(.mt-premium-slot) {
+    border: 2px dashed #c4c4c8 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: #18181b !important;
+}
+
+.mt-slot:not(.has-data):not(.mt-premium-slot) .mt-slot-title,
+.mt-slot:not(.has-data):not(.mt-premium-slot) .mt-slot-desc,
+.mt-slot:not(.has-data):not(.mt-premium-slot) .mt-slot-count,
+.mt-slot:not(.has-data):not(.mt-premium-slot) .mt-slot-count-label,
+.mt-slot:not(.has-data):not(.mt-premium-slot) .mt-slot-progress-row,
+.mt-slot:not(.has-data):not(.mt-premium-slot) .mt-progress-copy,
+.mt-slot:not(.has-data):not(.mt-premium-slot) .mt-progress-simple,
+.mt-slot:not(.has-data):not(.mt-premium-slot) .mt-slot-empty {
+    color: #18181b !important;
+}
+
+.mt-slot:not(.has-data):not(.mt-premium-slot) .mt-slot-empty {
+    background: transparent !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+}
+
+.mt-slot:not(.has-data):not(.mt-premium-slot) .mt-slot-meta-badge,
+.mt-slot:not(.has-data):not(.mt-premium-slot) .mt-wordweb-badge {
+    background: #18181b !important;
+    color: #fff !important;
+    border-color: #18181b !important;
+}
+
+.mt-slot:not(.has-data):not(.mt-premium-slot):hover {
+    border-color: #a1a1aa !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    transform: translateY(-3px) !important;
+}
+
+/* 중요 카드 모아보기는 검정 반전 디자인 유지 */
+.mt-slot.mt-premium-slot {
+    border: none !important;
+    background: #18181b !important;
+    box-shadow: 0 10px 30px -10px rgba(0,0,0,.10) !important;
+}
+</style>
 </head>
 <body>
 
