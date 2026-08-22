@@ -7813,9 +7813,12 @@ For EACH English sentence below:
 5) A temporal expression such as "tonight" that appears in the LAST English chunk MUST have its Korean counterpart (such as "오늘 밤") in the LAST Korean chunk.
 6) Preserve all important English meaning. Do not omit, duplicate, merge, or reorder important content.
 7) Korean chunks must contain Korean only. No English letters.
-8) For a single-token/single-word sentence, return exactly one English chunk and one Korean chunk.
+8) For a single-token/single-word original, return exactly ONE English chunk containing the entire English meaning and exactly ONE Korean chunk containing the entire direct-reading meaning. Never split it into multiple chunks.
 9) For short mixed-language originals whose English becomes a single meaningful unit, one chunk is allowed.
-10) Return ONLY the JSON array below.
+10) The number of korean_chunks MUST equal the number of english_chunks for every item.
+11) Before returning, count both arrays and correct any mismatch.
+12) Each Korean chunk must translate only the meaning of the English chunk at the same index.
+13) Return ONLY the JSON array below.
 
 Required output shape:
 [
@@ -7836,27 +7839,52 @@ INPUT:
 ${JSON.stringify(payload)}
         `.trim();
 
-        const raw = await fetchGemini(
-            prompt,
-            {
-                type:'ARRAY',
-                minItems:batchItems.length,
-                maxItems:batchItems.length,
-                items:{
-                    type:'OBJECT',
-                    properties:{
-                        index:{type:'INTEGER'},
-                        english_chunks:{type:'ARRAY',items:{type:'STRING'},minItems:1,maxItems:8},
-                        korean_chunks:{type:'ARRAY',items:{type:'STRING'},minItems:1,maxItems:8}
-                    },
-                    required:['index','english_chunks','korean_chunks']
-                }
-            },
-            config
-        );
-        if (!raw) throw new Error('직독직해 청크 API 응답이 없습니다.');
+        const schema = {
+            type:'ARRAY',
+            minItems:batchItems.length,
+            maxItems:batchItems.length,
+            items:{
+                type:'OBJECT',
+                properties:{
+                    index:{type:'INTEGER'},
+                    english_chunks:{type:'ARRAY',items:{type:'STRING'},minItems:1,maxItems:8},
+                    korean_chunks:{type:'ARRAY',items:{type:'STRING'},minItems:1,maxItems:8}
+                },
+                required:['index','english_chunks','korean_chunks']
+            }
+        };
 
-        const rows = Array.isArray(raw) ? raw : mtWordWebExtractJsonValue(raw);
+        let raw = await fetchGemini(prompt, schema, config);
+        if (!raw) throw new Error('직독직해 청크 API 응답이 없습니다.');
+        let rows = Array.isArray(raw) ? raw : mtWordWebExtractJsonValue(raw);
+
+        // 1차 결과에서 길이 불일치가 있으면 한 번만 "길이 교정 전용" 재요청합니다.
+        const hasCountMismatch = Array.isArray(rows) && rows.some(row => {
+            const e = Array.isArray(row?.english_chunks) ? row.english_chunks.filter(Boolean) : [];
+            const k = Array.isArray(row?.korean_chunks) ? row.korean_chunks.filter(Boolean) : [];
+            return e.length !== k.length;
+        });
+
+        if (hasCountMismatch) {
+            const repairPrompt = `
+The previous direct-reading output had a chunk-count mismatch.
+
+Repair ONLY the mismatched items.
+For every item:
+- english_chunks and korean_chunks MUST have exactly the same length.
+- korean_chunks[i] must correspond only to english_chunks[i].
+- Preserve exact English chunk order.
+- Do not rearrange Korean chunks into natural Korean sentence order.
+- Do not add or remove semantic content.
+- Return the FULL JSON array with all items, even unchanged ones.
+- Return ONLY JSON.
+
+INPUT:
+${JSON.stringify(rows)}
+            `.trim();
+            const repaired = await fetchGemini(repairPrompt, schema, config);
+            if (repaired) rows = Array.isArray(repaired) ? repaired : mtWordWebExtractJsonValue(repaired);
+        }
         if (!Array.isArray(rows) || rows.length !== batchItems.length) {
             throw new Error(`직독직해 청크 결과 개수가 ${batchItems.length}개와 일치하지 않습니다.`);
         }
@@ -7870,24 +7898,36 @@ ${JSON.stringify(payload)}
             const englishChunks = Array.isArray(row?.english_chunks)
                 ? row.english_chunks.map(x=>String(x ?? '').trim()).filter(Boolean)
                 : [];
-            const koreanChunks = Array.isArray(row?.korean_chunks)
+            let koreanChunks = Array.isArray(row?.korean_chunks)
                 ? row.korean_chunks.map(x=>String(x ?? '').trim()).filter(Boolean)
                 : [];
 
             const source = String(batchItems[idx].english || '').trim();
-            const tokenCount = String(batchItems[idx].source_korean || '').trim().split(/\s+/).filter(Boolean).length;
+            const originalTextForType = String(batchItems[idx].source_korean || '').trim();
+            const tokenCount = originalTextForType.split(/\s+/).filter(Boolean).length;
             const singleTokenOriginal = tokenCount === 1;
-            const sourceTextForType = String(batchItems[idx].source_korean || '').trim();
-            const sourceHasHangulForType = /[가-힣]/.test(sourceTextForType);
-            const sourceHasLatinForType = /[A-Za-z]/.test(sourceTextForType);
+            const sourceHasHangulForType = /[가-힣]/.test(originalTextForType);
+            const sourceHasLatinForType = /[A-Za-z]/.test(originalTextForType);
             const isMixedOriginalForType = sourceHasHangulForType && sourceHasLatinForType;
             const minChunks = (singleTokenOriginal || isMixedOriginalForType) ? 1 : 2;
+
+            // 한 단어/한 토큰 원문은 모델이 여러 청크로 잘못 분할해도
+            // 전체 의미를 하나의 청크로 결정적으로 정규화합니다.
+            // 예: "안녕" → 영어 ["Hello there"] / 한국어 ["안녕"]
+            if (singleTokenOriginal) {
+                const mergedEnglish = englishChunks.join(' ').replace(/\s+/g,' ').trim();
+                const mergedKorean = koreanChunks.join(' ').replace(/\s+/g,' ').trim();
+                englishChunks.length = 0;
+                koreanChunks.length = 0;
+                englishChunks.push(mergedEnglish);
+                koreanChunks.push(mergedKorean);
+            }
 
             if (englishChunks.length < minChunks || englishChunks.length > 8) {
                 throw new Error(`${idx+1}번 영어 청크 수가 올바르지 않습니다. 실제=${englishChunks.length}`);
             }
             if (koreanChunks.length !== englishChunks.length) {
-                throw new Error(`${idx+1}번 영어/한국어 청크 개수가 일치하지 않습니다. 영어=${englishChunks.length}, 한국어=${koreanChunks.length}`);
+                throw new Error(`${idx+1}번 영어/한국어 청크 개수가 일치하지 않습니다. 영어=${englishChunks.length}, 한국어=${koreanChunks.length}. 자동 정규화 후에도 불일치하여 배치를 저장하지 않았습니다.`);
             }
             if (englishChunks.some(x => !/[A-Za-z가-힣0-9]/.test(x))) {
                 throw new Error(`${idx+1}번 영어 청크에 유효한 문자가 없습니다.`);
@@ -8107,7 +8147,7 @@ For each ORIGINAL sentence:
 6. Return ONLY JSON.
 
 Required keys:
-source_korean, english, korean
+index, english, korean
 
 INPUT:
 ${JSON.stringify(batch.map((k,i)=>({index:i,source_korean:k})))}
@@ -8122,11 +8162,11 @@ ${JSON.stringify(batch.map((k,i)=>({index:i,source_korean:k})))}
                     items:{
                         type:'OBJECT',
                         properties:{
-                            source_korean:{type:'STRING'},
+                            index:{type:'INTEGER'},
                             english:{type:'STRING'},
                             korean:{type:'STRING'}
                         },
-                        required:['source_korean','english','korean']
+                        required:['index','english','korean']
                     }
                 },
                 wrappedAiConfig
@@ -8139,10 +8179,22 @@ ${JSON.stringify(batch.map((k,i)=>({index:i,source_korean:k})))}
             }
 
             const normalize = value => String(value ?? '').normalize('NFC').replace(/\s+/g,' ').trim();
-            const normalized = baseList.map((item,i)=>({
-                source_korean: normalize(item?.source_korean),
-                english: normalize(item?.english),
-                korean: normalize(item?.korean),
+            const byBaseIndex = new Map();
+            for (const item of baseList) {
+                const idx = Number(item?.index);
+                if (!Number.isInteger(idx) || idx < 0 || idx >= batch.length || byBaseIndex.has(idx)) {
+                    throw new Error(`A2 생성 결과의 index가 올바르지 않습니다: ${item?.index}`);
+                }
+                byBaseIndex.set(idx, item);
+            }
+            if (byBaseIndex.size !== batch.length) {
+                throw new Error(`A2 생성 결과 index가 ${batch.length}개와 일치하지 않습니다.`);
+            }
+
+            const normalized = batch.map((sourceText, i)=>({
+                source_korean: normalize(sourceText),
+                english: normalize(byBaseIndex.get(i)?.english),
+                korean: normalize(byBaseIndex.get(i)?.korean),
                 batchIndex:i
             }));
 
@@ -8156,9 +8208,6 @@ ${JSON.stringify(batch.map((k,i)=>({index:i,source_korean:k})))}
 
             for (let i=0;i<normalized.length;i++) {
                 const item=normalized[i];
-                if (item.source_korean !== normalize(batch[i])) {
-                    throw new Error(`${i+1}번 원문 보존 검증 실패`);
-                }
                 if (item.english.length < 2 || item.korean.length < 1) {
                     throw new Error(`${i+1}번 영어/한국어가 비어 있습니다.`);
                 }
