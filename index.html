@@ -3845,38 +3845,76 @@ body { background: var(--bench-v2-bg) !important; }
     }
 
     // 생성형 슬롯 공통 AI 오류 로그
-    const MT_GENERATOR_ERROR_LOG_PREFIX = 'mt_generator_error_log_v2_';
+    const MT_GENERATOR_ERROR_LOG_PREFIX = 'mt_generator_error_log_v3_';
     const MT_GENERATOR_ERROR_LOG_MAX = 10;
+    const MT_GENERATOR_ERROR_LOG_OLD_PREFIXES = ['mt_generator_error_log_v2_', 'mt_slot9_error_log_v1'];
     function mtGeneratorLogKey(slotKey) { return MT_GENERATOR_ERROR_LOG_PREFIX + String(slotKey); }
     function mtGetGeneratorErrorLogs(slotKey) {
+        const key = String(slotKey);
+        let all = [];
+        const keys = [mtGeneratorLogKey(key), ...MT_GENERATOR_ERROR_LOG_OLD_PREFIXES.map(p => p + key)];
+        for (const storageKey of keys) {
+            try {
+                const raw = JSON.parse(localStorage.getItem(storageKey) || '[]');
+                if (Array.isArray(raw)) all.push(...raw);
+            } catch (_) {}
+        }
         try {
-            const raw = JSON.parse(localStorage.getItem(mtGeneratorLogKey(slotKey)) || '[]');
-            return Array.isArray(raw) ? raw.slice(-MT_GENERATOR_ERROR_LOG_MAX) : [];
-        } catch (_) { return []; }
+            const mem = window.__mtGeneratorErrorLogMemory?.[key];
+            if (Array.isArray(mem)) all.push(...mem);
+        } catch (_) {}
+        const seen = new Set();
+        const unique = [];
+        all.sort((a,b) => Number(a.timestampMs || 0) - Number(b.timestampMs || 0)).forEach(item => {
+            const sig = `${item.timestampKST||''}|${item.model||''}|${item.httpStatus??''}|${item.errorMessage||''}`;
+            if (seen.has(sig)) return;
+            seen.add(sig);
+            unique.push(item);
+        });
+        return unique.slice(-MT_GENERATOR_ERROR_LOG_MAX);
     }
     function mtRecordGeneratorErrorLog(slotKey, detail = {}) {
+        const key = String(slotKey);
+        const now = Date.now();
+        const timestampKST = mtGetSeoulTimestamp();
+        const errorMessage = String(detail.errorMessage || '');
+        const model = String(detail.model || '');
+        let logs = mtGetGeneratorErrorLogs(key);
+        const duplicate = logs.find(item =>
+            String(item.errorMessage || '') === errorMessage &&
+            String(item.model || '') === model &&
+            Math.abs(Number(item.timestampMs || 0) - now) <= 5000
+        );
+        if (duplicate) return duplicate;
+        const entry = {
+            timestampKST,
+            timestampMs: now,
+            slotKey: key,
+            slotLabel: String(detail.slotLabel || key),
+            model,
+            httpStatus: detail.httpStatus ?? null,
+            finishReason: detail.finishReason || '',
+            promptFeedback: detail.promptFeedback ?? null,
+            contentParts: detail.contentParts ?? null,
+            responseObject: detail.responseObject ?? null,
+            errorMessage
+        };
+        logs.push(entry);
+        logs.sort((a,b)=>Number(a.timestampMs||0)-Number(b.timestampMs||0));
+        logs = logs.slice(-MT_GENERATOR_ERROR_LOG_MAX);
+        logs.forEach((item, idx)=>{ item.seq = idx + 1; });
+        // 로그는 매우 작게 유지하고, 본체 생성 데이터와 분리합니다.
+        try { localStorage.setItem(mtGeneratorLogKey(key), JSON.stringify(logs)); } catch (e) { console.warn('[생성형 오류로그 저장]', e); }
         try {
-            const logs = mtGetGeneratorErrorLogs(slotKey);
-            const entry = {
-                seq: logs.length + 1,
-                timestampKST: mtGetSeoulTimestamp(),
-                slotKey: String(slotKey),
-                ...detail
-            };
-            logs.push(entry);
-            const kept = logs.slice(-MT_GENERATOR_ERROR_LOG_MAX);
-            kept.forEach((item, idx) => { item.seq = idx + 1; });
-            localStorage.setItem(mtGeneratorLogKey(slotKey), JSON.stringify(kept));
-            return kept[kept.length - 1] || entry;
-        } catch (e) {
-            console.error('[생성형 슬롯 오류로그 저장 실패]', e);
-            return null;
-        }
+            window.__mtGeneratorErrorLogMemory = window.__mtGeneratorErrorLogMemory || {};
+            window.__mtGeneratorErrorLogMemory[key] = logs.slice();
+        } catch (_) {}
+        return entry;
     }
     function mtFormatGeneratorErrorEntry(entry) {
         return [
             `===== ${entry.slotLabel || entry.slotKey || '생성형 슬롯'} 오류 #${entry.seq} =====`,
-            `발생시각(KST): ${entry.timestampKST || ''}`,
+            `실제 기록시각(KST): ${entry.timestampKST || ''}`,
             `모델: ${entry.model || ''}`,
             `HTTP 상태: ${entry.httpStatus ?? ''}`,
             `finishReason: ${entry.finishReason || ''}`,
@@ -3888,34 +3926,35 @@ body { background: var(--bench-v2-bg) !important; }
             JSON.stringify(entry.responseObject ?? null, null, 2),
             `오류 메시지: ${entry.errorMessage || ''}`,
             ''
-        ].join('\\n');
+        ].join('\n');
     }
     function mtDownloadGeneratorErrorLog(event, slotKey, slotLabel) {
         if (event) event.stopPropagation();
-        let logs = mtGetGeneratorErrorLogs(slotKey).slice(-MT_GENERATOR_ERROR_LOG_MAX).sort((a,b) => String(b.timestampKST||'').localeCompare(String(a.timestampKST||'')));
-        // 저장소에 기록이 누락된 경우에도 현재 슬롯 상태의 마지막 진단을 복구해서 로그에 포함합니다.
+        let logs = mtGetGeneratorErrorLogs(slotKey).sort((a,b)=>Number(b.timestampMs||0)-Number(a.timestampMs||0));
         if (!logs.length) {
-            let fallback = null;
             try {
+                let fallback = null;
                 if (slotKey === 'slot9') fallback = mtSlot9GetState()?.lastDiagnostic || null;
                 else if (slotKey === 'wordweb') fallback = mtWordWebGetState()?.lastDiagnostic || null;
                 else if (/^typed_\d+$/.test(String(slotKey))) fallback = mtGetTypedState(Number(String(slotKey).slice(6)))?.lastDiagnostic || null;
+                if (fallback) logs = [fallback];
             } catch (_) {}
-            if (fallback) {
-                logs = [fallback];
-            }
         }
         if (!logs.length) {
-            alert('저장된 오류 로그가 없습니다.\n\n오류가 발생한 뒤 [오류로그]를 눌러 주세요.');
+            alert('저장된 오류 로그가 없습니다.');
             return;
         }
+        const latestTimestamp = logs[0]?.timestampKST || '없음';
         const text = [
             `[마스킹타이핑] ${slotLabel || slotKey} 오류 로그`,
-            `생성시각(KST): ${mtGetSeoulTimestamp()}`,
+            `로그 파일 생성시각(KST): ${mtGetSeoulTimestamp()}`,
+            `가장 최근 실제 오류 기록시각(KST): ${latestTimestamp}`,
             `총 오류 수: ${logs.length}`,
             '',
+            '[최신 오류 → 과거 오류 순]',
+            '',
             ...logs.map(mtFormatGeneratorErrorEntry)
-        ].join('\\n');
+        ].join('\n');
         const blob = new Blob([text], {type:'text/plain;charset=utf-8'});
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -3981,24 +4020,7 @@ body { background: var(--bench-v2-bg) !important; }
         }).format(new Date()).replace(' ', 'T');
     }
     function mtRecordSlot9ErrorLog(detail) {
-        try {
-            const logs = JSON.parse(localStorage.getItem(MT_SLOT9_ERROR_LOG_KEY) || '[]');
-            const arr = Array.isArray(logs) ? logs : [];
-            const entry = {
-                seq: arr.length + 1,
-                timestampKST: mtGetSeoulTimestamp(),
-                ...detail
-            };
-            arr.push(entry);
-            // 과도한 누적을 방지하되 최근 기록은 충분히 보존합니다.
-            const kept = arr.slice(-MT_GENERATOR_ERROR_LOG_MAX);
-            kept.forEach((item, idx) => { item.seq = idx + 1; });
-            localStorage.setItem(MT_SLOT9_ERROR_LOG_KEY, JSON.stringify(kept));
-            return entry;
-        } catch (e) {
-            console.error('[슬롯9 오류로그 저장 실패]', e);
-            return null;
-        }
+        return mtRecordGeneratorErrorLog('slot9', { slotLabel:'슬롯9', ...detail });
     }
     function mtFormatSlot9ErrorEntry(entry) {
         const lines = [
@@ -4427,6 +4449,19 @@ body { background: var(--bench-v2-bg) !important; }
         const s9 = document.getElementById('mtSlot9ApiKeyInput'); if (s9) s9.value = mtGetSlotApiKey('slot9');
         const ww = document.getElementById('mtWordWebApiKeyInput'); if (ww) ww.value = mtGetSlotApiKey('wordweb');
     }
+function mtForceRecordSlot9Failure(error, extra = {}) {
+        return mtRecordGeneratorErrorLog('slot9', {
+            slotLabel: '슬롯9',
+            model: extra.model || '',
+            httpStatus: extra.httpStatus ?? null,
+            finishReason: extra.finishReason || '',
+            promptFeedback: extra.promptFeedback ?? null,
+            contentParts: extra.contentParts ?? null,
+            responseObject: extra.responseObject ?? null,
+            errorMessage: String(extra.errorMessage || error?.message || error || '알 수 없는 오류')
+        });
+    }
+
 function mtGetSlot9AiConfig() {
         return {
             apiKey: mtGetSlotApiKey('slot9'),
@@ -7302,6 +7337,12 @@ Rules:
             mtSlot9StateCache=s9 || null;
             mtWordWebStateCache=ww || null;
 
+            // 최신 IndexedDB 상태가 있으면 과거의 대용량 localStorage 슬롯9 키를 즉시 제거합니다.
+            // 이 키가 남아 있으면 작은 오류 로그조차 localStorage quota에 막힐 수 있습니다.
+            if (mtSlot9StateCache) {
+                try { localStorage.removeItem(MT_SLOT9_LEGACY_STORAGE_KEY); } catch (_) {}
+            }
+
             let migratedSlot9 = false;
             let migratedWordWeb = false;
             if(!mtSlot9StateCache){
@@ -7736,6 +7777,11 @@ ${JSON.stringify(batch)}
             mtInitSlots();
 
         } catch (e) {
+            // 모든 최종 실패를 반드시 로그에 남깁니다. diagnosticHandler가 놓친 저장/검증/타임아웃 전파도 포함합니다.
+            let lastDiag = null;
+            try { lastDiag = mtSlot9GetState()?.lastDiagnostic || null; } catch (_) {}
+            const msg = String(e?.message || e || '알 수 없는 오류');
+            if (!lastDiag || String(lastDiag.errorMessage || '') !== msg) mtForceRecordSlot9Failure(e, lastDiag || {});
             // 실패 원인별로 다음 실행 시점을 다르게 잡습니다.
             // 일일 quota 초과는 5분마다 무의미하게 재요청하지 않고 24시간 후 다시 확인합니다.
             const latestSt = mtSlot9GetState();
