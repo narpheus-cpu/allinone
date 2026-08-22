@@ -12101,3 +12101,48 @@ Return JSON only.`;
 </script>
 </body>
 </html>
+<style id="v26-delete-and-badge-fix">
+/* v26: compact, saturated delete button */
+.mt-btn-delete.compact-delete-btn,
+.mt-btn-delete,
+button.mt-btn-delete {
+  width:22px !important;
+  min-width:22px !important;
+  height:22px !important;
+  min-height:22px !important;
+  padding:0 !important;
+  margin:0 !important;
+  border:0 !important;
+  border-radius:6px !important;
+  background:#c1121f !important;
+  color:#fff !important;
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  font-size:14px !important;
+  line-height:1 !important;
+  font-weight:900 !important;
+  letter-spacing:-.06em !important;
+  box-shadow:none !important;
+}
+.mt-btn-delete.compact-delete-btn:hover,
+.mt-btn-delete:hover { background:#a60f1b !important; }
+
+/* v26: normal badge exact requested green */
+.mt-slot .mt-slot-meta-badge:not(.ai):not(.success):not(.book) {
+  background:#247d3c !important;
+  color:#fff !important;
+  border-color:#247d3c !important;
+}
+/* preserve the other requested type colors */
+.mt-slot .mt-slot-meta-badge.ai {
+  background:#205e85 !important; color:#fff !important; border-color:#205e85 !important;
+}
+.mt-slot .mt-slot-meta-badge.success {
+  background:#832085 !important; color:#fff !important; border-color:#832085 !important;
+}
+.mt-slot .mt-slot-meta-badge.book {
+  background:#854520 !important; color:#fff !important; border-color:#854520 !important;
+}
+.mt-slot.mt-premium-slot .mt-slot-meta-badge { background:#fff !important; color:#18181b !important; border-color:#fff !important; }
+</style>
