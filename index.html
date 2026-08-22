@@ -1422,6 +1422,514 @@
             .mt-slot { min-height:118px; padding:10px; }
         }
 </style>
+<style id="benchmarkDesignOverride">
+/* =========================================================
+   BENCHMARK DESIGN OVERRIDE
+   Inspired by the attached modern B&W reference.
+   Functionality/DOM structure intentionally preserved.
+   ========================================================= */
+:root {
+    --bench-bg-body: #f4f4f5;
+    --bench-card: #ffffff;
+    --bench-primary: #18181b;
+    --bench-primary-hover: #000000;
+    --bench-text-title: #000000;
+    --bench-text-body: #3f3f46;
+    --bench-text-muted: #71717a;
+    --bench-border: #e4e4e7;
+}
+
+body {
+    background: var(--bench-bg-body) !important;
+    color: var(--bench-text-body) !important;
+    padding: 32px 20px !important;
+}
+
+.container {
+    max-width: 1200px !important;
+    background: transparent !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    border: 0 !important;
+}
+
+.header-container {
+    margin-bottom: 28px !important;
+    gap: 18px !important;
+    align-items: center !important;
+}
+
+.header-container h1 {
+    font-size: 26px !important;
+    font-weight: 900 !important;
+    letter-spacing: -0.6px !important;
+    color: var(--bench-text-title) !important;
+}
+
+.header-buttons {
+    gap: 8px !important;
+}
+
+.header-buttons > .btn-excel,
+.header-buttons > .file-open-btn,
+.header-buttons > button.file-sync-btn {
+    min-height: 40px !important;
+    height: 40px !important;
+    padding: 8px 14px !important;
+    border-radius: 12px !important;
+    border: 1px solid var(--bench-border) !important;
+    font-size: 12px !important;
+    font-weight: 800 !important;
+    box-sizing: border-box !important;
+    transition: all .2s cubic-bezier(.4,0,.2,1) !important;
+}
+
+.header-buttons > .btn-excel,
+.header-buttons > .file-open-btn {
+    background: #fff !important;
+    color: var(--bench-text-title) !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,.02) !important;
+}
+
+.header-buttons > .btn-excel:hover,
+.header-buttons > .file-open-btn:hover {
+    background: #fff !important;
+    color: #000 !important;
+    border-color: var(--bench-primary) !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,.08) !important;
+}
+
+.header-buttons > button.file-sync-btn {
+    background: var(--bench-primary) !important;
+    color: #fff !important;
+    border-color: var(--bench-primary) !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,.15) !important;
+}
+
+.header-buttons > button.file-sync-btn:hover {
+    background: var(--bench-primary-hover) !important;
+    border-color: var(--bench-primary-hover) !important;
+}
+
+.tabs {
+    display: inline-flex !important;
+    width: auto !important;
+    background: #e4e4e7 !important;
+    padding: 6px !important;
+    border: 0 !important;
+    border-radius: 16px !important;
+    margin-bottom: 28px !important;
+    gap: 4px !important;
+    box-sizing: border-box !important;
+}
+
+.tab-btn {
+    flex: 0 0 auto !important;
+    padding: 11px 22px !important;
+    margin: 0 !important;
+    border: 0 !important;
+    border-radius: 12px !important;
+    background: transparent !important;
+    color: var(--bench-text-body) !important;
+    font-size: 13px !important;
+    font-weight: 800 !important;
+    transition: all .2s ease !important;
+}
+
+.tab-btn:hover {
+    color: var(--bench-text-title) !important;
+    background: rgba(255,255,255,.45) !important;
+}
+
+.tab-btn.active {
+    background: var(--bench-primary) !important;
+    color: #fff !important;
+    border: 0 !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,.10) !important;
+}
+
+/* Main slot dashboard: benchmark card language */
+.mt-slots-grid {
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)) !important;
+    gap: 24px !important;
+    margin-top: 0 !important;
+    align-items: stretch !important;
+}
+
+.mt-slot {
+    min-height: 190px !important;
+    padding: 24px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    justify-content: flex-start !important;
+    background: var(--bench-card) !important;
+    border: 1px solid var(--bench-border) !important;
+    border-radius: 24px !important;
+    box-shadow: 0 10px 30px -10px rgba(0,0,0,.05) !important;
+    color: var(--bench-text-body) !important;
+    overflow: hidden !important;
+    transition: transform .3s ease, box-shadow .3s ease, border-color .3s ease !important;
+}
+
+.mt-slot:hover,
+.mt-slot.mt-special-slot:hover,
+.mt-slot.mt-wordweb-slot:hover {
+    transform: translateY(-5px) !important;
+    background: #fff !important;
+    border-color: #71717a !important;
+    box-shadow: 0 20px 40px -15px rgba(0,0,0,.12) !important;
+}
+
+.mt-slot.has-data,
+.mt-slot.mt-special-slot,
+.mt-slot.mt-wordweb-slot {
+    background: var(--bench-card) !important;
+    border: 1px solid var(--bench-border) !important;
+}
+
+.mt-slot-title {
+    margin-bottom: 18px !important;
+    font-size: 15px !important;
+    line-height: 1.4 !important;
+    font-weight: 800 !important;
+    color: var(--bench-text-title) !important;
+    text-align: left !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+
+.mt-slot-desc {
+    margin-bottom: 18px !important;
+    font-size: 12px !important;
+    line-height: 1.55 !important;
+    color: var(--bench-text-muted) !important;
+    text-align: left !important;
+}
+
+.mt-slot-stat-row {
+    align-items: baseline !important;
+    gap: 8px !important;
+    margin-bottom: 16px !important;
+}
+
+.mt-slot-count {
+    font-size: 36px !important;
+    line-height: 1 !important;
+    font-weight: 900 !important;
+    letter-spacing: -1px !important;
+    color: var(--bench-text-title) !important;
+}
+
+.mt-slot-count-label {
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    color: var(--bench-text-muted) !important;
+}
+
+.mt-slot-star-count {
+    padding: 4px 10px !important;
+    border-radius: 999px !important;
+    background: #f4f4f5 !important;
+    color: var(--bench-text-title) !important;
+    border: 1px solid var(--bench-border) !important;
+    font-size: 11px !important;
+    font-weight: 800 !important;
+}
+
+.mt-slot-meta-badge,
+.mt-wordweb-badge {
+    margin-bottom: 14px !important;
+    padding: 4px 10px !important;
+    border-radius: 8px !important;
+    background: #f4f4f5 !important;
+    color: var(--bench-text-title) !important;
+    border: 1px solid var(--bench-border) !important;
+    font-size: 10px !important;
+    font-weight: 800 !important;
+}
+
+.mt-slot-meta-badge.ai,
+.mt-wordweb-badge {
+    background: var(--bench-primary) !important;
+    color: #fff !important;
+    border-color: var(--bench-primary) !important;
+}
+
+.mt-slot-progress-row {
+    min-height: 30px !important;
+    margin-bottom: 16px !important;
+    color: var(--bench-text-muted) !important;
+}
+
+.mt-slot-actions-row {
+    margin-top: auto !important;
+    padding-top: 16px !important;
+    border-top: 1px solid var(--bench-border) !important;
+    gap: 10px !important;
+}
+
+.mt-slot-actions-row button,
+.mt-slot button {
+    border-radius: 8px !important;
+}
+
+/* The collection/premium card follows the reference's dark inverse card. */
+.mt-slot.mt-special-slot {
+    background: var(--bench-primary) !important;
+    color: #fff !important;
+    border-color: var(--bench-primary) !important;
+}
+
+.mt-slot.mt-special-slot .mt-slot-title,
+.mt-slot.mt-special-slot .mt-slot-count,
+.mt-slot.mt-special-slot .mt-slot-desc,
+.mt-slot.mt-special-slot .mt-slot-count-label,
+.mt-slot.mt-special-slot .mt-slot-progress-row,
+.mt-slot.mt-special-slot .mt-slot-star-count {
+    color: #fff !important;
+}
+
+.mt-slot.mt-special-slot .mt-slot-actions-row {
+    border-top-color: #3f3f46 !important;
+}
+
+.mt-slot.mt-special-slot .mt-slot-star-count,
+.mt-slot.mt-special-slot .mt-slot-meta-badge {
+    background: #fff !important;
+    color: var(--bench-primary) !important;
+    border-color: #fff !important;
+}
+
+/* Empty slot: keep the benchmark's quiet placeholder treatment. */
+.mt-slot.mt-slot-empty,
+.mt-slot:has(.mt-slot-empty) {
+    background: rgba(255,255,255,.55) !important;
+    border: 2px dashed #d4d4d8 !important;
+    box-shadow: none !important;
+}
+
+@media (max-width: 768px) {
+    body { padding: 24px 14px !important; }
+    .header-container { flex-direction: column !important; align-items: stretch !important; }
+    .header-buttons { justify-content: flex-start !important; }
+    .tabs { width: 100% !important; overflow-x: auto !important; }
+    .tab-btn { flex: 1 0 auto !important; white-space: nowrap !important; }
+    .mt-slots-grid { gap: 18px !important; }
+    .mt-slot { border-radius: 20px !important; padding: 20px !important; }
+}
+</style>
+<style id="benchmarkV2Style">
+
+/* =========================================================
+   BENCHMARK V2 — card dashboard refinement
+   ========================================================= */
+:root {
+    --bench-v2-bg: #f4f4f5;
+    --bench-v2-card: #ffffff;
+    --bench-v2-primary: #18181b;
+    --bench-v2-text: #000000;
+    --bench-v2-body: #3f3f46;
+    --bench-v2-muted: #71717a;
+    --bench-v2-border: #e4e4e7;
+}
+
+body { background: var(--bench-v2-bg) !important; }
+.container { max-width: 1200px !important; background: transparent !important; padding: 0 !important; border: 0 !important; box-shadow: none !important; }
+.header-container { margin-bottom: 30px !important; gap: 20px !important; }
+.header-container h1 { font-size: 26px !important; font-weight: 900 !important; color: var(--bench-v2-text) !important; letter-spacing: -.5px !important; }
+.header-buttons { gap: 10px !important; }
+.header-buttons > .btn-excel, .header-buttons > .file-open-btn, .header-buttons button.file-sync-btn {
+    min-height: 40px !important; height: 40px !important; padding: 9px 16px !important; border-radius: 12px !important; font-size: 12px !important;
+}
+.header-buttons > .btn-excel, .header-buttons > .file-open-btn { background:#fff !important; color:var(--bench-v2-text) !important; border:1px solid var(--bench-v2-border) !important; box-shadow:0 2px 8px rgba(0,0,0,.02) !important; }
+.header-buttons button.file-sync-btn { background:var(--bench-v2-primary) !important; color:#fff !important; border-color:var(--bench-v2-primary) !important; box-shadow:0 4px 12px rgba(0,0,0,.15) !important; }
+
+.tabs {
+    display:inline-flex !important; align-items:center !important; gap:4px !important; margin:0 0 30px !important;
+    padding:6px !important; border:0 !important; border-radius:16px !important; background:#e4e4e7 !important;
+}
+.tab-btn {
+    flex:0 0 auto !important; padding:12px 24px !important; margin:0 !important; border:0 !important; border-radius:12px !important;
+    font-size:14px !important; font-weight:700 !important; color:var(--bench-v2-body) !important; background:transparent !important;
+}
+.tab-btn.active { color:#fff !important; background:var(--bench-v2-primary) !important; border:0 !important; box-shadow:0 2px 8px rgba(0,0,0,.10) !important; }
+
+.mt-slots-grid {
+    grid-template-columns:repeat(auto-fill,minmax(280px,1fr)) !important;
+    gap:24px !important; margin-top:0 !important; align-items:stretch !important;
+}
+.mt-slot {
+    min-height:0 !important; padding:24px !important; border:1px solid var(--bench-v2-border) !important;
+    border-radius:24px !important; background:var(--bench-v2-card) !important; color:var(--bench-v2-body) !important;
+    box-shadow:0 10px 30px -10px rgba(0,0,0,.05) !important; overflow:hidden !important;
+    transition:transform .3s ease,box-shadow .3s ease,border-color .3s ease,background .3s ease !important;
+}
+.mt-slot:hover {
+    transform:translateY(-5px) !important; background:#fff !important; border-color:#71717a !important;
+    box-shadow:0 20px 40px -15px rgba(0,0,0,.12) !important;
+}
+/* Data-bearing cards are quiet gray outlined cards. */
+.mt-slot.has-data:not(.mt-premium-slot) { border:1px solid var(--bench-v2-border) !important; background:#fff !important; }
+/* Empty cards use the benchmark's dashed outline and no shadow. */
+.mt-slot.mt-empty-card, .mt-slot:has(.mt-slot-empty) {
+    background:rgba(255,255,255,.60) !important; border:2px dashed #d4d4d8 !important; box-shadow:none !important;
+}
+.mt-slot.mt-empty-card:hover, .mt-slot:has(.mt-slot-empty):hover {
+    background:#fff !important; border-color:var(--bench-v2-primary) !important; box-shadow:none !important;
+}
+
+.mt-slot-title { margin-bottom:20px !important; font-size:16px !important; line-height:1.4 !important; font-weight:800 !important; color:#000 !important; }
+.mt-slot-stat-row { align-items:baseline !important; gap:8px !important; margin-bottom:16px !important; }
+.mt-slot-count { font-size:36px !important; line-height:1 !important; font-weight:900 !important; letter-spacing:-1px !important; color:#000 !important; }
+.mt-slot-count-label { font-size:11px !important; font-weight:700 !important; color:var(--bench-v2-muted) !important; }
+.mt-slot-star-count { padding:4px 10px !important; border-radius:999px !important; background:#f4f4f5 !important; color:#000 !important; border:1px solid var(--bench-v2-border) !important; font-size:11px !important; font-weight:800 !important; }
+.mt-slot-desc { margin-bottom:20px !important; font-size:12px !important; line-height:1.5 !important; color:var(--bench-v2-muted) !important; }
+.mt-slot-meta-badge,.mt-wordweb-badge { margin-bottom:14px !important; padding:4px 10px !important; border-radius:8px !important; background:#f4f4f5 !important; color:#000 !important; border:1px solid var(--bench-v2-border) !important; font-size:10px !important; font-weight:800 !important; }
+.mt-slot-meta-badge.ai,.mt-wordweb-badge { background:var(--bench-v2-primary) !important; color:#fff !important; border-color:var(--bench-v2-primary) !important; }
+
+/* Progress graph: benchmark-like 8px rounded black bar. */
+.mt-slot-progress-row {
+    width:100% !important; min-height:0 !important; margin:0 0 20px !important; padding:0 !important;
+    display:block !important; color:var(--bench-v2-muted) !important; text-align:left !important; font-size:12px !important; font-weight:700 !important;
+}
+.mt-progress-copy { display:flex; justify-content:space-between; gap:12px; margin-bottom:6px; font-size:12px; font-weight:700; color:var(--bench-v2-muted); }
+.mt-progress-track { width:100%; height:8px; background:var(--bench-v2-border); border-radius:999px; overflow:hidden; }
+.mt-progress-fill { height:100%; width:0; background:var(--bench-v2-primary); border-radius:999px; transition:width .5s ease-out; }
+.mt-progress-simple { color:var(--bench-v2-muted); font-size:11px; font-weight:700; }
+
+.mt-slot-actions-row {
+    display:flex !important; justify-content:space-between !important; align-items:center !important; gap:10px !important;
+    margin-top:auto !important; padding-top:16px !important; border-top:1px solid var(--bench-v2-border) !important;
+}
+.mt-slot-actions-row .mt-slot-meta-badge { margin:0 !important; }
+.mt-slot-actions-row button, .mt-slot-actions-row .btn-download, .mt-slot-actions-row .mt-btn-delete {
+    min-height:30px !important; padding:6px 12px !important; border:0 !important; border-radius:8px !important;
+    background:transparent !important; color:var(--bench-v2-muted) !important; font-size:12px !important; font-weight:700 !important;
+    box-shadow:none !important;
+}
+.mt-slot-actions-row button:hover { background:#f4f4f5 !important; color:#000 !important; }
+.mt-slot-actions-row .mt-btn-delete:hover { background:#18181b !important; color:#fff !important; }
+.mt-slot-empty { margin-top:auto !important; padding:0 !important; background:transparent !important; color:var(--bench-v2-muted) !important; font-size:12px !important; font-weight:700 !important; }
+
+/* Premium / important collection = full inverse card, exactly like benchmark. */
+.mt-slot.mt-premium-slot {
+    background:var(--bench-v2-primary) !important; color:#fff !important; border-color:var(--bench-v2-primary) !important;
+    box-shadow:0 10px 30px -10px rgba(0,0,0,.18) !important;
+}
+.mt-slot.mt-premium-slot:hover { background:#18181b !important; border-color:#18181b !important; box-shadow:0 20px 40px -15px rgba(0,0,0,.28) !important; }
+.mt-slot.mt-premium-slot .mt-slot-title,
+.mt-slot.mt-premium-slot .mt-slot-count,
+.mt-slot.mt-premium-slot .mt-slot-count-label,
+.mt-slot.mt-premium-slot .mt-slot-desc,
+.mt-slot.mt-premium-slot .mt-slot-progress-row { color:#fff !important; }
+.mt-slot.mt-premium-slot .mt-slot-meta-badge { background:#fff !important; color:#18181b !important; border-color:#fff !important; }
+.mt-slot.mt-premium-slot .mt-slot-star-count { background:#fff !important; color:#18181b !important; border-color:#fff !important; }
+.mt-slot.mt-premium-slot .mt-slot-actions-row { border-top-color:#3f3f46 !important; }
+.mt-slot.mt-premium-slot .mt-slot-actions-row button { background:#fff !important; color:#18181b !important; width:100%; }
+.mt-slot.mt-premium-slot .mt-slot-actions-row button:hover { background:#e4e4e7 !important; }
+.mt-slot.mt-premium-slot .mt-progress-track { background:#3f3f46 !important; }
+.mt-slot.mt-premium-slot .mt-progress-fill { background:#fff !important; }
+
+@media (max-width:768px){
+    .tabs { width:100% !important; overflow-x:auto !important; box-sizing:border-box !important; }
+    .tab-btn { flex:1 0 auto !important; }
+    .mt-slots-grid { grid-template-columns:1fr !important; gap:18px !important; }
+    .mt-slot { border-radius:20px !important; padding:20px !important; }
+}
+
+</style>
+
+<style id="requestedBenchmarkPolish">
+/* 최종 요청 반영: 메뉴/슬롯/진행률/여백 정리 */
+.tabs {
+    display:inline-flex !important;
+    align-items:center !important;
+    gap:4px !important;
+    padding:6px !important;
+    background:#e4e4e7 !important;
+    border:0 !important;
+    border-radius:16px !important;
+    margin:0 0 30px !important;
+}
+.tab-btn {
+    border:0 !important;
+    border-radius:12px !important;
+    background:transparent !important;
+    box-shadow:none !important;
+}
+.tab-btn.active {
+    background:#18181b !important;
+    color:#fff !important;
+    border:0 !important;
+    border-radius:12px !important;
+    box-shadow:0 2px 8px rgba(0,0,0,.10) !important;
+}
+
+.mt-slots-grid {
+    gap:24px !important;
+    padding:8px 10px 14px !important;
+    margin:0 !important;
+}
+.mt-slot {
+    box-sizing:border-box !important;
+    margin:0 !important;
+    border:1px solid #e4e4e7 !important;
+    border-radius:24px !important;
+    background:#fff !important;
+    box-shadow:0 10px 30px -10px rgba(0,0,0,.05) !important;
+}
+.mt-slot.has-data:not(.mt-premium-slot),
+.mt-slot.mt-wordweb-slot.has-data {
+    border:1px solid #e4e4e7 !important;
+    background:#fff !important;
+}
+.mt-slot.mt-empty-card,
+.mt-slot:has(.mt-slot-empty) {
+    border:2px dashed #d4d4d8 !important;
+    background:rgba(255,255,255,.62) !important;
+    box-shadow:none !important;
+}
+.mt-slot.mt-empty-card:hover,
+.mt-slot:has(.mt-slot-empty):hover {
+    border:2px dashed #18181b !important;
+    background:#fff !important;
+    box-shadow:none !important;
+}
+
+/* 진행률: 트랙은 연회색, 실제 진행은 진한 검정 */
+.mt-progress-track {
+    background:#e4e4e7 !important;
+}
+.mt-progress-fill {
+    background:#18181b !important;
+}
+.mt-slot.mt-premium-slot .mt-progress-track {
+    background:#3f3f46 !important;
+}
+.mt-slot.mt-premium-slot .mt-progress-fill {
+    background:#fff !important;
+}
+
+/* 하단 액션은 벤치마킹처럼 카드 내부 하단에 고정 */
+.mt-slot-actions-row {
+    margin-top:auto !important;
+    padding-top:16px !important;
+    border-top:1px solid #e4e4e7 !important;
+}
+.mt-slot.mt-premium-slot .mt-slot-actions-row {
+    border-top-color:#3f3f46 !important;
+}
+
+@media (max-width:768px) {
+    .mt-slots-grid { padding:6px 6px 12px !important; gap:18px !important; }
+    .mt-slot { border-radius:20px !important; }
+    .tab-btn.active { border-radius:12px !important; }
+}
+</style>
+
 </head>
 <body>
 
@@ -5917,7 +6425,15 @@ Rules:
         return `학습카드 수 ${Array.isArray(words) ? words.length : 0}`;
     }
     function mtSlotProgressRow(text) {
-        return `<div class="mt-slot-progress-row">${mtEscapeHTML(text)}</div>`;
+        const safe = String(text ?? '');
+        const match = safe.match(/진행률\s*(\d+)\s*%\s*\((\d+)\s*\/\s*(\d+)\)/);
+        if (match) {
+            const pct = Math.max(0, Math.min(100, Number(match[1]) || 0));
+            const done = Number(match[2]) || 0;
+            const total = Number(match[3]) || 0;
+            return `<div class="mt-slot-progress-row"><div class="mt-progress-copy"><span>진행률</span><span>${pct}% (${done}/${total})</span></div><div class="mt-progress-track"><div class="mt-progress-fill" style="width:${pct}%;"></div></div></div>`;
+        }
+        return `<div class="mt-slot-progress-row"><div class="mt-progress-simple">${mtEscapeHTML(safe)}</div></div>`;
     }
 
     function mtInitSlots() {
@@ -5974,7 +6490,7 @@ Rules:
                 `;
                 div.onclick = () => mtPromptAction(i, slotData);
             } else {
-                div.className = 'mt-slot';
+                div.className = 'mt-slot mt-empty-card';
                 div.innerHTML = `
                     <div class="mt-slot-title">슬롯 ${i}</div>
                     <div class="mt-slot-stat-row"><div><div class="mt-slot-count">0</div></div><div class="mt-slot-star-count">★ 0</div></div>
@@ -5992,15 +6508,14 @@ Rules:
 
         // ★ 모아보기 슬롯
         let starDiv = document.createElement('div');
-        starDiv.className = 'mt-slot has-data';
-        starDiv.style.borderColor = '#d97706';
-        starDiv.style.backgroundColor = '#fffbeb';
+        starDiv.className = 'mt-slot mt-premium-slot has-data';
         starDiv.innerHTML = `
-            <div class="mt-slot-title" style="color: #b45309;">★ 모아보기</div>
-            <span class="mt-slot-meta-badge" style="background:#fffbeb;color:#b45309;">모든 슬롯의 ★ 자동 수집</span>
-            <div class="mt-slot-stat-row"><div><div class="mt-slot-count" style="color:#b45309;">${allStarredWords.length}</div><div class="mt-slot-count-label">별표 카드</div></div></div>
-            <div>
-                <button class="btn-download" style="padding: 5px 10px; border-radius: 4px; font-size: 11px; font-weight: 600; background: #ffffff;" onclick="mtExportStarred(event)">내보내기</button>
+            <div class="mt-slot-title">★ 중요 문장 모아보기</div>
+            <span class="mt-slot-meta-badge">컬렉션</span>
+            <div class="mt-slot-stat-row"><div><div class="mt-slot-count">${allStarredWords.length}</div><div class="mt-slot-count-label">개의 별표 카드</div></div></div>
+            <div class="mt-slot-desc">모든 슬롯에서 별표(★) 체크한 문장들이 자동으로 모이는 특별한 슬롯입니다.</div>
+            <div class="mt-slot-actions-row">
+                <button class="btn-download" onclick="mtExportStarred(event)">엑셀로 모아서 내보내기</button>
             </div>
         `;
         let starSlotData = { name: "★ 모아보기 슬롯", words: allStarredWords, isStarSlot: true };
@@ -6976,6 +7491,7 @@ Rules:
             return eng && kor;
         }).length;
         const starredCount = mtWordWebGetStarredCount(state);
+        const words = mtWordWebBuildSlotData(state).words;
 
         div.className = 'mt-slot mt-wordweb-slot ' + (state.fileName ? 'has-data' : '');
         div.innerHTML = `
