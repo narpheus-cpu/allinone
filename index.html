@@ -9593,9 +9593,19 @@ Return JSON only.`;
             } else {
                 displayName = String(rawName).replace(/\.[^/.]+$/,'').trim() || `슬롯 ${slot+1}`;
             }
+            const existingNormal=mtGetNormalSlotSync(slot);
             const stored={name:displayName,words,lastSession:null,type:'normal',completedMaskKeys:[],columnPattern:{mainKorCol:mainIdx+1,subKorCol:subIdx>=0?subIdx+1:null,engCol:engIdx+1}};
             mtSetNormalSlotSync(slot, stored);
             mtSetSlotType(slot,'normal');
+            // 유형을 전자책→일반으로 되돌린 경우에도 새로 붙여넣은 주문장 기반 제목을 우선 유지합니다.
+            if(sourceType==='clipboard' && words.length){
+                const titleFromOrder=mtGetFallbackSlotTitle(slot+1, words.map(w=>({kor:w.kor})));
+                const currentStored=mtGetNormalSlotSync(slot);
+                if(currentStored && (!currentStored.name || mtIsDefaultSlotTitle(currentStored.name, slot+1))){
+                    currentStored.name=titleFromOrder;
+                    mtSetNormalSlotSync(slot,currentStored);
+                }
+            }
             mtNormalColumnTemp=null;
             const modal=document.getElementById('mtNormalColumnSelectModal'); if(modal) modal.style.display='none';
             // 전체 슬롯 재렌더링은 실패해도 가져오기 자체는 성공하도록 분리합니다.
@@ -9999,13 +10009,35 @@ Return JSON only.`;
         const d=mtGetNormalSlotSync(Number(slotIndex));
         return Array.isArray(d?.words)?d.words:[];
     }
+    function mtGetFallbackSlotTitle(slotIndex, words){
+        const n=Number(slotIndex);
+        const first=Array.isArray(words) ? words.find(w => String(w?.kor ?? '').trim()) : null;
+        const source=String(first?.kor ?? '').trim();
+        if(!source) return `슬롯 ${n}`;
+        const chars=Array.from(source);
+        let title=chars.slice(0,24).join('');
+        if(chars.length>24) title += '…';
+        return title || `슬롯 ${n}`;
+    }
+    function mtIsDefaultSlotTitle(name, slotIndex){
+        const s=String(name??'').trim();
+        const n=Number(slotIndex);
+        return !s || s===`슬롯 ${n}` || s===`슬롯${n}` || s===`슬롯 ${n+1}` || s===`슬롯${n+1}`;
+    }
     function mtGetSlotNameForConversion(slotIndex){
         const n=String(slotIndex);
         if(n==='slot9') return mtSlot9GetState().fileName || '슬롯 9';
         if(n==='wordweb') return mtWordWebGetState().fileName || '슬롯 10';
         const type=mtGetSlotType(slotIndex);
-        if(type){ const st=mtGetTypedState(Number(slotIndex)); return st.fileName || `슬롯 ${Number(slotIndex)+1}`; }
-        const d=mtGetNormalSlotSync(Number(slotIndex)); return d?.name || `슬롯 ${Number(slotIndex)}`;
+        const words=mtGetSlotWordsForConversion(slotIndex);
+        if(type){
+            const st=mtGetTypedState(Number(slotIndex));
+            const current=String(st.fileName||'').trim();
+            return mtIsDefaultSlotTitle(current, Number(slotIndex)) ? mtGetFallbackSlotTitle(slotIndex, words) : (current || `슬롯 ${Number(slotIndex)+1}`);
+        }
+        const d=mtGetNormalSlotSync(Number(slotIndex));
+        const current=String(d?.name||'').trim();
+        return mtIsDefaultSlotTitle(current, Number(slotIndex)) ? mtGetFallbackSlotTitle(slotIndex, words) : (current || `슬롯 ${Number(slotIndex)}`);
     }
     function mtGetSuccessfulIndexesForSlot(slotIndex, words){
         const set=new Set();
