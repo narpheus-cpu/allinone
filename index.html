@@ -3900,13 +3900,9 @@ body { background: var(--bench-v2-bg) !important; }
         const safeLogs = Array.isArray(logs) ? logs.slice(-MT_GENERATOR_ERROR_LOG_MAX) : [];
         try {
             const db = await mtOpenDedicatedErrorLogDB();
-            try {
-                const tx = db.transaction(MT_ERROR_LOG_DB_STORE, 'readwrite');
-                tx.objectStore(MT_ERROR_LOG_DB_STORE).put(safeLogs, key);
-                await waitForTransaction(tx);
-            } finally {
-                db.close();
-            }
+            const tx = db.transaction(MT_ERROR_LOG_DB_STORE, 'readwrite');
+            tx.objectStore(MT_ERROR_LOG_DB_STORE).put(safeLogs, key);
+            await waitForTransaction(tx);
             return true;
         } catch (e) {
             console.warn('[생성형 오류로그 전용 DB 저장 실패]', e);
@@ -3918,18 +3914,14 @@ body { background: var(--bench-v2-bg) !important; }
         const key = String(slotKey);
         try {
             const db = await mtOpenDedicatedErrorLogDB();
-            try {
-                const tx = db.transaction(MT_ERROR_LOG_DB_STORE, 'readonly');
-                const q = tx.objectStore(MT_ERROR_LOG_DB_STORE).get(key);
-                const result = await new Promise(resolve => {
-                    q.onsuccess = () => resolve(Array.isArray(q.result) ? q.result : []);
-                    q.onerror = () => resolve([]);
-                });
-                await waitForTransaction(tx).catch(() => {});
-                return result;
-            } finally {
-                db.close();
-            }
+            const tx = db.transaction(MT_ERROR_LOG_DB_STORE, 'readonly');
+            const q = tx.objectStore(MT_ERROR_LOG_DB_STORE).get(key);
+            const result = await new Promise(resolve => {
+                q.onsuccess = () => resolve(Array.isArray(q.result) ? q.result : []);
+                q.onerror = () => resolve([]);
+            });
+            await waitForTransaction(tx).catch(() => {});
+            return result;
         } catch (_) {
             return [];
         }
@@ -3996,27 +3988,14 @@ body { background: var(--bench-v2-bg) !important; }
         return unique.slice(-MT_GENERATOR_ERROR_LOG_MAX);
     }
 
+    let mtGeneratorErrorWriteChain = Promise.resolve();
+
     function mtRecordGeneratorErrorLog(slotKey, detail = {}) {
         const key = String(slotKey);
         const now = Date.now();
         const timestampKST = mtGetSeoulTimestamp();
         const errorMessage = String(detail.errorMessage || '알 수 없는 오류');
         const model = String(detail.model || '');
-
-        const existing = mtGetGeneratorErrorLogs(key);
-        const duplicate = existing.find(item =>
-            String(item.errorMessage || '') === errorMessage &&
-            String(item.model || '') === model &&
-            Math.abs(Number(item.timestampMs || 0) - now) <= 5000
-        );
-        if (duplicate) {
-            // 중복이어도 세션 즉시 캐시는 최신 항목을 다시 보존합니다.
-            try {
-                sessionStorage.setItem(MT_ERROR_LOG_SESSION_PREFIX + key, JSON.stringify(duplicate));
-            } catch (_) {}
-            return duplicate;
-        }
-
         const entry = {
             timestampKST,
             timestampMs: now,
@@ -4031,30 +4010,66 @@ body { background: var(--bench-v2-bg) !important; }
             errorMessage
         };
 
-        const logs = mtMergeGeneratorErrorLogs([...existing, entry]);
-        logs.forEach((item, idx) => { item.seq = idx + 1; });
-
-        // 1) 같은 탭에서 즉시 확보
+        // 메모리/세션은 동기적으로 먼저 확보합니다.
         try {
             window.__mtGeneratorErrorLogMemory = window.__mtGeneratorErrorLogMemory || {};
-            window.__mtGeneratorErrorLogMemory[key] = logs.slice();
+            const current = Array.isArray(window.__mtGeneratorErrorLogMemory[key]) ? window.__mtGeneratorErrorLogMemory[key] : [];
+            const duplicate = current.find(item =>
+                String(item.errorMessage || '') === errorMessage &&
+                String(item.model || '') === model &&
+                Math.abs(Number(item.timestampMs || 0) - now) <= 5000
+            );
+            if (duplicate) return duplicate;
+            const logs = mtMergeGeneratorErrorLogs([...current, entry]);
+            logs.forEach((item, idx) => { item.seq = idx + 1; });
+            window.__mtGeneratorErrorLogMemory[key] = logs.slice(-MT_GENERATOR_ERROR_LOG_MAX);
         } catch (_) {}
 
-        // 2) 같은 탭의 즉시 fallback
         try {
             sessionStorage.setItem(MT_ERROR_LOG_SESSION_PREFIX + key, JSON.stringify(entry));
         } catch (_) {}
 
-        // 3) 별도 IndexedDB 영구 저장
-        //    생성형 상태 DB와 완전히 분리
-        mtWriteDedicatedErrorLog(key, logs).catch(() => {});
+        // IndexedDB 전용 로그 저장은 직렬화합니다. 생성 데이터 저장과 완전히 분리됩니다.
+        const persist = async () => {
+            const current = await mtReadDedicatedErrorLog(key);
+            const logs = mtMergeGeneratorErrorLogs([current, entry]);
+            logs.forEach((item, idx) => { item.seq = idx + 1; });
+            await mtWriteDedicatedErrorLog(key, logs);
+            try {
+                window.__mtGeneratorErrorLogMemory = window.__mtGeneratorErrorLogMemory || {};
+                window.__mtGeneratorErrorLogMemory[key] = logs.slice(-MT_GENERATOR_ERROR_LOG_MAX);
+            } catch (_) {}
+        };
+        mtGeneratorErrorWriteChain = mtGeneratorErrorWriteChain
+            .then(persist)
+            .catch(() => {});
 
-        // 4) 기존 버전 호환 저장은 보조 수단으로만 사용
-        try {
-            localStorage.setItem(mtGeneratorLogKey(key), JSON.stringify(logs));
-        } catch (_) {}
-
+        // 구형 localStorage 로그에는 더 이상 쓰지 않습니다.
+        // 과거 대용량 슬롯9 상태 때문에 localStorage 전체가 포화될 수 있었던 것이 실제 오류 원인이었습니다.
+        try { localStorage.removeItem('word_slot_9_conversation'); } catch (_) {}
         return entry;
+    }
+
+    async function mtPersistLatestGeneratorError(slotKey, entry) {
+        const key = String(slotKey);
+        if (!entry) return false;
+        const persist = async () => {
+            const current = await mtReadDedicatedErrorLog(key);
+            const logs = mtMergeGeneratorErrorLogs([current, entry]);
+            logs.forEach((item, idx) => { item.seq = idx + 1; });
+            await mtWriteDedicatedErrorLog(key, logs);
+            try {
+                window.__mtGeneratorErrorLogMemory = window.__mtGeneratorErrorLogMemory || {};
+                window.__mtGeneratorErrorLogMemory[key] = logs.slice(-MT_GENERATOR_ERROR_LOG_MAX);
+            } catch (_) {}
+            return true;
+        };
+        let result = false;
+        mtGeneratorErrorWriteChain = mtGeneratorErrorWriteChain
+            .then(async () => { result = await persist(); })
+            .catch(() => { result = false; });
+        await mtGeneratorErrorWriteChain;
+        return result;
     }
 
     async function mtGetGeneratorErrorLogsAsync(slotKey) {
@@ -4131,8 +4146,8 @@ body { background: var(--bench-v2-bg) !important; }
     }
 
     // 생성형 오류는 API/로컬/저장/검증 어느 경로에서든 강제 기록
-    function mtForceRecordGeneratorFailure(slotKey, slotLabel, error, extra = {}) {
-        return mtRecordGeneratorErrorLog(slotKey, {
+    async function mtForceRecordGeneratorFailure(slotKey, slotLabel, error, extra = {}) {
+        const entry = mtRecordGeneratorErrorLog(slotKey, {
             slotLabel: String(slotLabel || slotKey),
             model: extra.model || '',
             httpStatus: extra.httpStatus ?? null,
@@ -4142,9 +4157,11 @@ body { background: var(--bench-v2-bg) !important; }
             responseObject: extra.responseObject ?? null,
             errorMessage: String(extra.errorMessage || error?.message || error || '알 수 없는 오류')
         });
+        await mtPersistLatestGeneratorError(slotKey, entry);
+        return entry;
     }
 
-    function mtForceRecordSlot9Failure(error, extra = {}) {
+    async function mtForceRecordSlot9Failure(error, extra = {}) {
         return mtForceRecordGeneratorFailure('slot9', '슬롯9', error, extra);
     }
 
@@ -4177,6 +4194,7 @@ body { background: var(--bench-v2-bg) !important; }
             responseObject: detail.responseObject ?? null,
             errorMessage: detail.errorMessage || ''
         });
+        mtPersistLatestGeneratorError(slotKey, entry).catch(() => {});
         const compact = [
             `AI 요청 실패: [${detail.model || 'unknown'}]`,
             detail.errorMessage || '알 수 없는 오류',
@@ -7495,6 +7513,7 @@ Rules:
     // ==========================================
     const MT_SLOT9_LEGACY_STORAGE_KEY = 'word_slot_9_conversation'; // 구버전 1회 마이그레이션용, 이후에는 사용하지 않음
     const MT_SLOT9_INTERVAL_MS = 5 * 60 * 1000;
+    const MT_SLOT9_BATCH_SIZE = 4;
     const MT_SLOT9_LIST_PAGE_SIZE = 60;
     let mtSlot9TimerId = null;
     let mtSlot9Busy = false;
@@ -7793,70 +7812,44 @@ Rules:
         if (!st.fileName || (!canUseRetry && !canUseFresh)) return;
 
         mtSlot9Busy = true;
-        st.lastError = '';
-        mtSlot9SaveState(st);
-        mtSlot9RenderStatus();
-
         try {
-            const aiConfig = mtGetSlot9AiConfig();
-            // [수정점 1] 에러 로그 기록기(diagnosticHandler)를 API 설정에 정상적으로 부착
-            const wrappedAiConfig = mtGetGeneratorAiConfig(aiConfig, 'slot9', '슬롯9');
-
             const freshStart = Number(st.nextSourceIndex || 0);
-            const freshBatch = canUseRetry ? [] : st.sourceRows
-                .slice(freshStart, freshStart + 6)
-                .map(v => String(v ?? '').trim())
-                .filter(Boolean);
-
-            const retryBatch = canUseRetry ? retryRows.slice(0, 6).map(x => ({
+            const retryBatch = canUseRetry ? retryRows.slice(0, MT_SLOT9_BATCH_SIZE).map(x => ({
                 sourceIndex: Number(x.sourceIndex),
                 korean: String(x.korean ?? '').trim()
             })) : [];
-
             const batch = canUseRetry
-                ? retryBatch.map(x => x.korean)
-                : freshBatch;
+                ? retryBatch.map(x => x.korean).filter(Boolean)
+                : st.sourceRows.slice(freshStart, freshStart + MT_SLOT9_BATCH_SIZE).map(v => String(v ?? '').trim()).filter(Boolean);
 
             if (!batch.length) throw new Error('처리할 A열 원문이 없습니다.');
 
-const prompt = `
-You are an expert English-learning content generator.
+            const aiConfig = mtGetSlot9AiConfig();
+            const wrappedAiConfig = mtGetGeneratorAiConfig(aiConfig, 'slot9', '슬롯9');
+            const prompt = `
+You are a professional English teacher and Korean-English translator.
+For each ORIGINAL Korean sentence, create exactly one faithful, natural everyday English sentence at CEFR A2 level, one natural Korean translation of that English, and one Korean direct-reading translation in English phrase order.
 
-For each ORIGINAL Korean sentence, produce exactly one faithful A2 English sentence,
-one natural Korean translation, and one Korean direct-reading translation following the
-English phrase order.
+STRICT RULES:
+1. Process exactly ${batch.length} input sentences.
+2. Preserve each ORIGINAL Korean sentence exactly in source_korean.
+3. Preserve the meaning exactly. Do not add names, greetings, dates, time expressions, farewells, or unrelated information.
+4. English must be natural everyday CEFR A2 English.
+5. korean must be a natural Korean sentence matching the English meaning.
+6. literal_korean must contain 2-8 Korean-only bracket chunks in the English phrase order.
+7. Return ONLY a JSON array. No markdown or explanation.
+8. Return exactly these keys: source_korean, english, korean, literal_korean.
 
-HARD RULES:
-1. ORIGINAL Korean is immutable. Copy it exactly into source_korean.
-2. Do not add greetings, names, dates, time expressions, farewells, or unrelated content.
-3. English must preserve the exact meaning of the original Korean.
-4. korean must be one natural Korean sentence matching the English meaning.
-5. literal_korean must be Korean-only bracket chunks in English phrase order.
-6. Use square brackets around every literal chunk.
-7. Return ONLY a JSON array with exactly ${batch.length} objects.
-8. SAFETY RULES: If the ORIGINAL Korean contains violent, offensive, or highly sensitive words (e.g., kill, blood, hit, steal, rape, dick, handjob), you MUST SOFTEN or NEUTRALIZE them in the English translation to bypass safety filters, while keeping the core context intact.
-
-Required keys:
-source_korean, english, korean, literal_korean
-
-Example:
-[
-  {
-    "source_korean":"팔을 조심스럽게 스트레칭 하세요.",
-    "english":"Please stretch your arms carefully.",
-    "korean":"팔을 조심스럽게 스트레칭 하세요.",
-    "literal_korean":"[제발] [스트레칭하세요] [당신의 팔들을] [조심스럽게]"
-  }
-]
-
-ORIGINAL KOREAN SENTENCES:
+INPUT:
 ${JSON.stringify(batch)}
             `.trim();
 
             const raw = await fetchGemini(
                 prompt,
                 {
-                    type:'ARRAY', minItems:batch.length, maxItems:batch.length,
+                    type:'ARRAY',
+                    minItems:batch.length,
+                    maxItems:batch.length,
                     items:{
                         type:'OBJECT',
                         properties:{
@@ -7868,24 +7861,23 @@ ${JSON.stringify(batch)}
                         required:['source_korean','english','korean','literal_korean']
                     }
                 },
-                wrappedAiConfig // [수정점 1 적용] 이제 로그 파일 시스템이 정상 작동합니다.
+                wrappedAiConfig
             );
 
-            if (!raw) throw new Error('AI 요청 실패: ' + (wrappedAiConfig && wrappedAiConfig.lastError ? wrappedAiConfig.lastError : 'API 응답을 받지 못했습니다.'));
-
-            let resultList = Array.isArray(raw) ? raw : mtWordWebExtractJsonValue(raw);
+            if (!raw) throw new Error('AI 응답이 없습니다.');
+            const resultList = Array.isArray(raw) ? raw : mtWordWebExtractJsonValue(raw);
             if (!Array.isArray(resultList) || resultList.length !== batch.length) {
                 throw new Error(`AI 응답 문장 수가 ${batch.length}개가 아닙니다.`);
             }
 
-            const normalize = s => String(s ?? '').normalize('NFC').replace(/\s+/g,' ').trim();
+            const normalize = value => String(value ?? '').normalize('NFC').replace(/\s+/g, ' ').trim();
             const isKoreanOnlyChunkList = literal => {
-                const s = String(literal || '').trim();
-                const chunks = s.match(/\[[^\[\]]+\]/g) || [];
-                if (!s || chunks.length < 2 || chunks.length > 8) return false;
-                if (s.replace(/\[[^\[\]]+\]/g,'').trim() !== '') return false;
-                return chunks.every(c => {
-                    const inside = c.slice(1,-1).trim();
+                const text = String(literal || '').trim();
+                const chunks = text.match(/\[[^\[\]]+\]/g) || [];
+                if (!text || chunks.length < 2 || chunks.length > 8) return false;
+                if (text.replace(/\[[^\[\]]+\]/g, '').trim() !== '') return false;
+                return chunks.every(chunk => {
+                    const inside = chunk.slice(1,-1).trim();
                     return inside && /[가-힣]/.test(inside) && !/[A-Za-z]/.test(inside);
                 });
             };
@@ -7901,85 +7893,52 @@ ${JSON.stringify(batch)}
                         if (a && a===b && b===c) return true;
                     }
                 }
-                const maxLen = Math.max(120, e.replace(/\s+/g,'').length * 5 + 50);
-                return k.replace(/\s+/g,'').length > maxLen;
-            };
-            const validRow = (item, expectedSource) => {
-                if (normalize(item?.source_korean) !== normalize(expectedSource)) return false;
-                const eng = normalize(item?.english), kor = normalize(item?.korean), lit = String(item?.literal_korean || '').trim();
-                if (eng.length < 2 || kor.length < 2) return false;
-                if (looksSuspiciousKorean(eng, kor)) return false;
-                if (!isKoreanOnlyChunkList(lit)) return false;
-                return true;
+                return k.replace(/\s+/g,'').length > Math.max(120, e.replace(/\s+/g,'').length * 5 + 50);
             };
 
-            resultList = resultList.map((x, i) => ({
-                source_korean:String(x?.source_korean ?? ''),
-                english:String(x?.english ?? '').trim(),
-                korean:String(x?.korean ?? '').trim(),
-                literal_korean:String(x?.literal_korean ?? '').trim(),
-                batchPos:i
+            const normalized = resultList.map(item => ({
+                source_korean: normalize(item?.source_korean),
+                english: normalize(item?.english),
+                korean: normalize(item?.korean),
+                literal_korean: String(item?.literal_korean || '').trim()
             }));
 
-            const failed = [];
-            resultList.forEach((item, i) => {
-                if (!validRow(item, batch[i])) failed.push({ index:i, sourceKorean:batch[i], reason:'로컬 검증 실패' });
-            });
-
-            // 품질 검증은 그대로 유지합니다.
-            // 다만 검증 실패 행을 문장별 추가 API로 복구하면 무료 quota가 빠르게 소진될 수 있으므로
-            // 실패 행은 retryRows로 넘겨 다음 배치에서 다시 생성합니다.
-            const unresolved = [];
-            resultList.forEach((item, i) => {
-                if (!validRow(item, batch[i])) unresolved.push(i);
-            });
-
-            const successful = resultList
-                .map((item,i) => validRow(item,batch[i]) ? {item, batchIndex:i} : null)
-                .filter(Boolean);
-
-            const p = mtSlot9GetPattern(st);
-            let serialStart = (st.outputRows || []).length + 1;
-            for (const s of successful) {
-                const row=[];
-                const width=Math.max(p.sourceKorCol,p.engCol,p.mainKorCol,p.subKorCol,p.serialCol);
-                for(let c=0;c<width;c++) row[c]='';
-                const sourceIndex = canUseRetry ? retryBatch[s.batchIndex].sourceIndex : freshStart + s.batchIndex;
-                row[p.sourceKorCol-1] = String(st.sourceRows[sourceIndex] ?? batch[s.batchIndex]);
-                row[p.engCol-1] = s.item.english;
-                row[p.mainKorCol-1] = s.item.korean;
-                row[p.subKorCol-1] = s.item.literal_korean;
-                row[p.serialCol-1] = String(serialStart++);
-                st.outputRows.push(row);
+            for (let i=0; i<normalized.length; i++) {
+                const item = normalized[i];
+                if (item.source_korean !== normalize(batch[i])) throw new Error(`${i+1}번 원문 보존 검증 실패`);
+                if (item.english.length < 2 || item.korean.length < 2) throw new Error(`${i+1}번 영어/한국어가 비어 있습니다.`);
+                if (looksSuspiciousKorean(item.english, item.korean)) throw new Error(`${i+1}번 한국어 결과가 비정상 패턴입니다.`);
+                if (!isKoreanOnlyChunkList(item.literal_korean)) throw new Error(`${i+1}번 직독직해 형식이 올바르지 않습니다.`);
             }
 
-            if (!canUseRetry) st.nextSourceIndex = freshStart + batch.length;
-            else st.retryRows = retryRows.slice(batch.length);
+            // 성공한 전체 배치를 메모리에 반영한 후 딱 한 번 저장합니다.
+            const p = mtSlot9GetPattern(st);
+            let serialStart = (st.outputRows || []).length + 1;
+            normalized.forEach((item, index) => {
+                const row = Array(Math.max(p.sourceKorCol,p.engCol,p.mainKorCol,p.subKorCol,p.serialCol)).fill('');
+                const sourceIndex = canUseRetry ? retryBatch[index].sourceIndex : freshStart + index;
+                row[p.sourceKorCol-1] = String(st.sourceRows[sourceIndex] ?? batch[index]);
+                row[p.engCol-1] = item.english;
+                row[p.mainKorCol-1] = item.korean;
+                row[p.subKorCol-1] = item.literal_korean;
+                row[p.serialCol-1] = String(serialStart++);
+                st.outputRows.push(row);
+            });
 
-            const newFailed = unresolved.map(i => ({
-                sourceIndex: canUseRetry ? retryBatch[i].sourceIndex : freshStart + i,
-                korean: batch[i]
-            }));
-            st.retryRows = (Array.isArray(st.retryRows) ? st.retryRows : []).concat(newFailed);
-
-            st.lastRun=Date.now();
-            st.nextRun=Date.now()+MT_SLOT9_INTERVAL_MS;
-            st.lastError = unresolved.length
-                ? `${successful.length}개 저장, ${unresolved.length}개는 다음 자동 실행에서 재시도합니다.`
-                : '';
+            if (canUseRetry) st.retryRows = retryRows.slice(retryBatch.length);
+            else st.nextSourceIndex = freshStart + normalized.length;
+            st.lastRun = Date.now();
+            st.nextRun = Date.now() + MT_SLOT9_INTERVAL_MS;
+            st.lastError = '';
             st.sourceRows = st.sourceRows.slice();
             st.sourceRowsLock = st.sourceRows.slice();
             mtSlot9SaveState(st);
-            mtSlot9RenderStatus(unresolved.length ? st.lastError : `${successful.length}문장 생성 완료`);
+            mtSlot9RenderStatus(`${normalized.length}문장 생성 완료`);
             mtInitSlots();
-
         } catch (e) {
-            // 모든 최종 실패를 반드시 로그에 남깁니다. diagnosticHandler가 놓친 저장/검증/타임아웃 전파도 포함합니다.
-            let lastDiag = null;
-            try { lastDiag = mtSlot9GetState()?.lastDiagnostic || null; } catch (_) {}
+            const lastDiag = (() => { try { return mtSlot9GetState()?.lastDiagnostic || null; } catch (_) { return null; } })();
             const msg = String(e?.message || e || '알 수 없는 오류');
-            // API diagnosticHandler와 무관하게 최종 실패는 반드시 한 번 강제 기록합니다.
-            mtForceRecordSlot9Failure(e, {
+            await mtForceRecordSlot9Failure(e, {
                 ...(lastDiag || {}),
                 errorMessage: msg,
                 model: lastDiag?.model || '',
@@ -7989,27 +7948,19 @@ ${JSON.stringify(batch)}
                 contentParts: lastDiag?.contentParts ?? null,
                 responseObject: lastDiag?.responseObject ?? null
             });
-            // 실패 원인별로 다음 실행 시점을 다르게 잡습니다.
-            // 일일 quota 초과는 5분마다 무의미하게 재요청하지 않고 24시간 후 다시 확인합니다.
+
             const latestSt = mtSlot9GetState();
             latestSt.lastRun = Date.now();
-            const errorText = String(e?.message || e || '');
-            const isDailyQuota = /PerDayPerProjectPerModel-FreeTier|일일 Gemini API quota|quota.*PerDay/i.test(errorText);
-            const isTemporaryQuota = /quota.*초과|RESOURCE_EXHAUSTED|retry in/i.test(errorText);
-            const is503 = /HTTP 503|high demand|UNAVAILABLE/i.test(errorText);
-            const isTimeout = /시간이 초과|timed out|timeout/i.test(errorText);
-            latestSt.nextRun = isDailyQuota
-                ? Date.now() + (24 * 60 * 60 * 1000)
-                : isTemporaryQuota
-                    ? Date.now() + (15 * 60 * 1000)
-                    : is503
-                        ? Date.now() + (2 * 60 * 1000)
-                        : isTimeout
-                            ? Date.now() + (3 * 60 * 1000)
-                            : Date.now() + MT_SLOT9_INTERVAL_MS;
-            if (!latestSt.lastDiagnostic) {
-                latestSt.lastError = errorText;
-            }
+            const isDailyQuota = /PerDayPerProjectPerModel-FreeTier|일일 Gemini API quota|quota.*PerDay/i.test(msg);
+            const isTemporaryQuota = /quota.*초과|RESOURCE_EXHAUSTED|retry in/i.test(msg);
+            const is503 = /HTTP 503|high demand|UNAVAILABLE/i.test(msg);
+            const isTimeout = /시간이 초과|timed out|timeout/i.test(msg);
+            latestSt.nextRun = isDailyQuota ? Date.now()+24*60*60*1000
+                : isTemporaryQuota ? Date.now()+15*60*1000
+                : is503 ? Date.now()+2*60*1000
+                : isTimeout ? Date.now()+3*60*1000
+                : Date.now()+MT_SLOT9_INTERVAL_MS;
+            latestSt.lastError = msg;
             mtSlot9SaveState(latestSt);
             mtSlot9RenderStatus();
             console.error('[슬롯9]', e);
