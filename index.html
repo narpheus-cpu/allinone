@@ -4460,9 +4460,11 @@ body { background: var(--bench-v2-bg) !important; }
         const s9 = document.getElementById('mtSlot9ApiKeyInput'); if (s9) s9.value = mtGetSlotApiKey('slot9');
         const ww = document.getElementById('mtWordWebApiKeyInput'); if (ww) ww.value = mtGetSlotApiKey('wordweb');
     }
-function mtForceRecordSlot9Failure(error, extra = {}) {
-        return mtRecordGeneratorErrorLog('slot9', {
-            slotLabel: '슬롯9',
+// [수정점] 생성형(자체형/참조형) 슬롯 공통: fetchGemini 내부 diagnosticHandler가 미처 감지하지
+// 못한 실패(로컬 검증 실패, 응답 개수 불일치 등)도 반드시 실제 시각과 함께 오류 로그에 남깁니다.
+function mtForceRecordGeneratorFailure(slotKey, slotLabel, error, extra = {}) {
+        return mtRecordGeneratorErrorLog(slotKey, {
+            slotLabel: String(slotLabel || slotKey),
             model: extra.model || '',
             httpStatus: extra.httpStatus ?? null,
             finishReason: extra.finishReason || '',
@@ -4471,6 +4473,9 @@ function mtForceRecordSlot9Failure(error, extra = {}) {
             responseObject: extra.responseObject ?? null,
             errorMessage: String(extra.errorMessage || error?.message || error || '알 수 없는 오류')
         });
+    }
+    function mtForceRecordSlot9Failure(error, extra = {}) {
+        return mtForceRecordGeneratorFailure('slot9', '슬롯9', error, extra);
     }
 
 function mtGetSlot9AiConfig() {
@@ -9300,7 +9305,27 @@ Return JSON only.`;
         const state=mtGetTypedState(slotIndex); const type=state.type;
         if(!state.fileName)return;
         if(immediate){
-            (async()=>{try{if(type==='self_generate')await mtTypedSelfGenerate(slotIndex); else if(type==='reference_generate')await mtTypedReferenceGenerate(slotIndex);}catch(e){const latest=mtGetTypedState(slotIndex);if(!latest.lastDiagnostic)latest.lastError=String(e?.message||e);mtSaveTypedState(slotIndex,latest);mtInitSlots();}finally{mtStartTypedTimer(slotIndex,false);}})(); return;
+            (async()=>{
+                try{
+                    if(type==='self_generate')await mtTypedSelfGenerate(slotIndex);
+                    else if(type==='reference_generate')await mtTypedReferenceGenerate(slotIndex);
+                }catch(e){
+                    // [수정점] diagnosticHandler가 잡지 못하는 로컬 검증 실패(문장 수 불일치, 직독직해 실패 등)도
+                    // 반드시 실제 시각(KST)과 함께 오류 로그에 강제 기록합니다. 중복 기록은 mtRecordGeneratorErrorLog
+                    // 내부의 5초 이내 동일 메시지 dedup 로직이 자동으로 막아줍니다.
+                    const latest=mtGetTypedState(slotIndex);
+                    const slotLabel=`슬롯 ${Number(slotIndex)+1}`;
+                    const msg=String(e?.message||e||'알 수 없는 오류');
+                    if(!latest.lastDiagnostic || String(latest.lastDiagnostic.errorMessage||'')!==msg){
+                        latest.lastDiagnostic=mtForceRecordGeneratorFailure(`typed_${slotIndex}`, slotLabel, e, latest.lastDiagnostic||{});
+                    }
+                    latest.lastError=msg;
+                    mtSaveTypedState(slotIndex,latest);
+                    const statusEl=document.getElementById(`mtTypedStatus_${slotIndex}`);
+                    if(statusEl) statusEl.innerHTML=`<span style="color:#dc2626;">최근 오류: ${mtEscapeHTML(msg)}</span>`;
+                    mtInitSlots();
+                }finally{mtStartTypedTimer(slotIndex,false);}
+            })(); return;
         }
         const next=Number(state.nextRun||0); if(!next)return;
         const delay=Math.max(1000,next-Date.now());
