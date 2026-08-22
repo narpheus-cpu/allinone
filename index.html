@@ -3863,125 +3863,210 @@ body { background: var(--bench-v2-bg) !important; }
         }
         return 0;
     }
+
+    // ===== 오류로그는 생성 데이터와 분리된 전용 저장소를 사용합니다. =====
+    const MT_ERROR_LOG_DB_NAME = 'MaskingTypingErrorLogDB_v1';
+    const MT_ERROR_LOG_DB_VERSION = 1;
+    const MT_ERROR_LOG_DB_STORE = 'logs';
+    const MT_ERROR_LOG_SESSION_PREFIX = 'masking_typing_latest_error::';
+    let mtErrorLogDbPromise = null;
+
+    function mtOpenDedicatedErrorLogDB() {
+        if (mtErrorLogDbPromise) return mtErrorLogDbPromise;
+        mtErrorLogDbPromise = new Promise((resolve, reject) => {
+            if (!window.indexedDB) {
+                reject(new Error('IndexedDB를 사용할 수 없습니다.'));
+                return;
+            }
+            const req = indexedDB.open(MT_ERROR_LOG_DB_NAME, MT_ERROR_LOG_DB_VERSION);
+            req.onupgradeneeded = () => {
+                const db = req.result;
+                if (!db.objectStoreNames.contains(MT_ERROR_LOG_DB_STORE)) {
+                    db.createObjectStore(MT_ERROR_LOG_DB_STORE);
+                }
+            };
+            req.onsuccess = () => {
+                const db = req.result;
+                db.onversionchange = () => db.close();
+                resolve(db);
+            };
+            req.onerror = () => reject(req.error || new Error('오류로그 DB 열기 실패'));
+        });
+        return mtErrorLogDbPromise;
+    }
+
+    async function mtWriteDedicatedErrorLog(slotKey, logs) {
+        const key = String(slotKey);
+        const safeLogs = Array.isArray(logs) ? logs.slice(-MT_GENERATOR_ERROR_LOG_MAX) : [];
+        try {
+            const db = await mtOpenDedicatedErrorLogDB();
+            try {
+                const tx = db.transaction(MT_ERROR_LOG_DB_STORE, 'readwrite');
+                tx.objectStore(MT_ERROR_LOG_DB_STORE).put(safeLogs, key);
+                await waitForTransaction(tx);
+            } finally {
+                db.close();
+            }
+            return true;
+        } catch (e) {
+            console.warn('[생성형 오류로그 전용 DB 저장 실패]', e);
+            return false;
+        }
+    }
+
+    async function mtReadDedicatedErrorLog(slotKey) {
+        const key = String(slotKey);
+        try {
+            const db = await mtOpenDedicatedErrorLogDB();
+            try {
+                const tx = db.transaction(MT_ERROR_LOG_DB_STORE, 'readonly');
+                const q = tx.objectStore(MT_ERROR_LOG_DB_STORE).get(key);
+                const result = await new Promise(resolve => {
+                    q.onsuccess = () => resolve(Array.isArray(q.result) ? q.result : []);
+                    q.onerror = () => resolve([]);
+                });
+                await waitForTransaction(tx).catch(() => {});
+                return result;
+            } finally {
+                db.close();
+            }
+        } catch (_) {
+            return [];
+        }
+    }
+
     function mtGetGeneratorErrorLogs(slotKey) {
         const key = String(slotKey);
         let all = [];
-        const keys = [mtGeneratorLogKey(key), ...MT_GENERATOR_ERROR_LOG_OLD_PREFIXES.map(p => p + key)];
+
+        // 기존 로그 호환
+        const keys = [
+            mtGeneratorLogKey(key),
+            ...MT_GENERATOR_ERROR_LOG_OLD_PREFIXES.map(p => p + key)
+        ];
         for (const storageKey of keys) {
             try {
                 const raw = JSON.parse(localStorage.getItem(storageKey) || '[]');
                 if (Array.isArray(raw)) all.push(...raw);
             } catch (_) {}
         }
+
+        // 현재 탭 즉시 캐시
         try {
             const mem = window.__mtGeneratorErrorLogMemory?.[key];
             if (Array.isArray(mem)) all.push(...mem);
         } catch (_) {}
+
+        // 같은 탭에서 마지막 오류를 즉시 보존
+        try {
+            const raw = sessionStorage.getItem(MT_ERROR_LOG_SESSION_PREFIX + key);
+            if (raw) {
+                const latest = JSON.parse(raw);
+                if (latest && typeof latest === 'object') all.push(latest);
+            }
+        } catch (_) {}
+
+        return mtMergeGeneratorErrorLogs(all);
+    }
+
+    function mtMergeGeneratorErrorLogs(arraysOrItems) {
+        const source = Array.isArray(arraysOrItems) ? arraysOrItems : [];
+        const flat = [];
+        source.forEach(item => {
+            if (Array.isArray(item)) flat.push(...item);
+            else if (item && typeof item === 'object') flat.push(item);
+        });
+
         const seen = new Set();
         const unique = [];
-        all.sort((a,b) => mtGeneratorLogSortKey(a) - mtGeneratorLogSortKey(b)).forEach(item => {
-            const sig = `${item.timestampKST||''}|${item.model||''}|${item.httpStatus??''}|${item.errorMessage||''}`;
-            if (seen.has(sig)) return;
-            seen.add(sig);
-            unique.push(item);
-        });
+        flat
+            .sort((a,b) => mtGeneratorLogSortKey(a) - mtGeneratorLogSortKey(b))
+            .forEach(item => {
+                const sig = [
+                    item.timestampMs || item.timestampKST || '',
+                    item.model || '',
+                    item.httpStatus ?? '',
+                    item.errorMessage || ''
+                ].join('|');
+                if (seen.has(sig)) return;
+                seen.add(sig);
+                unique.push(item);
+            });
+
         return unique.slice(-MT_GENERATOR_ERROR_LOG_MAX);
     }
+
     function mtRecordGeneratorErrorLog(slotKey, detail = {}) {
         const key = String(slotKey);
         const now = Date.now();
         const timestampKST = mtGetSeoulTimestamp();
-        const errorMessage = String(detail.errorMessage || '');
+        const errorMessage = String(detail.errorMessage || '알 수 없는 오류');
         const model = String(detail.model || '');
-        let logs = mtGetGeneratorErrorLogs(key);
-        const duplicate = logs.find(item =>
+
+        const existing = mtGetGeneratorErrorLogs(key);
+        const duplicate = existing.find(item =>
             String(item.errorMessage || '') === errorMessage &&
             String(item.model || '') === model &&
             Math.abs(Number(item.timestampMs || 0) - now) <= 5000
         );
-        if (duplicate) return duplicate;
+        if (duplicate) {
+            // 중복이어도 세션 즉시 캐시는 최신 항목을 다시 보존합니다.
+            try {
+                sessionStorage.setItem(MT_ERROR_LOG_SESSION_PREFIX + key, JSON.stringify(duplicate));
+            } catch (_) {}
+            return duplicate;
+        }
+
         const entry = {
-            timestampKST, timestampMs: now, slotKey: key,
+            timestampKST,
+            timestampMs: now,
+            slotKey: key,
             slotLabel: String(detail.slotLabel || key),
-            model, httpStatus: detail.httpStatus ?? null,
+            model,
+            httpStatus: detail.httpStatus ?? null,
             finishReason: detail.finishReason || '',
             promptFeedback: detail.promptFeedback ?? null,
             contentParts: detail.contentParts ?? null,
             responseObject: detail.responseObject ?? null,
             errorMessage
         };
-        logs.push(entry);
-        logs.sort((a,b)=>mtGeneratorLogSortKey(a)-mtGeneratorLogSortKey(b));
-        logs = logs.slice(-MT_GENERATOR_ERROR_LOG_MAX);
-        logs.forEach((item, idx)=>{ item.seq = idx + 1; });
+
+        const logs = mtMergeGeneratorErrorLogs([...existing, entry]);
+        logs.forEach((item, idx) => { item.seq = idx + 1; });
+
+        // 1) 같은 탭에서 즉시 확보
         try {
             window.__mtGeneratorErrorLogMemory = window.__mtGeneratorErrorLogMemory || {};
             window.__mtGeneratorErrorLogMemory[key] = logs.slice();
         } catch (_) {}
-        // IndexedDB가 오류 로그의 영구 저장소입니다. 생성 데이터 크기와 완전히 분리합니다.
+
+        // 2) 같은 탭의 즉시 fallback
         try {
-            if (typeof mtWithGeneratorStore === 'function') {
-                mtWithGeneratorStore('readwrite', store => {
-                    store.put(logs, MT_GENERATOR_ERROR_LOG_IDB_PREFIX + key);
-                }).catch(e => console.warn('[생성형 오류로그 IndexedDB 저장]', e));
-            }
-        } catch (e) { console.warn('[생성형 오류로그 IndexedDB 저장]', e); }
-        // 구버전 호환용 localStorage는 최선 시도만 합니다. 실패해도 로그 기록 자체는 유지됩니다.
-        try { localStorage.setItem(mtGeneratorLogKey(key), JSON.stringify(logs)); } catch (_) {}
+            sessionStorage.setItem(MT_ERROR_LOG_SESSION_PREFIX + key, JSON.stringify(entry));
+        } catch (_) {}
+
+        // 3) 별도 IndexedDB 영구 저장
+        //    생성형 상태 DB와 완전히 분리
+        mtWriteDedicatedErrorLog(key, logs).catch(() => {});
+
+        // 4) 기존 버전 호환 저장은 보조 수단으로만 사용
+        try {
+            localStorage.setItem(mtGeneratorLogKey(key), JSON.stringify(logs));
+        } catch (_) {}
+
         return entry;
     }
+
     async function mtGetGeneratorErrorLogsAsync(slotKey) {
         const key = String(slotKey);
-        try {
-            if (typeof mtWithGeneratorStore === 'function') {
-                const logs = await mtWithGeneratorStore('readonly', store => new Promise(resolve => {
-                    const q = store.get(MT_GENERATOR_ERROR_LOG_IDB_PREFIX + key);
-                    q.onsuccess = () => resolve(Array.isArray(q.result) ? q.result : []);
-                    q.onerror = () => resolve([]);
-                }));
-                if (Array.isArray(logs) && logs.length) return logs.slice(-MT_GENERATOR_ERROR_LOG_MAX);
-            }
-        } catch (_) {}
-        return mtGetGeneratorErrorLogs(key);
+        const dedicated = await mtReadDedicatedErrorLog(key);
+        const legacy = mtGetGeneratorErrorLogs(key);
+        return mtMergeGeneratorErrorLogs([dedicated, legacy]);
     }
-    // [수정점] 새로고침/재접속 직후에는 window.__mtGeneratorErrorLogMemory가 비어 있어서,
-    // mtRecordGeneratorErrorLog가 오류 기록 시 사용하는 동기(localStorage+메모리) 기준 배열이
-    // IndexedDB에 이미 저장된 과거 기록을 모른 채로 시작합니다. 이 상태에서 새 실패가 기록되면
-    // "가장 최근 기록"이 실제로는 IndexedDB의 과거 항목과 뒤섞이거나, 반대로 IndexedDB 쓰기가
-    // 이 불완전한 기준으로 덮어써져 방금 발생한 실패가 다운로드 결과에 반영되지 않을 수 있습니다.
-    // 페이지 초기화 시 IndexedDB에 저장된 모든 오류 로그를 메모리 캐시에 미리 채워, 이후의 모든
-    // 동기 기록/조회가 항상 최신 상태를 기준으로 동작하도록 보장합니다.
-    async function mtPreloadGeneratorErrorLogMemory() {
-        try {
-            if (typeof mtWithGeneratorStore !== 'function') return;
-            const rows = await mtWithGeneratorStore('readonly', store => new Promise(resolve => {
-                let keysResult = null, valsResult = null;
-                const finish = () => { if (keysResult && valsResult) resolve({ keys: keysResult, vals: valsResult }); };
-                const keysReq = store.getAllKeys();
-                keysReq.onsuccess = () => { keysResult = keysReq.result || []; finish(); };
-                keysReq.onerror = () => { keysResult = []; finish(); };
-                const valsReq = store.getAll();
-                valsReq.onsuccess = () => { valsResult = valsReq.result || []; finish(); };
-                valsReq.onerror = () => { valsResult = []; finish(); };
-            }));
-            if (!rows || !Array.isArray(rows.keys)) return;
-            window.__mtGeneratorErrorLogMemory = window.__mtGeneratorErrorLogMemory || {};
-            rows.keys.forEach((k, idx) => {
-                const keyStr = String(k || '');
-                if (!keyStr.startsWith(MT_GENERATOR_ERROR_LOG_IDB_PREFIX)) return;
-                const slotKey = keyStr.slice(MT_GENERATOR_ERROR_LOG_IDB_PREFIX.length);
-                const logs = rows.vals[idx];
-                if (Array.isArray(logs) && logs.length) {
-                    window.__mtGeneratorErrorLogMemory[slotKey] = logs.slice();
-                }
-            });
-        } catch (e) {
-            console.warn('[생성형 오류로그 사전 로드 실패]', e);
-        }
-    }
+
     function mtFormatGeneratorErrorEntry(entry) {
         return [
-            `===== ${entry.slotLabel || entry.slotKey || '생성형 슬롯'} 오류 #${entry.seq} =====`,
+            `===== ${entry.slotLabel || entry.slotKey || '생성형 슬롯'} 오류 #${entry.seq || ''} =====`,
             `실제 기록시각(KST): ${entry.timestampKST || ''}`,
             `모델: ${entry.model || ''}`,
             `HTTP 상태: ${entry.httpStatus ?? ''}`,
@@ -3996,23 +4081,33 @@ body { background: var(--bench-v2-bg) !important; }
             ''
         ].join('\n');
     }
+
     async function mtDownloadGeneratorErrorLog(event, slotKey, slotLabel) {
         if (event) event.stopPropagation();
-        let logs = (await mtGetGeneratorErrorLogsAsync(slotKey)).sort((a,b)=>mtGeneratorLogSortKey(b)-mtGeneratorLogSortKey(a));
+
+        let logs = await mtGetGeneratorErrorLogsAsync(slotKey);
+        logs = logs.sort((a,b) => mtGeneratorLogSortKey(b) - mtGeneratorLogSortKey(a));
+
         if (!logs.length) {
             try {
                 let fallback = null;
                 if (slotKey === 'slot9') fallback = mtSlot9GetState()?.lastDiagnostic || null;
                 else if (slotKey === 'wordweb') fallback = mtWordWebGetState()?.lastDiagnostic || null;
-                else if (/^typed_\d+$/.test(String(slotKey))) fallback = mtGetTypedState(Number(String(slotKey).slice(6)))?.lastDiagnostic || null;
+                else if (/^typed_\d+$/.test(String(slotKey))) {
+                    fallback = mtGetTypedState(Number(String(slotKey).slice(6)))?.lastDiagnostic || null;
+                }
                 if (fallback) logs = [fallback];
             } catch (_) {}
         }
+
         if (!logs.length) {
             alert('저장된 오류 로그가 없습니다.');
             return;
         }
+
+        // 실제 오류시각을 최우선으로 사용
         const latestTimestamp = logs[0]?.timestampKST || '없음';
+
         const text = [
             `[마스킹타이핑] ${slotLabel || slotKey} 오류 로그`,
             `로그 파일 생성시각(KST): ${mtGetSeoulTimestamp()}`,
@@ -4023,6 +4118,7 @@ body { background: var(--bench-v2-bg) !important; }
             '',
             ...logs.map(mtFormatGeneratorErrorEntry)
         ].join('\n');
+
         const blob = new Blob([text], {type:'text/plain;charset=utf-8'});
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -4033,6 +4129,38 @@ body { background: var(--bench-v2-bg) !important; }
         a.remove();
         setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
+
+    // 생성형 오류는 API/로컬/저장/검증 어느 경로에서든 강제 기록
+    function mtForceRecordGeneratorFailure(slotKey, slotLabel, error, extra = {}) {
+        return mtRecordGeneratorErrorLog(slotKey, {
+            slotLabel: String(slotLabel || slotKey),
+            model: extra.model || '',
+            httpStatus: extra.httpStatus ?? null,
+            finishReason: extra.finishReason || '',
+            promptFeedback: extra.promptFeedback ?? null,
+            contentParts: extra.contentParts ?? null,
+            responseObject: extra.responseObject ?? null,
+            errorMessage: String(extra.errorMessage || error?.message || error || '알 수 없는 오류')
+        });
+    }
+
+    function mtForceRecordSlot9Failure(error, extra = {}) {
+        return mtForceRecordGeneratorFailure('slot9', '슬롯9', error, extra);
+    }
+
+    // 생성형 오류로그는 페이지 초기화와 독립적으로 읽습니다.
+    async function mtPreloadGeneratorErrorLogMemory() {
+        try {
+            window.__mtGeneratorErrorLogMemory = window.__mtGeneratorErrorLogMemory || {};
+            for (const key of ['slot9', 'wordweb']) {
+                const logs = await mtReadDedicatedErrorLog(key);
+                if (Array.isArray(logs) && logs.length) {
+                    window.__mtGeneratorErrorLogMemory[key] = logs.slice(-MT_GENERATOR_ERROR_LOG_MAX);
+                }
+            }
+        } catch (_) {}
+    }
+
     function mtGetGeneratorAiConfig(baseConfig, slotKey, slotLabel) {
         const cfg = {...(baseConfig || {})};
         cfg.diagnosticHandler = (detail) => mtHandleGeneratorApiDiagnostic(slotKey, slotLabel, detail);
@@ -7850,7 +7978,17 @@ ${JSON.stringify(batch)}
             let lastDiag = null;
             try { lastDiag = mtSlot9GetState()?.lastDiagnostic || null; } catch (_) {}
             const msg = String(e?.message || e || '알 수 없는 오류');
-            if (!lastDiag || String(lastDiag.errorMessage || '') !== msg) mtForceRecordSlot9Failure(e, lastDiag || {});
+            // API diagnosticHandler와 무관하게 최종 실패는 반드시 한 번 강제 기록합니다.
+            mtForceRecordSlot9Failure(e, {
+                ...(lastDiag || {}),
+                errorMessage: msg,
+                model: lastDiag?.model || '',
+                httpStatus: lastDiag?.httpStatus ?? null,
+                finishReason: lastDiag?.finishReason || '',
+                promptFeedback: lastDiag?.promptFeedback ?? null,
+                contentParts: lastDiag?.contentParts ?? null,
+                responseObject: lastDiag?.responseObject ?? null
+            });
             // 실패 원인별로 다음 실행 시점을 다르게 잡습니다.
             // 일일 quota 초과는 5분마다 무의미하게 재요청하지 않고 24시간 후 다시 확인합니다.
             const latestSt = mtSlot9GetState();
