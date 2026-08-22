@@ -3849,6 +3849,20 @@ body { background: var(--bench-v2-bg) !important; }
     const MT_GENERATOR_ERROR_LOG_MAX = 10;
     const MT_GENERATOR_ERROR_LOG_OLD_PREFIXES = ['mt_generator_error_log_v2_', 'mt_slot9_error_log_v1'];
     function mtGeneratorLogKey(slotKey) { return MT_GENERATOR_ERROR_LOG_PREFIX + String(slotKey); }
+    // [수정점] timestampMs가 손상/누락된 옛 형식 항목이 섞여 있어도 정렬이 무너지지 않도록
+    // timestampKST(항상 존재)를 보조 기준으로 폴백합니다. 이 키가 없으면 정렬 자체가
+    // "no-op"이 되어 최신순/과거순이 뒤바뀌어 표시되는 문제가 생깁니다.
+    function mtGeneratorLogSortKey(entry) {
+        const ms = Number(entry?.timestampMs);
+        if (Number.isFinite(ms) && ms > 0) return ms;
+        const kst = String(entry?.timestampKST || '').trim();
+        if (kst) {
+            // mtGetSeoulTimestamp()는 'YYYY-MM-DDTHH:mm:ss' (KST, UTC+9) 형식입니다.
+            const parsed = Date.parse(/[+-]\d{2}:?\d{2}$|Z$/.test(kst) ? kst : `${kst}+09:00`);
+            if (Number.isFinite(parsed)) return parsed;
+        }
+        return 0;
+    }
     function mtGetGeneratorErrorLogs(slotKey) {
         const key = String(slotKey);
         let all = [];
@@ -3865,7 +3879,7 @@ body { background: var(--bench-v2-bg) !important; }
         } catch (_) {}
         const seen = new Set();
         const unique = [];
-        all.sort((a,b) => Number(a.timestampMs || 0) - Number(b.timestampMs || 0)).forEach(item => {
+        all.sort((a,b) => mtGeneratorLogSortKey(a) - mtGeneratorLogSortKey(b)).forEach(item => {
             const sig = `${item.timestampKST||''}|${item.model||''}|${item.httpStatus??''}|${item.errorMessage||''}`;
             if (seen.has(sig)) return;
             seen.add(sig);
@@ -3897,7 +3911,7 @@ body { background: var(--bench-v2-bg) !important; }
             errorMessage
         };
         logs.push(entry);
-        logs.sort((a,b)=>Number(a.timestampMs||0)-Number(b.timestampMs||0));
+        logs.sort((a,b)=>mtGeneratorLogSortKey(a)-mtGeneratorLogSortKey(b));
         logs = logs.slice(-MT_GENERATOR_ERROR_LOG_MAX);
         logs.forEach((item, idx)=>{ item.seq = idx + 1; });
         try {
@@ -3930,6 +3944,41 @@ body { background: var(--bench-v2-bg) !important; }
         } catch (_) {}
         return mtGetGeneratorErrorLogs(key);
     }
+    // [수정점] 새로고침/재접속 직후에는 window.__mtGeneratorErrorLogMemory가 비어 있어서,
+    // mtRecordGeneratorErrorLog가 오류 기록 시 사용하는 동기(localStorage+메모리) 기준 배열이
+    // IndexedDB에 이미 저장된 과거 기록을 모른 채로 시작합니다. 이 상태에서 새 실패가 기록되면
+    // "가장 최근 기록"이 실제로는 IndexedDB의 과거 항목과 뒤섞이거나, 반대로 IndexedDB 쓰기가
+    // 이 불완전한 기준으로 덮어써져 방금 발생한 실패가 다운로드 결과에 반영되지 않을 수 있습니다.
+    // 페이지 초기화 시 IndexedDB에 저장된 모든 오류 로그를 메모리 캐시에 미리 채워, 이후의 모든
+    // 동기 기록/조회가 항상 최신 상태를 기준으로 동작하도록 보장합니다.
+    async function mtPreloadGeneratorErrorLogMemory() {
+        try {
+            if (typeof mtWithGeneratorStore !== 'function') return;
+            const rows = await mtWithGeneratorStore('readonly', store => new Promise(resolve => {
+                let keysResult = null, valsResult = null;
+                const finish = () => { if (keysResult && valsResult) resolve({ keys: keysResult, vals: valsResult }); };
+                const keysReq = store.getAllKeys();
+                keysReq.onsuccess = () => { keysResult = keysReq.result || []; finish(); };
+                keysReq.onerror = () => { keysResult = []; finish(); };
+                const valsReq = store.getAll();
+                valsReq.onsuccess = () => { valsResult = valsReq.result || []; finish(); };
+                valsReq.onerror = () => { valsResult = []; finish(); };
+            }));
+            if (!rows || !Array.isArray(rows.keys)) return;
+            window.__mtGeneratorErrorLogMemory = window.__mtGeneratorErrorLogMemory || {};
+            rows.keys.forEach((k, idx) => {
+                const keyStr = String(k || '');
+                if (!keyStr.startsWith(MT_GENERATOR_ERROR_LOG_IDB_PREFIX)) return;
+                const slotKey = keyStr.slice(MT_GENERATOR_ERROR_LOG_IDB_PREFIX.length);
+                const logs = rows.vals[idx];
+                if (Array.isArray(logs) && logs.length) {
+                    window.__mtGeneratorErrorLogMemory[slotKey] = logs.slice();
+                }
+            });
+        } catch (e) {
+            console.warn('[생성형 오류로그 사전 로드 실패]', e);
+        }
+    }
     function mtFormatGeneratorErrorEntry(entry) {
         return [
             `===== ${entry.slotLabel || entry.slotKey || '생성형 슬롯'} 오류 #${entry.seq} =====`,
@@ -3949,7 +3998,7 @@ body { background: var(--bench-v2-bg) !important; }
     }
     async function mtDownloadGeneratorErrorLog(event, slotKey, slotLabel) {
         if (event) event.stopPropagation();
-        let logs = (await mtGetGeneratorErrorLogsAsync(slotKey)).sort((a,b)=>Number(b.timestampMs||0)-Number(a.timestampMs||0));
+        let logs = (await mtGetGeneratorErrorLogsAsync(slotKey)).sort((a,b)=>mtGeneratorLogSortKey(b)-mtGeneratorLogSortKey(a));
         if (!logs.length) {
             try {
                 let fallback = null;
@@ -4062,7 +4111,7 @@ body { background: var(--bench-v2-bg) !important; }
     }
     async function mtDownloadSlot9ErrorLog(event) {
         event?.stopPropagation();
-        const logs = (await mtGetGeneratorErrorLogsAsync('slot9')).sort((a,b)=>Number(b.timestampMs||0)-Number(a.timestampMs||0));
+        const logs = (await mtGetGeneratorErrorLogsAsync('slot9')).sort((a,b)=>mtGeneratorLogSortKey(b)-mtGeneratorLogSortKey(a));
         if (!logs.length) { alert('저장된 슬롯9 오류 로그가 없습니다.'); return; }
         const latestTimestamp = logs[0]?.timestampKST || '없음';
         const text = [
@@ -7404,6 +7453,10 @@ Rules:
                 try{ mtWordWebStateCache=JSON.parse(localStorage.getItem(MT_WORDWEB_STORAGE_KEY)||'null') || mtWordWebDefaultState(); }catch(_){ mtWordWebStateCache=mtWordWebDefaultState(); }
             }
         }finally{ if(db) db.close(); }
+        // [수정점] 오류 로그 메모리 캐시를 IndexedDB 기준으로 미리 채워둡니다.
+        // 이게 없으면 새로고침 직후 발생한 실패가 과거 IndexedDB 기록을 모른 채 기록되어,
+        // 다운로드한 오류로그에 방금 실패가 아니라 예전 기록만 보이는 문제가 생길 수 있습니다.
+        try { await mtPreloadGeneratorErrorLogMemory(); } catch (_) {}
     }
 
     function mtWithGeneratorStore(mode, callback){
