@@ -3892,7 +3892,7 @@ body { background: var(--bench-v2-bg) !important; }
     }
     function mtDownloadGeneratorErrorLog(event, slotKey, slotLabel) {
         if (event) event.stopPropagation();
-        let logs = mtGetGeneratorErrorLogs(slotKey).slice(-MT_GENERATOR_ERROR_LOG_MAX).sort((a,b) => Number(a.seq||0) - Number(b.seq||0));
+        let logs = mtGetGeneratorErrorLogs(slotKey).slice(-MT_GENERATOR_ERROR_LOG_MAX).sort((a,b) => String(b.timestampKST||'').localeCompare(String(a.timestampKST||'')));
         // 저장소에 기록이 누락된 경우에도 현재 슬롯 상태의 마지막 진단을 복구해서 로그에 포함합니다.
         if (!logs.length) {
             let fallback = null;
@@ -4027,10 +4027,14 @@ body { background: var(--bench-v2-bg) !important; }
             alert('저장된 슬롯9 오류 로그가 없습니다.');
             return;
         }
+        const latestTimestamp = logs.length ? (logs[0].timestampKST || '') : '';
         const text = [
             '[마스킹타이핑] 슬롯9 오류 로그',
-            `생성시각(KST): ${mtGetSeoulTimestamp()}`,
+            `로그 파일 생성시각(KST): ${mtGetSeoulTimestamp()}`,
+            `가장 최근 오류 기록시각(KST): ${latestTimestamp || '없음'}`,
             `총 오류 수: ${logs.length}`,
+            '',
+            '[최신 오류 → 과거 오류 순]',
             '',
             ...logs.map(mtFormatSlot9ErrorEntry)
         ].join('\n');
