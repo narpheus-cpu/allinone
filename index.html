@@ -2112,6 +2112,34 @@ body { background: var(--bench-v2-bg) !important; }
     margin:0 !important;
 }
 </style>
+
+<style id="uniformSlotCardHeightV8">
+/* 모든 슬롯을 동일 높이로 통일: 모아보기 카드도 일반 카드와 동일한 박스 높이 */
+.mt-slots-grid {
+    align-items: stretch !important;
+    grid-auto-rows: 280px !important;
+}
+.mt-slots-grid > .mt-slot {
+    height: 280px !important;
+    min-height: 280px !important;
+    max-height: 280px !important;
+    box-sizing: border-box !important;
+}
+.mt-slots-grid > .mt-slot.mt-premium-slot {
+    height: 280px !important;
+    min-height: 280px !important;
+    max-height: 280px !important;
+}
+@media (max-width: 768px) {
+    .mt-slots-grid { grid-auto-rows: 250px !important; }
+    .mt-slots-grid > .mt-slot,
+    .mt-slots-grid > .mt-slot.mt-premium-slot {
+        height: 250px !important;
+        min-height: 250px !important;
+        max-height: 250px !important;
+    }
+}
+</style>
 </head>
 <body>
 
