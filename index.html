@@ -2267,6 +2267,14 @@ body { background: var(--bench-v2-bg) !important; }
 .mt-slot .mt-slot-meta-badge:not(.ai):not(.success):not(.book) { background:#f4f4f5 !important; color:#18181b !important; border-color:#e4e4e7 !important; }
 .mt-slot.mt-premium-slot .mt-slot-meta-badge { background:#fff !important; color:#18181b !important; border-color:#fff !important; }
 
+
+/* v24: requested exact slot-type badge colors */
+.mt-slot .mt-slot-meta-badge { background:#f1f5f9 !important; color:#18181b !important; border-color:#e4e4e7 !important; }
+.mt-slot .mt-slot-meta-badge.ai { background:#205e85 !important; color:#fff !important; border-color:#205e85 !important; }
+.mt-slot .mt-slot-meta-badge.success { background:#832085 !important; color:#fff !important; border-color:#832085 !important; }
+.mt-slot .mt-slot-meta-badge.book { background:#854520 !important; color:#fff !important; border-color:#854520 !important; }
+/* 일반 슬롯은 별도 class가 없으므로 neutral selector를 유지 */
+
 </style>
 </head>
 <body>
@@ -9573,9 +9581,18 @@ Return JSON only.`;
             }
             if(!words.length) throw new Error(`선택한 열에서 주문장과 영어문장 데이터를 찾지 못했습니다. (주문장=${mainIdx+1}열, 영어문장=${engIdx+1}열)`);
 
-            const displayName=sourceType==='clipboard'
-                ? (normalize(fixedRows[0]?.[0])||`슬롯 ${slot+1}`)
-                : (String(rawName).replace(/\.[^/.]+$/,'').trim()||`슬롯 ${slot+1}`);
+            let displayName;
+            if (sourceType === 'clipboard') {
+                // 클립보드 입력 시 제목은 선택한 주문장 열의 첫 실제 데이터 일부를 사용합니다.
+                const titleStart = looksLikeExportHeader ? 1 : 0;
+                const titleSource = normalize(fixedRows[titleStart]?.[mainIdx] || '');
+                const titleChars = Array.from(titleSource);
+                const titlePart = titleChars.slice(0, 24).join('');
+                displayName = titlePart || `슬롯 ${slot+1}`;
+                if (titleChars.length > 24) displayName += '…';
+            } else {
+                displayName = String(rawName).replace(/\.[^/.]+$/,'').trim() || `슬롯 ${slot+1}`;
+            }
             const stored={name:displayName,words,lastSession:null,type:'normal',completedMaskKeys:[],columnPattern:{mainKorCol:mainIdx+1,subKorCol:subIdx>=0?subIdx+1:null,engCol:engIdx+1}};
             mtSetNormalSlotSync(slot, stored);
             mtSetSlotType(slot,'normal');
