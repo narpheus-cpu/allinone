@@ -1380,7 +1380,9 @@
             /* 슬롯 본체는 항상 순백색 */
             background: #ffffff !important;
             /* 회색 그라데이션 없이 오른쪽/아래쪽으로만 짙은 검정 엣지 */
-            box-shadow: 5px 5px 0 #161616 !important;
+            box-shadow: none !important;
+            border-right: 1.5px solid #111111 !important;
+            border-bottom: 2px solid #111111 !important;
             overflow: visible !important;
             transform: none !important;
             transition: transform .18s ease, box-shadow .18s ease;
@@ -1388,7 +1390,7 @@
         .mt-slot:hover {
             transform: translate(-1px, -1px) !important;
             background: #ffffff !important;
-            box-shadow: 6px 6px 0 #0b0b0b !important;
+            box-shadow: 4px 4px 0 #0b0b0b !important;
         }
         .mt-slot.has-data {
             background: #ffffff !important;
