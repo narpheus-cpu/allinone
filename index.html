@@ -2067,6 +2067,51 @@ body { background: var(--bench-v2-bg) !important; }
     }
 }
 </style>
+
+<style id="cardCollectionBadgeFixV7">
+/* 카드 모아보기: 숫자만 흰색 배지, 전체 행은 왼쪽 정렬 */
+.mt-slot-card-count-line {
+    display:flex !important;
+    align-items:center !important;
+    justify-content:flex-start !important;
+    align-self:flex-start !important;
+    width:100% !important;
+    gap:8px !important;
+    margin:0 0 16px 0 !important;
+    text-align:left !important;
+    color:#fff !important;
+    font-size:13px !important;
+    font-weight:700 !important;
+    line-height:1.4 !important;
+}
+.mt-slot-card-count-badge {
+    display:inline-flex !important;
+    align-items:center !important;
+    justify-content:center !important;
+    min-width:34px !important;
+    height:28px !important;
+    box-sizing:border-box !important;
+    padding:4px 10px !important;
+    border-radius:8px !important;
+    background:#fff !important;
+    color:#18181b !important;
+    border:1px solid #fff !important;
+    font-size:13px !important;
+    font-weight:900 !important;
+    line-height:1 !important;
+    text-align:center !important;
+    flex:0 0 auto !important;
+}
+.mt-slot-card-count-label {
+    display:inline-block !important;
+    color:#fff !important;
+    font-size:13px !important;
+    font-weight:700 !important;
+    line-height:1.4 !important;
+    text-align:left !important;
+    margin:0 !important;
+}
+</style>
 </head>
 <body>
 
@@ -6647,9 +6692,8 @@ Rules:
         let starDiv = document.createElement('div');
         starDiv.className = 'mt-slot mt-premium-slot has-data';
         starDiv.innerHTML = `
-            <div class="mt-slot-title">★ 중요 문장 모아보기</div>
-            <span class="mt-slot-meta-badge">컬렉션</span>
-            <div class="mt-slot-stat-row"><div><div class="mt-slot-count">${allStarredWords.length}</div><div class="mt-slot-count-label">개의 별표 카드</div></div></div>
+            <div class="mt-slot-title">★ 카드 모아보기</div>
+            <div class="mt-slot-card-count-line"><span class="mt-slot-card-count-badge">${allStarredWords.length}</span><span class="mt-slot-card-count-label">개의 별표 카드</span></div>
             <div class="mt-slot-desc">모든 슬롯에서 별표(★) 체크한 문장들이 자동으로 모이는 특별한 슬롯입니다.</div>
             <div class="mt-slot-actions-row">
                 <button class="btn-download" onclick="mtExportStarred(event)">엑셀로 모아서 내보내기</button>
