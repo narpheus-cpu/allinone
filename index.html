@@ -2209,6 +2209,24 @@ body { background: var(--bench-v2-bg) !important; }
 }
 
 /* 저장 알림: 헤더 레이아웃/오버플로와 무관하게 화면 위에 표시 */
+
+/* 상세통계: 메인 탭 메뉴와 같은 줄, 오른쪽 정렬 */
+.tabs .mt-tabs-stats {
+    margin-left: auto !important;
+    padding: 0 0 0 12px !important;
+    flex: 0 0 auto !important;
+    align-self: center !important;
+    justify-content: flex-end !important;
+}
+.tabs .mt-tabs-stats #mtDailyStatsText {
+    white-space: nowrap !important;
+}
+@media (max-width: 1100px) {
+    .tabs .mt-tabs-stats #mtDailyStatsText {
+        font-size: 10px !important;
+    }
+}
+
 #saveReminder.save-reminder {
     position: fixed !important;
     top: 88px !important;
@@ -2232,12 +2250,6 @@ body { background: var(--bench-v2-bg) !important; }
         <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템</h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
-
-            <!-- 메인화면 통계: API 키 설정 바로 왼쪽 -->
-            <div id="mtDailyStatsBar" class="mt-header-stats">
-                <span id="mtDailyStatsText">한국시간 기준 일일 통계를 불러오는 중…</span>
-                <button class="btn-excel" type="button" onclick="mtOpenStatsModal()">상세통계</button>
-            </div>
 
             <!-- 글꼴 링크 & API 설정 토글 버튼 -->
             <button class="btn-excel" onclick="toggleApiKeyInput()">API 키 설정</button>
@@ -2268,6 +2280,10 @@ body { background: var(--bench-v2-bg) !important; }
         <button class="tab-btn" onclick="switchMainTab('vocaTab')">단어장</button>
         <button class="tab-btn" onclick="switchMainTab('quizTab')">라운드퀴즈</button>
         <button class="tab-btn" onclick="switchMainTab('boardTab')">게시판</button>
+        <div id="mtDailyStatsBar" class="mt-header-stats mt-tabs-stats">
+            <span id="mtDailyStatsText">한국시간 기준 일일 통계를 불러오는 중…</span>
+            <button class="btn-excel" type="button" onclick="mtOpenStatsModal()">상세통계</button>
+        </div>
     </div>
 
     <!-- ========================================== -->
