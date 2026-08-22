@@ -3657,7 +3657,7 @@ body { background: var(--bench-v2-bg) !important; }
                     mtWordWebStateCache.nextRun = Date.now() + MT_WORDWEB_INTERVAL_MS;
                 }
                 try { await mtPersistGeneratorStates(); } catch (e) { console.warn('[백업 복원] 생성형 IndexedDB 저장 실패:', e); }
-                try { localStorage.removeItem(MT_SLOT9_STORAGE_KEY); } catch (_) {}
+                try { localStorage.removeItem(MT_SLOT9_LEGACY_STORAGE_KEY); } catch (_) {}
                 try { localStorage.removeItem(MT_WORDWEB_STORAGE_KEY); } catch (_) {}
                 if (Object.prototype.hasOwnProperty.call(parsed.mtBackupData, 'slot9_api_key')) {
                     if (parsed.mtBackupData['slot9_api_key']) localStorage.setItem(MT_SLOT9_API_KEY_STORAGE_KEY, parsed.mtBackupData['slot9_api_key']);
@@ -7228,7 +7228,7 @@ Rules:
     // ==========================================
     // 슬롯9 회화 변환 (원본 A열 한국어 → 영어 + 영어순서 한국어 청크)
     // ==========================================
-    const MT_SLOT9_STORAGE_KEY = 'word_slot_9_conversation';
+    const MT_SLOT9_LEGACY_STORAGE_KEY = 'word_slot_9_conversation'; // 구버전 1회 마이그레이션용, 이후에는 사용하지 않음
     const MT_SLOT9_INTERVAL_MS = 5 * 60 * 1000;
     const MT_SLOT9_LIST_PAGE_SIZE = 60;
     let mtSlot9TimerId = null;
@@ -7262,24 +7262,39 @@ Rules:
             ]);
             mtSlot9StateCache=s9 || null;
             mtWordWebStateCache=ww || null;
-            // 기존 localStorage 데이터 1회 마이그레이션
+
+            // 슬롯9의 대용량 상태는 IndexedDB가 단일 원본입니다.
+            // localStorage는 구버전 데이터가 남아 있을 때 딱 한 번만 읽어 마이그레이션하고 즉시 제거합니다.
             if(!mtSlot9StateCache){
-                try{ const raw=localStorage.getItem(MT_SLOT9_STORAGE_KEY); if(raw) mtSlot9StateCache=JSON.parse(raw); }catch(_){}
+                try{
+                    const raw=localStorage.getItem(MT_SLOT9_LEGACY_STORAGE_KEY);
+                    if(raw){
+                        const parsed=JSON.parse(raw);
+                        if(parsed && typeof parsed === 'object') mtSlot9StateCache=parsed;
+                    }
+                }catch(_){}
             }
             if(!mtWordWebStateCache){
                 try{ const raw=localStorage.getItem(MT_WORDWEB_STORAGE_KEY); if(raw) mtWordWebStateCache=JSON.parse(raw); }catch(_){}
             }
+
+            // 데이터가 하나라도 있으면 IndexedDB에만 영구 저장합니다.
             if(mtSlot9StateCache || mtWordWebStateCache){
                 await mtPersistGeneratorStates();
-                try{ localStorage.removeItem(MT_SLOT9_STORAGE_KEY); }catch(_){}
+                try{ localStorage.removeItem(MT_SLOT9_LEGACY_STORAGE_KEY); }catch(_){}
                 try{ localStorage.removeItem(MT_WORDWEB_STORAGE_KEY); }catch(_){}
             }
+
             if(!mtSlot9StateCache) mtSlot9StateCache=mtSlot9DefaultState();
             if(!mtWordWebStateCache) mtWordWebStateCache=mtWordWebDefaultState();
         }catch(e){
             console.warn('[생성형 IndexedDB 초기화 실패]',e);
-            try{ mtSlot9StateCache=JSON.parse(localStorage.getItem(MT_SLOT9_STORAGE_KEY)||'null') || mtSlot9DefaultState(); }catch(_){ mtSlot9StateCache=mtSlot9DefaultState(); }
-            try{ mtWordWebStateCache=JSON.parse(localStorage.getItem(MT_WORDWEB_STORAGE_KEY)||'null') || mtWordWebDefaultState(); }catch(_){ mtWordWebStateCache=mtWordWebDefaultState(); }
+            // 슬롯9는 대용량 상태를 localStorage로 되돌리지 않습니다.
+            // 그래야 수 MB 상태를 setItem으로 재저장하면서 quota 오류가 반복되지 않습니다.
+            if(!mtSlot9StateCache) mtSlot9StateCache=mtSlot9DefaultState();
+            if(!mtWordWebStateCache){
+                try{ mtWordWebStateCache=JSON.parse(localStorage.getItem(MT_WORDWEB_STORAGE_KEY)||'null') || mtWordWebDefaultState(); }catch(_){ mtWordWebStateCache=mtWordWebDefaultState(); }
+            }
         }finally{ if(db) db.close(); }
     }
 
@@ -7372,7 +7387,15 @@ Rules:
     }
     function mtSlot9RenderStatus(extra=''){
         const el=document.getElementById('mtSlot9Status'); if(!el) return; const st=mtSlot9GetState();
-        el.innerHTML=mtSlot9Busy?'<span style="color:#1d4ed8;font-weight:700;">생성 중…</span>':(st.lastError?`<span style="color:#dc2626;">최근 오류: ${mtEscapeHTML(st.lastError)}</span>`:(extra?`<span style="color:#0f766e;font-weight:700;">${mtEscapeHTML(extra)}</span>`:''));
+        let shown = '';
+        if (mtSlot9Busy) shown = '<span style="color:#1d4ed8;font-weight:700;">생성 중…</span>';
+        else if (st.lastError) {
+            const err = String(st.lastError || '');
+            if (/일일 Gemini API quota|PerDayPerProjectPerModel-FreeTier/i.test(err)) {
+                shown = '<span style="color:#b91c1c;font-weight:700;">Gemini 일일 사용량 한도에 도달했습니다. 다음 자동 실행에서 다시 확인합니다.</span>';
+            } else shown = `<span style="color:#dc2626;">최근 오류: ${mtEscapeHTML(err)}</span>`;
+        } else if (extra) shown = `<span style="color:#0f766e;font-weight:700;">${mtEscapeHTML(extra)}</span>`;
+        el.innerHTML = shown;
     }
     function mtRenderSlot9Slot(div){
         const st=mtSlot9GetState();
@@ -7583,62 +7606,9 @@ ${JSON.stringify(batch)}
                 if (!validRow(item, batch[i])) failed.push({ index:i, sourceKorean:batch[i], reason:'로컬 검증 실패' });
             });
 
-            async function repairOne(sourceKorean, reason) {
-                const repairPrompt = `
-Repair exactly ONE row.
-
-ORIGINAL KOREAN (must be copied exactly):
-${JSON.stringify(sourceKorean)}
-
-Issue:
-${JSON.stringify(reason)}
-
-Return ONLY JSON object:
-{"source_korean":"...","english":"...","korean":"...","literal_korean":"[...] [...]"}
-
-Rules:
-- Faithful CEFR A2 English.
-- Natural Korean matching the English meaning.
-- literal_korean must be Korean-only bracket chunks in the exact English phrase order.
-- Do not add unrelated content.
-                `.trim();
-
-                for (let attempt=0; attempt<2; attempt++) {
-                    const repairedRaw = await fetchGemini(
-                        repairPrompt,
-                        {
-                            type:'OBJECT',
-                            properties:{
-                                source_korean:{type:'STRING'},
-                                english:{type:'STRING'},
-                                korean:{type:'STRING'},
-                                literal_korean:{type:'STRING'}
-                            },
-                            required:['source_korean','english','korean','literal_korean']
-                        },
-                        mtGetGeneratorAiConfig(aiConfig, 'slot9', '슬롯9')
-                    );
-                    if (!repairedRaw) continue;
-                    try {
-                        const obj = Array.isArray(repairedRaw)
-                            ? repairedRaw[0]
-                            : (typeof repairedRaw === 'object' ? repairedRaw : mtWordWebExtractJsonValue(repairedRaw));
-                        if (validRow(obj, sourceKorean)) return {
-                            source_korean:normalize(obj.source_korean),
-                            english:normalize(obj.english),
-                            korean:normalize(obj.korean),
-                            literal_korean:String(obj.literal_korean).trim()
-                        };
-                    } catch(e) {}
-                }
-                return null;
-            }
-
-            for (const f of failed) {
-                const repaired = await repairOne(f.sourceKorean, f.reason);
-                if (repaired) resultList[f.index] = {...repaired, batchPos:f.index};
-            }
-
+            // 품질 검증은 그대로 유지합니다.
+            // 다만 검증 실패 행을 문장별 추가 API로 복구하면 무료 quota가 빠르게 소진될 수 있으므로
+            // 실패 행은 retryRows로 넘겨 다음 배치에서 다시 생성합니다.
             const unresolved = [];
             resultList.forEach((item, i) => {
                 if (!validRow(item, batch[i])) unresolved.push(i);
@@ -7684,14 +7654,26 @@ Rules:
             mtInitSlots();
 
         } catch (e) {
-            // [수정점 2] 상태를 새로고침하여 기록기가 작성한 로그(lastDiagnostic)를 덮어쓰지 않게 보호
+            // 실패 원인별로 다음 실행 시점을 다르게 잡습니다.
+            // 일일 quota 초과는 5분마다 무의미하게 재요청하지 않고 24시간 후 다시 확인합니다.
             const latestSt = mtSlot9GetState();
             latestSt.lastRun = Date.now();
-            latestSt.nextRun = Date.now() + MT_SLOT9_INTERVAL_MS;
-            
-            // [수정점 3] UI 에러 메시지가 짤리지 않도록 220자 제한 해제
+            const errorText = String(e?.message || e || '');
+            const isDailyQuota = /PerDayPerProjectPerModel-FreeTier|일일 Gemini API quota|quota.*PerDay/i.test(errorText);
+            const isTemporaryQuota = /quota.*초과|RESOURCE_EXHAUSTED|retry in/i.test(errorText);
+            const is503 = /HTTP 503|high demand|UNAVAILABLE/i.test(errorText);
+            const isTimeout = /시간이 초과|timed out|timeout/i.test(errorText);
+            latestSt.nextRun = isDailyQuota
+                ? Date.now() + (24 * 60 * 60 * 1000)
+                : isTemporaryQuota
+                    ? Date.now() + (15 * 60 * 1000)
+                    : is503
+                        ? Date.now() + (2 * 60 * 1000)
+                        : isTimeout
+                            ? Date.now() + (3 * 60 * 1000)
+                            : Date.now() + MT_SLOT9_INTERVAL_MS;
             if (!latestSt.lastDiagnostic) {
-                latestSt.lastError = String(e?.message || e);
+                latestSt.lastError = errorText;
             }
             mtSlot9SaveState(latestSt);
             mtSlot9RenderStatus();
@@ -8902,9 +8884,11 @@ Return JSON only.`;
                 if (mtWordWebTimerId) clearTimeout(mtWordWebTimerId);
                 mtWordWebTimerId = null;
             } else if (slotIndex === 'slot9') {
-                localStorage.removeItem(MT_SLOT9_STORAGE_KEY);
+                mtSlot9StateCache = mtSlot9DefaultState();
                 if (mtSlot9TimerId) clearTimeout(mtSlot9TimerId);
                 mtSlot9TimerId = null;
+                try { mtWithGeneratorStore('readwrite', store => store.delete('slot9')).catch(e => console.warn('[슬롯9 저장소 삭제]', e)); } catch (_) {}
+                try { localStorage.removeItem(MT_SLOT9_LEGACY_STORAGE_KEY); } catch (_) {}
             } else {
                 const typed = mtGetSlotType(slotIndex);
                 if (slotIndex === 'naver') {
