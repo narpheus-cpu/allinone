@@ -4017,6 +4017,7 @@ body { background: var(--bench-v2-bg) !important; }
             timestampMs: now,
             slotKey: key,
             slotLabel: String(detail.slotLabel || key),
+            phase: String(detail.phase || (detail.httpStatus ? 'api' : 'local')),
             model,
             httpStatus: detail.httpStatus ?? null,
             finishReason: detail.finishReason || '',
@@ -4108,6 +4109,7 @@ body { background: var(--bench-v2-bg) !important; }
             JSON.stringify(entry.contentParts ?? null, null, 2),
             '전체 응답 객체:',
             JSON.stringify(entry.responseObject ?? null, null, 2),
+            `오류 단계: ${entry.phase || (entry.httpStatus ? 'api' : 'local')}`,
             `오류 메시지: ${entry.errorMessage || ''}`,
             ''
         ].join('\n');
@@ -4203,6 +4205,7 @@ body { background: var(--bench-v2-bg) !important; }
     function mtHandleGeneratorApiDiagnostic(slotKey, slotLabel, detail) {
         const entry = mtRecordGeneratorErrorLog(slotKey, {
             slotLabel: String(slotLabel || slotKey),
+            phase: detail.phase || 'api',
             model: detail.model || '',
             httpStatus: detail.httpStatus ?? null,
             finishReason: detail.finishReason || '',
@@ -8201,9 +8204,22 @@ ${JSON.stringify(batch.map((k,i)=>({index:i,source_korean:k})))}
             const looksSuspiciousKorean = (eng, kor) => {
                 const e=normalize(eng), k=normalize(kor);
                 if (!e || !k || !/[가-힣]/.test(k)) return true;
-                if (/[A-Za-z]{3,}/.test(k)) return true;
+                // 정상적인 고유명사/약어/브랜드명(DUG, AI, PDF, USB, NYC 등)은 허용합니다.
+                const latinCount=(k.match(/[A-Za-z]/g)||[]).length;
+                const latinRatio=latinCount/Math.max(1,k.length);
+                if (!/[가-힣]/.test(k) && latinRatio>=0.65) return true;
                 if (e.toLowerCase()===k.toLowerCase()) return true;
-                return k.replace(/\s+/g,'').length > Math.max(120,e.replace(/\s+/g,'').length*5+50);
+                const compactK=k.replace(/\s+/g,'');
+                const compactE=e.replace(/\s+/g,'');
+                if (compactK.length > Math.max(160, compactE.length*6+60)) return true;
+                const parts=k.split(/\s+/).filter(Boolean);
+                for(let span=1;span<=3;span++){
+                    for(let j=0;j+span*3<=parts.length;j++){
+                        const a=parts.slice(j,j+span).join(' '), b=parts.slice(j+span,j+span*2).join(' '), c=parts.slice(j+span*2,j+span*3).join(' ');
+                        if(a && a===b && b===c) return true;
+                    }
+                }
+                return false;
             };
 
             for (let i=0;i<normalized.length;i++) {
@@ -8290,16 +8306,11 @@ ${JSON.stringify(batch.map((k,i)=>({index:i,source_korean:k})))}
         } catch(e) {
             const lastDiag=(()=>{try{return mtSlot9GetState()?.lastDiagnostic||null;}catch(_){return null;}})();
             const msg=String(e?.message||e||'알 수 없는 오류');
-            await mtForceRecordSlot9Failure(e,{
-                ...(lastDiag||{}),
-                errorMessage:msg,
-                model:lastDiag?.model||'',
-                httpStatus:lastDiag?.httpStatus??null,
-                finishReason:lastDiag?.finishReason||'',
-                promptFeedback:lastDiag?.promptFeedback??null,
-                contentParts:lastDiag?.contentParts??null,
-                responseObject:lastDiag?.responseObject??null
-            });
+            const isLocalValidationError=/한국어 결과가 비정상 패턴|청크|영어\/한국어|직독직해|A2 영어 생성|원문/.test(msg);
+            const errorContext=isLocalValidationError
+                ? {phase:'local_validation',errorMessage:msg,model:'',httpStatus:null,finishReason:'',promptFeedback:null,contentParts:null,responseObject:null}
+                : {...(lastDiag||{}),phase:lastDiag?.phase||'api',errorMessage:msg,model:lastDiag?.model||'',httpStatus:lastDiag?.httpStatus??null,finishReason:lastDiag?.finishReason||'',promptFeedback:lastDiag?.promptFeedback??null,contentParts:lastDiag?.contentParts??null,responseObject:lastDiag?.responseObject??null};
+            await mtForceRecordSlot9Failure(e,errorContext);
 
             const latestSt=mtSlot9GetState();
             latestSt.lastRun=Date.now();
