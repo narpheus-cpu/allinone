@@ -1842,94 +1842,160 @@ body { background: var(--bench-v2-bg) !important; }
 
 </style>
 
-<style id="requestedBenchmarkPolish">
-/* 최종 요청 반영: 메뉴/슬롯/진행률/여백 정리 */
-.tabs {
-    display:inline-flex !important;
-    align-items:center !important;
-    gap:4px !important;
-    padding:6px !important;
-    background:#e4e4e7 !important;
-    border:0 !important;
-    border-radius:16px !important;
-    margin:0 0 30px !important;
-}
-.tab-btn {
-    border:0 !important;
-    border-radius:12px !important;
-    background:transparent !important;
+
+
+
+<style id="requestedBenchmarkPolishV4">
+/* ===== Benchmark refinement V4 ===== */
+/* 1) Header controls: same size/design as 상세통계; only 저장 stays inverted. */
+.header-buttons > .btn-excel,
+.header-buttons > .file-open-btn,
+.mt-header-stats .btn-excel {
+    min-height:28px !important;
+    height:28px !important;
+    padding:4px 8px !important;
+    font-size:10px !important;
+    line-height:1 !important;
+    border:1px solid #e4e4e7 !important;
+    border-radius:6px !important;
+    background:#fff !important;
+    color:#111 !important;
     box-shadow:none !important;
+    font-weight:800 !important;
 }
-.tab-btn.active {
+.header-buttons > .btn-excel:hover,
+.header-buttons > .file-open-btn:hover,
+.mt-header-stats .btn-excel:hover {
+    background:#111 !important;
+    color:#fff !important;
+    border-color:#111 !important;
+}
+.header-buttons > .file-sync-btn {
+    min-height:28px !important;
+    height:28px !important;
+    padding:4px 10px !important;
+    font-size:10px !important;
+    line-height:1 !important;
+    border-radius:6px !important;
+    background:#111 !important;
+    color:#fff !important;
+    border:1px solid #111 !important;
+    box-shadow:none !important;
+    font-weight:800 !important;
+}
+.header-buttons > .file-sync-btn:hover {
+    background:#000 !important;
+    border-color:#000 !important;
+}
+/* 2) All regular type badges are unified to black/white. */
+.mt-slot-meta-badge,
+.mt-wordweb-badge {
     background:#18181b !important;
     color:#fff !important;
-    border:0 !important;
-    border-radius:12px !important;
-    box-shadow:0 2px 8px rgba(0,0,0,.10) !important;
+    border:1px solid #18181b !important;
+    border-radius:8px !important;
+    font-weight:800 !important;
 }
-
+.mt-slot-meta-badge.ai,
+.mt-slot-meta-badge.success,
+.mt-slot-meta-badge.book,
+.mt-wordweb-badge {
+    background:#18181b !important;
+    color:#fff !important;
+    border-color:#18181b !important;
+}
+/* Premium is intentionally inverted like the benchmark card. */
+.mt-slot.mt-premium-slot .mt-slot-meta-badge {
+    background:#fff !important;
+    color:#18181b !important;
+    border-color:#fff !important;
+}
+/* 3) Cards at ~75% of the previous benchmark scale. */
 .mt-slots-grid {
-    gap:24px !important;
-    padding:8px 10px 14px !important;
-    margin:0 !important;
+    grid-template-columns:repeat(auto-fill,minmax(210px,1fr)) !important;
+    gap:18px !important;
+    padding:8px 12px 14px !important;
 }
 .mt-slot {
-    box-sizing:border-box !important;
-    margin:0 !important;
-    border:1px solid #e4e4e7 !important;
-    border-radius:24px !important;
-    background:#fff !important;
-    box-shadow:0 10px 30px -10px rgba(0,0,0,.05) !important;
+    padding:18px !important;
+    border-radius:20px !important;
 }
-.mt-slot.has-data:not(.mt-premium-slot),
-.mt-slot.mt-wordweb-slot.has-data {
-    border:1px solid #e4e4e7 !important;
-    background:#fff !important;
+.mt-slot-title {
+    margin-bottom:14px !important;
+    font-size:14px !important;
+    line-height:1.35 !important;
 }
-.mt-slot.mt-empty-card,
-.mt-slot:has(.mt-slot-empty) {
-    border:2px dashed #d4d4d8 !important;
-    background:rgba(255,255,255,.62) !important;
-    box-shadow:none !important;
+.mt-slot-stat-row {
+    gap:6px !important;
+    margin-bottom:12px !important;
 }
-.mt-slot.mt-empty-card:hover,
-.mt-slot:has(.mt-slot-empty):hover {
-    border:2px dashed #18181b !important;
-    background:#fff !important;
-    box-shadow:none !important;
+.mt-slot-count {
+    font-size:27px !important;
+    line-height:1 !important;
 }
-
-/* 진행률: 트랙은 연회색, 실제 진행은 진한 검정 */
+.mt-slot-count-label {
+    font-size:10px !important;
+}
+.mt-slot-star-count {
+    padding:3px 8px !important;
+    font-size:10px !important;
+}
+.mt-slot-desc {
+    margin-bottom:12px !important;
+    font-size:11px !important;
+}
+/* 4) Progress spacing is identical for every slot. */
+.mt-slot-progress-row {
+    min-height:0 !important;
+    margin:0 0 12px !important;
+    padding:0 !important;
+}
+.mt-progress-copy {
+    margin-bottom:5px !important;
+    font-size:10px !important;
+}
 .mt-progress-track {
+    height:6px !important;
     background:#e4e4e7 !important;
 }
 .mt-progress-fill {
     background:#18181b !important;
 }
-.mt-slot.mt-premium-slot .mt-progress-track {
-    background:#3f3f46 !important;
+.mt-progress-simple {
+    font-size:10px !important;
 }
-.mt-slot.mt-premium-slot .mt-progress-fill {
-    background:#fff !important;
-}
-
-/* 하단 액션은 벤치마킹처럼 카드 내부 하단에 고정 */
+/* Remove artificial bottom gaps; each content block owns its own spacing. */
 .mt-slot-actions-row {
-    margin-top:auto !important;
-    padding-top:16px !important;
+    margin-top:0 !important;
+    padding-top:12px !important;
     border-top:1px solid #e4e4e7 !important;
 }
-.mt-slot.mt-premium-slot .mt-slot-actions-row {
-    border-top-color:#3f3f46 !important;
+.mt-slot-actions-row button,
+.mt-slot-actions-row .btn-download,
+.mt-slot-actions-row .mt-btn-delete {
+    min-height:26px !important;
+    padding:5px 9px !important;
+    font-size:10px !important;
 }
-
-@media (max-width:768px) {
-    .mt-slots-grid { padding:6px 6px 12px !important; gap:18px !important; }
-    .mt-slot { border-radius:20px !important; }
-    .tab-btn.active { border-radius:12px !important; }
+/* API-key strips in slots 9/10: no hidden bottom gap. */
+.mt-slot > div[style*="margin:6px 0 7px"],
+.mt-slot > div[style*="margin: 6px 0 7px"] {
+    margin:0 0 10px !important;
+}
+.mt-wordweb-status {
+    margin-top:8px !important;
+}
+/* Empty slot helper: keep the same flow rhythm as populated cards. */
+.mt-slot-empty {
+    margin-top:0 !important;
+    padding-top:10px !important;
+    font-size:10px !important;
+}
+@media (max-width:768px){
+    .mt-slots-grid { grid-template-columns:1fr !important; gap:16px !important; padding:6px 8px 12px !important; }
+    .mt-slot { padding:16px !important; border-radius:18px !important; }
 }
 </style>
-
 </head>
 <body>
 
