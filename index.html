@@ -12230,3 +12230,40 @@ button.mt-btn-delete {
   border-color:#111827 !important;
 }
 </style>
+<style id="v30-uniform-action-gaps">
+/* v30: 슬롯 하단 액션 버튼 간격을 모든 슬롯에서 동일하게 */
+.mt-slot-actions-row {
+  display:flex !important;
+  flex-wrap:nowrap !important;
+  align-items:center !important;
+  justify-content:flex-start !important;
+  column-gap:4px !important;
+  gap:4px !important;
+  width:100% !important;
+  margin-top:8px !important;
+  padding-top:8px !important;
+  box-sizing:border-box !important;
+}
+.mt-slot-actions-row .mt-slot-meta-badge {
+  flex:0 0 auto !important;
+  margin:0 4px 0 0 !important;
+}
+.mt-slot-actions-row > button {
+  flex:0 0 auto !important;
+  margin:0 !important;
+  box-sizing:border-box !important;
+  white-space:nowrap !important;
+}
+.mt-slot-actions-row .btn-excel,
+.mt-slot-actions-row .btn-download,
+.mt-slot-actions-row .mt-btn-delete {
+  min-width:0 !important;
+  min-height:25px !important;
+  height:25px !important;
+  padding:4px 7px !important;
+  line-height:1 !important;
+  letter-spacing:-0.35px !important;
+  font-size:10px !important;
+}
+</style>
+
