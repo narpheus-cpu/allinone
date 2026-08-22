@@ -2275,6 +2275,27 @@ body { background: var(--bench-v2-bg) !important; }
 .mt-slot .mt-slot-meta-badge.book { background:#854520 !important; color:#fff !important; border-color:#854520 !important; }
 /* 일반 슬롯은 별도 class가 없으므로 neutral selector를 유지 */
 
+
+/* v25: compact action row / dark red minus delete */
+.mt-slot-actions-row {
+    justify-content:flex-start !important;
+    gap:3px !important;
+    margin-top:6px !important;
+    padding-top:7px !important;
+    border-top:1px solid #e4e4e7 !important;
+    flex-wrap:nowrap !important;
+}
+.mt-slot-actions-row .mt-slot-meta-badge { margin-right:auto !important; flex:0 0 auto !important; }
+.mt-slot-actions-row button, .mt-slot-actions-row .btn-download, .mt-slot-actions-row .mt-btn-delete {
+    min-height:25px !important; height:25px !important; padding:4px 6px !important; margin:0 !important; font-size:10px !important;
+    letter-spacing:-0.45px !important; line-height:1 !important; border-radius:7px !important; white-space:nowrap !important;
+}
+.mt-slot-actions-row .mt-btn-delete {
+    width:25px !important; min-width:25px !important; padding:0 !important; display:inline-flex !important; align-items:center !important; justify-content:center !important;
+    background:#7f1d1d !important; color:#fff !important; border:0 !important; font-size:16px !important; font-weight:800 !important;
+}
+.mt-slot-actions-row .mt-btn-delete:hover { background:#991b1b !important; color:#fff !important; }
+.mt-slot-empty { margin-top:6px !important; }
 </style>
 </head>
 <body>
@@ -6990,7 +7011,7 @@ Rules:
 
                 div.className = 'mt-slot has-data';
                 div.innerHTML = `
-                    <div class="mt-slot-title">${mtEscapeHTML(mtGetDisplayFileTitle(slotData.name || `슬롯 ${i}`))}</div>
+                    <div class="mt-slot-title">${mtEscapeHTML(mtGetDisplayFileTitle(mtIsDefaultSlotTitle(slotData.name, i) ? mtGetFallbackSlotTitle(i, slotData.words) : (slotData.name || `슬롯 ${i}`)))}</div>
                     <div class="mt-slot-stat-row">
                         <div><div class="mt-slot-count">${slotData.words.length}</div></div>
                         <div class="mt-slot-star-count">★ ${starredCount}</div>
@@ -7001,7 +7022,7 @@ Rules:
                         <button class="btn-excel" onclick="mtOpenSlotAppendModal(${i});event.stopPropagation();">추가</button>
                         <button class="btn-excel" onclick="mtOpenSlotChangeModal(${i});event.stopPropagation();">변경</button>
                         <button class="btn-download" onclick="mtExportSlot(event, ${i})">내보내기</button>
-                        <button class="mt-btn-delete" onclick="mtDeleteSlot(event, ${i})">삭제</button>
+                        <button class="mt-btn-delete" title="삭제" aria-label="삭제" onclick="mtDeleteSlot(event, ${i})">−</button>
                     </div>
                 `;
                 div.onclick = () => mtPromptAction(i, slotData);
@@ -7070,7 +7091,7 @@ Rules:
                     <div class="mt-slot-actions-row">
                         <span class="mt-slot-meta-badge">일반</span>
                         <button class="btn-download" onclick="mtExportSlot(event, 11)">내보내기</button>
-                        <button class="mt-btn-delete" onclick="mtDeleteSlot(event, 11)">삭제</button>
+                        <button class="mt-btn-delete" title="삭제" aria-label="삭제" onclick="mtDeleteSlot(event, 11)">−</button>
                     </div>
                 `;
                 generatorDiv.onclick = () => mtPromptAction(11, generatorData);
@@ -7685,7 +7706,7 @@ Rules:
         const learningCardCount=mtGetGeneratorSuccessfulCardCount(st, words);
         const star=mtSlot9GetStarredCount(st);
         div.className='mt-slot mt-wordweb-slot '+(st.fileName?'has-data':'');
-        div.innerHTML=`<div class="mt-slot-title">${mtEscapeHTML(mtGetDisplayFileTitle(st.fileName || '슬롯 9'))}</div><div class="mt-slot-stat-row"><div><div class="mt-slot-count">${words.length}</div></div><div style="display:flex;align-items:center;gap:6px;"><div class="mt-slot-star-count">★ ${star}</div><button class="btn-excel" style="padding:4px 8px;font-size:10px;" onclick="mtDownloadGeneratorErrorLog(event,'slot9','슬롯9')">오류로그</button></div></div><div class="mt-slot-progress-row mt-generator-learning-row"><div class="mt-progress-copy"><span>학습카드수</span><span>${learningCardCount}</span></div></div><div style="width:100%;margin:6px 0 7px;" onclick="event.stopPropagation()" onpointerdown="event.stopPropagation()"><div style="display:flex;gap:4px;align-items:center;"><input id="mtSlot9ApiKeyInput" type="password" autocomplete="off" placeholder="슬롯9 전용 API Key (비워두면 메인 API 사용)" value="${mtEscapeHTML(mtGetSlotApiKey('slot9'))}" style="flex:1;min-width:0;padding:6px 7px;border:1px solid #d1d5db;border-radius:6px;font-size:10px;box-sizing:border-box;"><button class="btn-excel" style="padding:6px 8px;font-size:10px;" onclick="event.stopPropagation();mtSaveSlotApiKey('slot9')">저장</button></div></div><div class="mt-slot-actions-row"><span class="mt-slot-meta-badge ai">자체생성</span>${st.fileName?`<button class="btn-download" onclick="mtSlot9DownloadClick(event)">내보내기</button>`:'<button class="btn-download" disabled>내보내기</button>'}${st.fileName?`<button class="mt-btn-delete" onclick="mtDeleteSlot(event,'slot9')">삭제</button>`:'<button class="mt-btn-delete" disabled>삭제</button>'}</div><div id="mtSlot9Status" class="mt-wordweb-status"></div>`;
+        div.innerHTML=`<div class="mt-slot-title">${mtEscapeHTML(mtGetDisplayFileTitle(st.fileName || '슬롯 9'))}</div><div class="mt-slot-stat-row"><div><div class="mt-slot-count">${words.length}</div></div><div style="display:flex;align-items:center;gap:6px;"><div class="mt-slot-star-count">★ ${star}</div><button class="btn-excel" style="padding:4px 8px;font-size:10px;" onclick="mtDownloadGeneratorErrorLog(event,'slot9','슬롯9')">오류로그</button></div></div><div class="mt-slot-progress-row mt-generator-learning-row"><div class="mt-progress-copy"><span>학습카드수</span><span>${learningCardCount}</span></div></div><div style="width:100%;margin:6px 0 7px;" onclick="event.stopPropagation()" onpointerdown="event.stopPropagation()"><div style="display:flex;gap:4px;align-items:center;"><input id="mtSlot9ApiKeyInput" type="password" autocomplete="off" placeholder="슬롯9 전용 API Key (비워두면 메인 API 사용)" value="${mtEscapeHTML(mtGetSlotApiKey('slot9'))}" style="flex:1;min-width:0;padding:6px 7px;border:1px solid #d1d5db;border-radius:6px;font-size:10px;box-sizing:border-box;"><button class="btn-excel" style="padding:6px 8px;font-size:10px;" onclick="event.stopPropagation();mtSaveSlotApiKey('slot9')">저장</button></div></div><div class="mt-slot-actions-row"><span class="mt-slot-meta-badge ai">자체생성</span>${st.fileName?`<button class="btn-download" onclick="mtSlot9DownloadClick(event)">내보내기</button>`:'<button class="btn-download" disabled>내보내기</button>'}${st.fileName?`<button class="mt-btn-delete" title="삭제" aria-label="삭제" onclick="mtDeleteSlot(event,'slot9')">−</button>`:'<button class="mt-btn-delete" disabled title="삭제" aria-label="삭제">−</button>'}</div><div id="mtSlot9Status" class="mt-wordweb-status"></div>`;
         div.onclick=()=>{ if(!st.fileName){ mtSlot9TriggerUpload(); return;} mtPromptAction('slot9',mtSlot9BuildSlotData(st)); };
         mtSlot9RenderStatus();
     }
@@ -8027,7 +8048,7 @@ ${JSON.stringify(batch)}
             <div class="mt-slot-actions-row">
                 <span class="mt-slot-meta-badge success">참조생성</span>
                 ${state.fileName ? `<button class="btn-download" onclick="mtWordWebDownloadClick(event)">내보내기</button>` : `<button class="btn-download" disabled>내보내기</button>`}
-                ${state.fileName ? `<button class="mt-btn-delete" onclick="mtDeleteSlot(event, 'wordweb')">삭제</button>` : `<button class="mt-btn-delete" disabled>삭제</button>`}
+                ${state.fileName ? `<button class="mt-btn-delete" title="삭제" aria-label="삭제" onclick="mtDeleteSlot(event, 'wordweb')">−</button>` : `<button class="mt-btn-delete" disabled>삭제</button>`}
             </div>
             <div id="mtWordWebStatus" class="mt-wordweb-status"></div>
         `;
@@ -9342,7 +9363,7 @@ Return JSON only.`;
         const displayTitle = mtGetDisplayFileTitle(state.fileName || `슬롯 ${Number(slotIndex)}`);
         const displayBadge = mtGetSlotTypeLabel(type);
         const badgeClass = type === 'reference_generate' ? 'success' : (type === 'ebook' ? 'book' : (type === 'self_generate' ? 'ai' : ''));
-        div.innerHTML = `<div class="mt-slot-title">${mtEscapeHTML(displayTitle)}</div><div class="mt-slot-stat-row"><div><div class="mt-slot-count">${words.length}</div></div><div style="display:flex;align-items:center;gap:6px;"><div class="mt-slot-star-count">★ ${star}</div>${['self_generate','reference_generate'].includes(type)?`<button class="btn-excel" style="padding:4px 8px;font-size:10px;" onclick="mtDownloadGeneratorErrorLog(event,'typed_${slotIndex}',${JSON.stringify(displayBadge)})">오류로그</button>`:''}</div></div>${type==='self_generate'||type==='reference_generate'?'':mtSlotProgressRow(mtGetSlotLearningProgress(slotIndex, mtTypedBuildSlotData(slotIndex), type))}<div class="mt-slot-actions-row"><span class="mt-slot-meta-badge ${badgeClass}">${displayBadge}</span>${hasData?`<button class="btn-excel" onclick="mtOpenSlotAppendModal(${slotIndex});event.stopPropagation();">추가</button><button class="btn-excel" onclick="mtOpenSlotChangeModal(${slotIndex});event.stopPropagation();">변경</button><button class="btn-download" onclick="mtTypedExport(event,${slotIndex})">내보내기</button><button class="mt-btn-delete" onclick="mtDeleteSlot(event,${slotIndex})">삭제</button>`:''}</div>${type!=='normal'?`<div id="mtTypedStatus_${slotIndex}" class="mt-wordweb-status"></div>`:''}`;
+        div.innerHTML = `<div class="mt-slot-title">${mtEscapeHTML(displayTitle)}</div><div class="mt-slot-stat-row"><div><div class="mt-slot-count">${words.length}</div></div><div style="display:flex;align-items:center;gap:6px;"><div class="mt-slot-star-count">★ ${star}</div>${['self_generate','reference_generate'].includes(type)?`<button class="btn-excel" style="padding:4px 8px;font-size:10px;" onclick="mtDownloadGeneratorErrorLog(event,'typed_${slotIndex}',${JSON.stringify(displayBadge)})">오류로그</button>`:''}</div></div>${type==='self_generate'||type==='reference_generate'?'':mtSlotProgressRow(mtGetSlotLearningProgress(slotIndex, mtTypedBuildSlotData(slotIndex), type))}<div class="mt-slot-actions-row"><span class="mt-slot-meta-badge ${badgeClass}">${displayBadge}</span>${hasData?`<button class="btn-excel" onclick="mtOpenSlotAppendModal(${slotIndex});event.stopPropagation();">추가</button><button class="btn-excel" onclick="mtOpenSlotChangeModal(${slotIndex});event.stopPropagation();">변경</button><button class="btn-download" onclick="mtTypedExport(event,${slotIndex})">내보내기</button><button class="mt-btn-delete" title="삭제" aria-label="삭제" onclick="mtDeleteSlot(event,${slotIndex})">−</button>`:''}</div>${type!=='normal'?`<div id="mtTypedStatus_${slotIndex}" class="mt-wordweb-status"></div>`:''}`;
         div.onclick = () => {
             if (!hasData) mtOpenConfiguredEmptySlotModal(slotIndex);
             else if (type === 'ebook') mtOpenEbookViewer(Number(slotIndex));
@@ -10032,12 +10053,22 @@ Return JSON only.`;
         const words=mtGetSlotWordsForConversion(slotIndex);
         if(type){
             const st=mtGetTypedState(Number(slotIndex));
+            const savedOriginal=String(st.originalTitle||'').trim();
+            if(savedOriginal) return savedOriginal;
             const current=String(st.fileName||'').trim();
-            return mtIsDefaultSlotTitle(current, Number(slotIndex)) ? mtGetFallbackSlotTitle(slotIndex, words) : (current || `슬롯 ${Number(slotIndex)+1}`);
+            if(!mtIsDefaultSlotTitle(current, Number(slotIndex)) && current) return current;
+            if(type==='ebook' && Array.isArray(st.ebook?.sourceRows)){
+                const mainCol=Number(st.ebook?.mainCol ?? 0);
+                const sourceRows=st.ebook.sourceRows;
+                const sourceTitle=String(sourceRows.find(r=>String(r?.[mainCol]??'').trim())?.[mainCol]??'').trim();
+                if(sourceTitle){ const chars=Array.from(sourceTitle); return chars.slice(0,24).join('') + (chars.length>24?'…':''); }
+            }
+            return mtGetFallbackSlotTitle(slotIndex, words);
         }
         const d=mtGetNormalSlotSync(Number(slotIndex));
         const current=String(d?.name||'').trim();
-        return mtIsDefaultSlotTitle(current, Number(slotIndex)) ? mtGetFallbackSlotTitle(slotIndex, words) : (current || `슬롯 ${Number(slotIndex)}`);
+        if(!mtIsDefaultSlotTitle(current, Number(slotIndex)) && current) return current;
+        return mtGetFallbackSlotTitle(slotIndex, words);
     }
     function mtGetSuccessfulIndexesForSlot(slotIndex, words){
         const set=new Set();
@@ -10141,10 +10172,12 @@ Return JSON only.`;
         const slot=mtChangeTargetSlot, target=document.getElementById('mtSlotChangeType')?.value; if(slot===null||!target)return; const words=mtGetSlotWordsForConversion(slot); if(!words.length)return alert('변경할 카드가 없습니다.'); const successful=mtGetSuccessfulIndexesForSlot(slot,words); const name=mtGetSlotNameForConversion(slot); const n=Number(slot);
         if(String(slot)==='slot9' || String(slot)==='wordweb'){ return alert('생성형 슬롯의 유형 변경은 생성 원본/주제 구조를 잃지 않도록 지원하지 않습니다.'); }
         if(target==='ebook'){
-            const st={type:'ebook',fileName:name,ebook:{sourceRows:words.map(w=>[w.kor,w.subKor||'',w.eng]),mainCol:0,subCol:1,engCol:2},outputRows:words.map((w,i)=>[w.eng||'',w.kor||'',w.subKor||'',String(i+1)]),pattern:{engCol:1,mainKorCol:2,subKorCol:3,serialCol:4},ebookReadIndexes:Array.from(successful).sort((a,b)=>a-b),starredSerials:words.filter(w=>w.starred).map(w=>String(w.serial||w.number||'')),lastSession:null,lastError:''};
+            const originalTitle = String(name||'').trim() || mtGetFallbackSlotTitle(slot, words);
+            const st={type:'ebook',fileName:originalTitle,originalTitle,ebook:{sourceRows:words.map(w=>[w.kor,w.subKor||'',w.eng]),mainCol:0,subCol:1,engCol:2},outputRows:words.map((w,i)=>[w.eng||'',w.kor||'',w.subKor||'',String(i+1)]),pattern:{engCol:1,mainKorCol:2,subKorCol:3,serialCol:4},ebookReadIndexes:Array.from(successful).sort((a,b)=>a-b),starredSerials:words.filter(w=>w.starred).map(w=>String(w.serial||w.number||'')),lastSession:null,lastError:''};
             mtSetSlotType(n,'ebook'); mtSaveTypedState(n,st); mtDeleteNormalSlotSync(n);
         } else {
-            const st={name,fileName:name,words:words.map((w,i)=>({id:w.id||Date.now()+i,number:String(w.serial||w.number||i+1),createdAt:w.createdAt||Date.now()+i,eng:w.eng||'',kor:w.kor||'',subKor:w.subKor||w.literalKor||'',score:w.score||0,lastQueriedAt:w.lastQueriedAt||0,selected:false,isEditing:false,starred:!!w.starred,originalIndex:i})),lastSession:null,type:'normal',completedMaskKeys:[],completedCardIndexes:Array.from(successful).sort((a,b)=>a-b),successCounts:{}};
+            const restoredTitle = String(name||'').trim() || mtGetFallbackSlotTitle(slot, words);
+            const st={name:restoredTitle,fileName:restoredTitle,originalTitle:restoredTitle,words:words.map((w,i)=>({id:w.id||Date.now()+i,number:String(w.serial||w.number||i+1),createdAt:w.createdAt||Date.now()+i,eng:w.eng||'',kor:w.kor||'',subKor:w.subKor||w.literalKor||'',score:w.score||0,lastQueriedAt:w.lastQueriedAt||0,selected:false,isEditing:false,starred:!!w.starred,originalIndex:i})),lastSession:null,type:'normal',completedMaskKeys:[],completedCardIndexes:Array.from(successful).sort((a,b)=>a-b),successCounts:{}};
             mtSetSlotType(n,'normal'); mtSetNormalSlotSync(n,st); localStorage.removeItem(mtGetTypedStateKey(n));
         }
         mtCloseSlotChangeModal(); mtInitSlots(); alert(`슬롯 유형을 ${target==='ebook'?'전자책':'일반'}으로 변경했습니다.`);
