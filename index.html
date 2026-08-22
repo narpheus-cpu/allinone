@@ -2761,10 +2761,16 @@
             }
 
             if (parsed.mtBackupData) {
+                // 백업 복원 중에는 기존 생성형 저장 예약/자동실행을 잠시 중단하여
+                // 이전 상태가 새로 불러온 슬롯9/10 데이터를 덮어쓰지 못하게 합니다.
+                try { if (mtGeneratorSaveTimer) { clearTimeout(mtGeneratorSaveTimer); mtGeneratorSaveTimer = null; } } catch (_) {}
+                try { if (mtSlot9TimerId) { clearTimeout(mtSlot9TimerId); mtSlot9TimerId = null; } } catch (_) {}
+                try { if (mtWordWebTimerId) { clearTimeout(mtWordWebTimerId); mtWordWebTimerId = null; } } catch (_) {}
+
                 // 일반 슬롯 1~8만 word_slot_* 키로 복원합니다.
-                // 슬롯9/10은 전용 저장 키로 복원해야 카드 수가 0으로 초기화되지 않습니다.
+                // 슬롯9/10은 전용 저장 키로 복원해야 카드 수/내용이 초기화되지 않습니다.
                 await mtInitNormalSlotCache();
-            await mtInitGeneratorStates();
+                await mtInitGeneratorStates();
                 for(let i = 1; i <= 8; i++) {
                     if(parsed.mtBackupData[i]) {
                         try { mtSetNormalSlotSync(i, JSON.parse(parsed.mtBackupData[i])); } catch (_) {}
@@ -2789,6 +2795,11 @@
 
                 if (Object.prototype.hasOwnProperty.call(parsed.mtBackupData, 'slot9_conversation')) {
                     try { mtSlot9StateCache = parsed.mtBackupData['slot9_conversation'] ? JSON.parse(parsed.mtBackupData['slot9_conversation']) : mtSlot9DefaultState(); } catch (_) { mtSlot9StateCache = mtSlot9DefaultState(); }
+                    // 백업에 기록된 nextRun이 이미 지난 시각이면 복원 직후 즉시 생성이 돌지 않도록
+                    // 다음 자동 실행을 5분 후로 재설정합니다. 기존 결과 데이터는 그대로 보존합니다.
+                    if (mtSlot9StateCache && mtSlot9StateCache.fileName && Number(mtSlot9StateCache.nextRun) <= Date.now()) {
+                        mtSlot9StateCache.nextRun = Date.now() + MT_SLOT9_INTERVAL_MS;
+                    }
                 }
                 if(parsed.mtBackupData['star_session']) {
                     localStorage.setItem('word_slot_star_session', parsed.mtBackupData['star_session']);
@@ -2797,6 +2808,9 @@
                     try { mtWordWebStateCache = JSON.parse(parsed.mtBackupData['wordweb_conversation']); } catch (_) { mtWordWebStateCache = mtWordWebDefaultState(); }
                 } else {
                     mtWordWebStateCache = mtWordWebDefaultState();
+                }
+                if (mtWordWebStateCache && mtWordWebStateCache.fileName && Number(mtWordWebStateCache.nextRun) <= Date.now()) {
+                    mtWordWebStateCache.nextRun = Date.now() + MT_WORDWEB_INTERVAL_MS;
                 }
                 try { await mtPersistGeneratorStates(); } catch (e) { console.warn('[백업 복원] 생성형 IndexedDB 저장 실패:', e); }
                 try { localStorage.removeItem(MT_SLOT9_STORAGE_KEY); } catch (_) {}
@@ -10659,6 +10673,9 @@ Return JSON only.`;
             // 타이핑 to 언마스크 초기화 (슬롯 불러오기 연동)
             mtApplyFontSettings();
             await mtInitNormalSlotCache();
+            // 슬롯9/10은 일반 슬롯과 별도의 IndexedDB 저장소를 사용하므로
+            // 반드시 생성형 상태를 먼저 복원한 뒤 화면을 그립니다.
+            if (typeof mtInitGeneratorStates === 'function') await mtInitGeneratorStates();
             if (typeof mtInitSlots === 'function') mtInitSlots();
             // 슬롯9와 슬롯10은 서로의 생성 상태/네트워크 요청에 의존하지 않고 독립적으로 5분 트리거를 복구합니다.
             if (typeof mtSlot9StartAutoTrigger === 'function') mtSlot9StartAutoTrigger(false);
