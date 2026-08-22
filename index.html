@@ -1996,6 +1996,77 @@ body { background: var(--bench-v2-bg) !important; }
     .mt-slot { padding:16px !important; border-radius:18px !important; }
 }
 </style>
+
+<style id="latestRequestedPolishV5">
+/* ===== Final polish V5 ===== */
+/* 1) Floating main menu: lower outer gray shell + rounded active black item. */
+.mt-main-menu-minimal {
+    background: transparent !important;
+}
+.tabs {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 3px !important;
+    padding: 4px !important;
+    border: 0 !important;
+    border-radius: 14px !important;
+    background: #e4e4e7 !important;
+    box-sizing: border-box !important;
+}
+.tab-btn {
+    padding: 9px 18px !important;
+    min-height: 34px !important;
+    border: 0 !important;
+    border-radius: 10px !important;
+    margin: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+.tab-btn:hover {
+    background: rgba(255,255,255,.42) !important;
+}
+.tab-btn.active {
+    background: #18181b !important;
+    color: #fff !important;
+    border: 0 !important;
+    border-radius: 10px !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,.12) !important;
+}
+
+/* 2) Remove any white canvas surrounding the slot cards; the cards themselves stay white. */
+#mt-main-menu,
+#mt-main-menu .mt-main-menu-minimal,
+.mt-main-menu-minimal,
+#mtSlotsGrid {
+    background: transparent !important;
+}
+.mt-slots-grid {
+    background: transparent !important;
+}
+
+/* Keep slot fronts white; premium/collection remains inverted black. */
+.mt-slot:not(.mt-premium-slot) {
+    background: #fff !important;
+}
+.mt-slot.mt-premium-slot {
+    background: #18181b !important;
+}
+
+@media (max-width: 768px) {
+    .tabs {
+        padding: 4px !important;
+        border-radius: 12px !important;
+    }
+    .tab-btn {
+        min-height: 32px !important;
+        padding: 8px 14px !important;
+        border-radius: 9px !important;
+    }
+    .tab-btn.active {
+        border-radius: 9px !important;
+    }
+}
+</style>
 </head>
 <body>
 
