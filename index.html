@@ -7006,14 +7006,22 @@ Rules:
 
     function mtCollectAllStarredWords() {
         const all = [];
-        // 일반 슬롯 1~8
+        // 일반 슬롯 1~8 (레거시 일반 데이터 또는 신규 타입 슬롯 데이터: 일반/전자책/자체생성/참조생성)
         for (let i = 1; i <= 8; i++) {
             const parsedSlot = mtGetNormalSlotSync(i);
-            if (!parsedSlot) continue;
-            const words = Array.isArray(parsedSlot) ? parsedSlot : parsedSlot.words;
-            (words || []).forEach((w, idx) => {
-                if (w?.starred) all.push({kor:w.kor,eng:w.eng,starred:true,originalIndex:idx,sourceSlot:i,sourceIndex:idx});
-            });
+            if (parsedSlot) {
+                const words = Array.isArray(parsedSlot) ? parsedSlot : parsedSlot.words;
+                (words || []).forEach((w, idx) => {
+                    if (w?.starred) all.push({kor:w.kor,eng:w.eng,starred:true,originalIndex:idx,sourceSlot:i,sourceIndex:idx});
+                });
+                continue;
+            }
+            const configuredType = mtGetSlotType(i);
+            if (configuredType) {
+                mtTypedCardWords(i).forEach((w, idx) => {
+                    if (w?.starred) all.push({kor:w.kor,eng:w.eng,starred:true,originalIndex:idx,sourceSlot:i,sourceIndex:idx});
+                });
+            }
         }
         // 슬롯9
         const s9=mtSlot9GetState(), p9=mtSlot9GetPattern(s9), ss9=new Set((s9.starredSerials||[]).map(String));
@@ -7021,7 +7029,7 @@ Rules:
         // 워드웹회화
         const ww=mtWordWebGetState(), p=mtWordWebGetPattern(ww), ss=new Set((ww.starredSerials||[]).map(String));
         (ww.outputRows||[]).forEach((r,idx)=>{ const serial=String(r[p.serialCol-1]||'').trim(); if(serial&&ss.has(serial)) all.push({kor:String(r[p.mainKorCol-1]||''),eng:String(r[p.engCol-1]||''),starred:true,originalIndex:idx,sourceSlot:'wordweb',sourceIndex:idx}); });
-        // 생성형 슬롯(11)
+        // 생성형 슬롯(11) (레거시 데이터 또는 신규 타입 슬롯 데이터)
         const raw11 = localStorage.getItem('word_slot_11');
         if (raw11) {
             try {
@@ -7031,6 +7039,10 @@ Rules:
                     if (w?.starred) all.push({kor:w.kor,eng:w.eng,starred:true,originalIndex:idx,sourceSlot:11,sourceIndex:idx});
                 });
             } catch(e) {}
+        } else if (mtGetSlotType(11)) {
+            mtTypedCardWords(11).forEach((w, idx) => {
+                if (w?.starred) all.push({kor:w.kor,eng:w.eng,starred:true,originalIndex:idx,sourceSlot:11,sourceIndex:idx});
+            });
         }
         return all;
     }
@@ -10910,7 +10922,7 @@ ${JSON.stringify(finalPayload)}`;
         const target = String(currentWord.eng || '');
         const input = document.getElementById('mtEngInput');
         const typed = String(input?.value || '');
-        const typingTarget = target.replace(/[.!?。！？]+\s*$/, '');
+        const typingTarget = target.replace(/[.!?,"。！？]+\s*$/, '');
         return typed.toLowerCase() === typingTarget.toLowerCase() ||
                typed.toLowerCase() === target.toLowerCase();
     }
@@ -10976,7 +10988,7 @@ ${JSON.stringify(finalPayload)}`;
         const typed = String(input?.value || '');
 
         // 입력으로 문장 전체가 완성된 경우
-        const typingTarget = target.replace(/[.!?。！？]+\s*$/, '');
+        const typingTarget = target.replace(/[.!?,"。！？]+\s*$/, '');
         if (typed.toLowerCase() === typingTarget.toLowerCase() || typed.toLowerCase() === target.toLowerCase()) return true;
 
         // 마스킹 대상(영문/숫자) 전체가 직접 입력 또는 힌트 공개되었는지 확인
@@ -11409,9 +11421,9 @@ ${JSON.stringify(finalPayload)}`;
                     let target = mtCurrentStudyWords[mtCurrentIndex].eng;
                     let typed = this.value;
 
-                    // 문장 끝의 구두점(. ! ? 。 ！ ？)은 입력하지 않아도 정답 처리합니다.
+                    // 문장 끝의 구두점(. ! ? , " 。 ！ ？)은 입력하지 않아도 정답 처리합니다.
                     // 중간의 어퍼스트러피, 쉼표, 대시 등은 그대로 입력해야 합니다.
-                    const typingTarget = target.replace(/[.!?。！？]+\s*$/, '');
+                    const typingTarget = target.replace(/[.!?,"。！？]+\s*$/, '');
                     const isComplete = typed.toLowerCase() === typingTarget.toLowerCase() ||
                                        typed.toLowerCase() === target.toLowerCase();
 
