@@ -2312,7 +2312,13 @@ body { background: var(--bench-v2-bg) !important; }
         }
 </style>
 </style>
-</head>
+<style id="v31OneLineActions">
+.mt-slot-actions-row{display:flex!important;align-items:center!important;flex-wrap:nowrap!important;gap:2px!important;white-space:nowrap!important;overflow:hidden!important}
+.mt-slot-actions-row>*{flex:0 0 auto!important;margin:0!important;min-width:0!important}
+.mt-slot-actions-row>button{padding:3px 5px!important;font-size:9px!important;line-height:1.05!important;white-space:nowrap!important}
+.mt-slot-actions-row>.mt-slot-meta-badge{padding:3px 6px!important;white-space:nowrap!important}
+@media(max-width:768px){.mt-slot-actions-row{gap:1px!important}.mt-slot-actions-row>button{padding:3px 4px!important;font-size:8px!important}}
+</style></head>
 <body>
 
 <div class="container">
@@ -2685,7 +2691,36 @@ body { background: var(--bench-v2-bg) !important; }
             </div>
         </div>
 
-        <div id="mtNormalImportSourceModal" class="modal-overlay" style="display:none;">
+        
+<div id="mtAddDataSourceModal" class="modal-overlay" style="display:none;">
+  <div class="modal-card mt-type-modal-card" style="width:min(560px,94vw);">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+      <div><div style="font-size:16px;font-weight:800;">추가</div><div id="mtAddDataSourceSubtitle" style="font-size:11px;color:#64748b;margin-top:3px;">기존 데이터를 유지하고 새 데이터를 추가합니다.</div></div>
+      <button class="btn-excel" onclick="mtCloseAddDataSourceModal()">닫기</button>
+    </div>
+    <div class="mt-type-option-grid" style="margin-top:16px;">
+      <button type="button" class="mt-type-option" onclick="mtStartAddDataFromFile()"><span class="mt-type-option-badge">FILE</span><div class="mt-type-option-title">파일 불러오기</div><div class="mt-type-option-desc">기존 데이터를 유지하고 새 데이터를 추가합니다.</div></button>
+      <button type="button" class="mt-type-option" onclick="mtOpenAddClipboardModal()"><span class="mt-type-option-badge">PASTE</span><div class="mt-type-option-title">클립보드 붙여넣기</div><div class="mt-type-option-desc">탭으로 열이 구분된 데이터를 기존 데이터 뒤에 추가합니다.</div></button>
+    </div>
+  </div>
+</div>
+<div id="mtAddClipboardModal" class="modal-overlay" style="display:none;">
+  <div class="modal-card mt-type-modal-card" style="width:min(640px,94vw);">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div><div style="font-size:16px;font-weight:800;">클립보드 붙여넣기</div><div style="font-size:11px;color:#64748b;margin-top:3px;">탭으로 열이 구분된 새 데이터를 붙여넣으세요.</div></div><button class="btn-excel" onclick="mtCloseAddClipboardModal()">닫기</button></div>
+    <textarea id="mtAddClipboardText" style="width:100%;height:220px;margin-top:12px;box-sizing:border-box;padding:9px;border:1px solid #d1d5db;border-radius:8px;resize:vertical;font-size:11px;line-height:1.45;"></textarea>
+    <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:8px;"><button class="btn-excel" onclick="mtPasteIntoAddClipboard()">클립보드에서 붙여넣기</button><button class="btn-download" onclick="mtConfirmAddClipboard()">추가</button></div>
+  </div>
+</div>
+<div id="mtTypeChangeModal" class="modal-overlay" style="display:none;">
+  <div class="modal-card mt-type-modal-card" style="width:min(560px,94vw);">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div><div style="font-size:16px;font-weight:800;">유형 변경</div><div id="mtTypeChangeSubtitle" style="font-size:11px;color:#64748b;margin-top:3px;">일반과 전자책 중 바꿀 유형을 선택하세요.</div></div><button class="btn-excel" onclick="mtCloseTypeChangeModal()">닫기</button></div>
+    <div class="mt-type-option-grid" style="margin-top:16px;">
+      <button type="button" class="mt-type-option" onclick="mtChangeNormalEbookType('normal')"><span class="mt-type-option-badge">일반</span><div class="mt-type-option-title">일반</div><div class="mt-type-option-desc">현재 데이터를 일반 유형으로 사용합니다.</div></button>
+      <button type="button" class="mt-type-option" onclick="mtChangeNormalEbookType('ebook')"><span class="mt-type-option-badge">전자책</span><div class="mt-type-option-title">전자책</div><div class="mt-type-option-desc">현재 데이터를 전자책 유형으로 사용합니다.</div></button>
+    </div>
+  </div>
+</div>
+<div id="mtNormalImportSourceModal" class="modal-overlay" style="display:none;">
             <div class="modal-card mt-type-modal-card" style="max-width:560px;">
                 <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
                     <div>
@@ -7263,6 +7298,8 @@ Rules:
                     ${mtSlotProgressRow(mtGetSlotLearningProgress(i, slotData, 'normal'))}
                     <div class="mt-slot-actions-row">
                         <span class="mt-slot-meta-badge">일반</span>
+                        <button class="btn-excel" onclick="event.stopPropagation();mtOpenAddDataSourceModal(${i},'normal')">추가</button>
+                        <button class="btn-excel" onclick="event.stopPropagation();mtOpenTypeChangeModal(${i})">변경</button>
                         <button class="btn-download" onclick="mtExportSlot(event, ${i})">내보내기</button>
                         <button class="mt-btn-delete" onclick="mtDeleteSlot(event, ${i})">삭제</button>
                     </div>
@@ -7332,6 +7369,8 @@ Rules:
                     </div>
                     <div class="mt-slot-actions-row">
                         <span class="mt-slot-meta-badge">일반</span>
+                        <button class="btn-excel" onclick="event.stopPropagation();mtOpenAddDataSourceModal(11,'normal')">추가</button>
+                        <button class="btn-excel" onclick="event.stopPropagation();mtOpenTypeChangeModal(11)">변경</button>
                         <button class="btn-download" onclick="mtExportSlot(event, 11)">내보내기</button>
                         <button class="mt-btn-delete" onclick="mtDeleteSlot(event, 11)">삭제</button>
                     </div>
@@ -9387,6 +9426,8 @@ ${JSON.stringify(finalPayload)}`;
 
     let mtNormalImportSlot = null;
     let mtNormalColumnTemp = null;
+    let mtAddDataSlot = null;
+    let mtAddDataType = null;
     function mtOpenNormalImportSourceModal(slotIndex) {
         mtNormalImportSlot = Number(slotIndex);
         const sub=document.getElementById('mtNormalImportSourceSubtitle');
@@ -9394,6 +9435,75 @@ ${JSON.stringify(finalPayload)}`;
         const m=document.getElementById('mtNormalImportSourceModal'); if(m)m.style.display='flex';
     }
     function mtCloseNormalImportSourceModal(){ const m=document.getElementById('mtNormalImportSourceModal'); if(m)m.style.display='none'; mtNormalImportSlot=null; }
+
+    function mtOpenAddDataSourceModal(slotIndex,type){
+        const slot=Number(slotIndex), t=String(type||'');
+        if(!Number.isInteger(slot)||!['normal','ebook'].includes(t))return;
+        mtAddDataSlot=slot; mtAddDataType=t;
+        const sub=document.getElementById('mtAddDataSourceSubtitle');
+        if(sub)sub.textContent=`슬롯 ${slot+1} · 기존 데이터를 유지하고 새 데이터를 추가합니다.`;
+        document.getElementById('mtAddDataSourceModal').style.display='flex';
+    }
+    function mtCloseAddDataSourceModal(){const m=document.getElementById('mtAddDataSourceModal');if(m)m.style.display='none';}
+    function mtStartAddDataFromFile(){
+        if(mtAddDataSlot==null)return;
+        const input=document.getElementById('mtFileUpload');if(!input)return;
+        input.dataset.mtAddMode='1';input.dataset.mtAddSlot=String(mtAddDataSlot);input.dataset.mtAddType=String(mtAddDataType);
+        mtActiveSlotIndex=mtAddDataSlot; input.value=''; mtCloseAddDataSourceModal(); input.click();
+    }
+    function mtOpenAddClipboardModal(){const m=document.getElementById('mtAddClipboardModal');if(m)m.style.display='flex';}
+    function mtCloseAddClipboardModal(){const m=document.getElementById('mtAddClipboardModal');if(m)m.style.display='none';}
+    async function mtPasteIntoAddClipboard(){
+        const ta=document.getElementById('mtAddClipboardText');if(!ta)return;
+        try{if(!navigator.clipboard?.readText)throw new Error('브라우저에서 클립보드 자동 읽기를 지원하지 않습니다.');const v=await navigator.clipboard.readText();if(v)ta.value=v;ta.focus();}catch(e){alert(e?.message||String(e));}
+    }
+    function mtConfirmAddClipboard(){
+        if(mtAddDataSlot==null)return;
+        const ta=document.getElementById('mtAddClipboardText'), text=String(ta?.value||'').replace(/^\uFEFF/,'').normalize('NFC');
+        if(!text.trim())return alert('추가할 데이터를 입력해 주세요.');
+        const rows=text.split(/\r?\n/).filter(x=>x.trim()!=='').map(x=>x.split('\t'));
+        if(!rows.some(r=>r.length>1))return alert('탭(\\t)으로 열이 구분된 데이터를 붙여넣어 주세요.');
+        try{
+            if(mtAddDataType==='normal') mtAppendNormalRows(mtAddDataSlot,rows);
+            else {mtEbookTemp={slotIndex:mtAddDataSlot,fileName:mtGetTypedState(mtAddDataSlot).fileName,rows,sourceSheetName:'클립보드',addMode:true};mtOpenEbookColumnModal(rows);}
+            mtCloseAddClipboardModal(); mtCloseAddDataSourceModal();
+        }catch(e){alert(`데이터 추가 중 오류가 발생했습니다.\n${e?.message||e}`);}
+    }
+    function mtOpenTypeChangeModal(slotIndex){
+        const slot=Number(slotIndex);if(!Number.isInteger(slot))return;
+        const type=mtGetSlotType(slot)||'normal',m=document.getElementById('mtTypeChangeModal');if(!m)return;
+        m.dataset.slotIndex=String(slot);m.dataset.currentType=type;
+        const sub=document.getElementById('mtTypeChangeSubtitle');if(sub)sub.textContent=`슬롯 ${slot+1} · 현재 ${type==='ebook'?'전자책':'일반'} · 변경할 유형을 선택하세요.`;
+        m.style.display='flex';
+    }
+    function mtCloseTypeChangeModal(){const m=document.getElementById('mtTypeChangeModal');if(m){m.style.display='none';delete m.dataset.slotIndex;delete m.dataset.currentType;}}
+    function mtChangeNormalEbookType(targetType){
+        const m=document.getElementById('mtTypeChangeModal'),slot=Number(m?.dataset.slotIndex),current=String(m?.dataset.currentType||'');
+        if(!Number.isInteger(slot)||!['normal','ebook'].includes(targetType))return;
+        if(current===targetType){mtCloseTypeChangeModal();return;}
+        try{
+            if(targetType==='normal'){
+                const st=mtGetTypedState(slot),p=st.pattern||{engCol:1,mainKorCol:2,subKorCol:3,serialCol:4};
+                const words=(st.outputRows||[]).map((r,i)=>({id:Date.now()+i,number:String(r?.[p.serialCol-1]??i+1),createdAt:Date.now(),eng:String(r?.[p.engCol-1]??''),kor:String(r?.[p.mainKorCol-1]??''),subKor:String(r?.[p.subKorCol-1]??''),score:0,lastQueriedAt:0,selected:false,isEditing:false,starred:false})).filter(w=>w.eng.trim()&&w.kor.trim());
+                mtSetNormalSlotSync(slot,{name:st.fileName||`슬롯 ${slot+1}`,words,lastSession:null,type:'normal',completedMaskKeys:[],columnPattern:{mainKorCol:2,subKorCol:3,engCol:1}});
+                mtSetSlotType(slot,'normal');
+                mtSaveTypedState(slot,{...st,type:'normal'});
+            }else{
+                const data=mtGetNormalSlotSync(slot)||{name:`슬롯 ${slot+1}`,words:[]},rows=(data.words||[]).map((w,i)=>[String(w.eng??w.english??''),String(w.kor??w.meaning??''),String(w.subKor??w.literalKor??w.hint??''),String(w.number??i+1)]).filter(r=>r[0]&&r[1]);
+                const st=mtGetTypedState(slot);st.type='ebook';st.fileName=data.name||`슬롯 ${slot+1}`;st.pattern={engCol:1,mainKorCol:2,subKorCol:3,serialCol:4};st.outputRows=rows;st.ebook={mainCol:1,subCol:2,engCol:0,sourceRows:rows.slice()};st.ebookReadIndexes=[];mtSetSlotType(slot,'ebook');mtSaveTypedState(slot,st);
+            }
+            mtCloseTypeChangeModal();mtInitSlots();
+        }catch(e){alert(`유형 변경 중 오류가 발생했습니다.\n${e?.message||e}`);}
+    }
+    function mtAppendNormalRows(slotIndex,rows){
+        const slot=Number(slotIndex),prior=mtGetNormalSlotSync(slot)||{name:`슬롯 ${slot+1}`,words:[],lastSession:null,type:'normal'};
+        const fixed=mtDetectAndRemoveHeaderRows(rows),p=prior.columnPattern||{mainKorCol:2,subKorCol:3,engCol:1},mi=Number(p.mainKorCol)-1,si=Number(p.subKorCol||0)-1,ei=Number(p.engCol)-1,add=[];
+        let n=(prior.words||[]).length+1;
+        fixed.forEach(r=>{const kor=String(r?.[mi]??'').trim(),eng=String(r?.[ei]??'').trim(),sub=si>=0?String(r?.[si]??'').trim():'';if(kor&&eng)add.push({id:Date.now()+add.length,number:String(n++),createdAt:Date.now(),eng,kor,subKor:sub,score:0,lastQueriedAt:0,selected:false,isEditing:false,starred:false});});
+        if(!add.length)throw new Error('추가 데이터에서 주문장과 영어문장을 찾지 못했습니다.');
+        prior.words=[...(prior.words||[]),...add];prior.lastSession=null;prior.type='normal';mtSetNormalSlotSync(slot,prior);mtSetSlotType(slot,'normal');mtInitSlots();alert(`[슬롯 ${slot+1}] 일반 데이터 ${add.length}개를 추가했습니다.`);
+    }
+
     function mtNormalImportFromFile(){
         if(mtNormalImportSlot===null || mtNormalImportSlot===undefined)return;
         const slot=mtNormalImportSlot; mtCloseNormalImportSourceModal(); mtActiveSlotIndex=slot;
@@ -9505,7 +9615,7 @@ ${JSON.stringify(finalPayload)}`;
         const displayTitle = mtGetDisplayFileTitle(state.fileName || `슬롯 ${Number(slotIndex)}`);
         const displayBadge = mtGetSlotTypeLabel(type);
         const badgeClass = type === 'reference_generate' ? 'success' : (type === 'ebook' ? 'book' : (type === 'self_generate' ? 'ai' : (type === 'normal' || !type ? 'normal' : '')));
-        div.innerHTML = `<div class="mt-slot-title">${mtEscapeHTML(displayTitle)}</div><div class="mt-slot-stat-row"><div><div class="mt-slot-count">${words.length}</div></div><div style="display:flex;align-items:center;gap:6px;"><div class="mt-slot-star-count">★ ${star}</div>${['self_generate','reference_generate'].includes(type)?`<button class="btn-excel" style="padding:4px 8px;font-size:10px;" onclick="mtDownloadGeneratorErrorLog(event,'typed_${slotIndex}',${JSON.stringify(displayBadge)})">오류로그</button>`:''}</div></div>${type==='self_generate'||type==='reference_generate'?'':mtSlotProgressRow(mtGetSlotLearningProgress(slotIndex, mtTypedBuildSlotData(slotIndex), type))}<div class="mt-slot-actions-row"><span class="mt-slot-meta-badge ${badgeClass}">${displayBadge}</span>${['self_generate','reference_generate'].includes(type)?`<button class="btn-excel mt-prompt-btn" onclick="event.stopPropagation();mtOpenGeneratorPromptEditor('typed_${slotIndex}',type,${JSON.stringify(displayBadge)})">프롬프트</button>`:''}${hasData?`<button class="btn-download" onclick="mtTypedExport(event,${slotIndex})">내보내기</button><button class="mt-btn-delete" onclick="mtDeleteSlot(event,${slotIndex})">삭제</button>`:''}</div>${type!=='normal'?`<div id="mtTypedStatus_${slotIndex}" class="mt-wordweb-status"></div>`:''}`;
+        div.innerHTML = `<div class="mt-slot-title">${mtEscapeHTML(displayTitle)}</div><div class="mt-slot-stat-row"><div><div class="mt-slot-count">${words.length}</div></div><div style="display:flex;align-items:center;gap:6px;"><div class="mt-slot-star-count">★ ${star}</div>${['self_generate','reference_generate'].includes(type)?`<button class="btn-excel" style="padding:4px 8px;font-size:10px;" onclick="mtDownloadGeneratorErrorLog(event,'typed_${slotIndex}',${JSON.stringify(displayBadge)})">오류로그</button>`:''}</div></div>${type==='self_generate'||type==='reference_generate'?'':mtSlotProgressRow(mtGetSlotLearningProgress(slotIndex, mtTypedBuildSlotData(slotIndex), type))}<div class="mt-slot-actions-row"><span class="mt-slot-meta-badge ${badgeClass}">${displayBadge}</span>${['self_generate','reference_generate'].includes(type)?`<button class="btn-excel mt-prompt-btn" onclick="event.stopPropagation();mtOpenGeneratorPromptEditor('typed_${slotIndex}',type,${JSON.stringify(displayBadge)})">프롬프트</button>`:''}${['normal','ebook'].includes(type)?`<button class="btn-excel" onclick="event.stopPropagation();mtOpenAddDataSourceModal(${slotIndex},type)">추가</button><button class="btn-excel" onclick="event.stopPropagation();mtOpenTypeChangeModal(${slotIndex})">변경</button>`:''}${hasData?`<button class="btn-download" onclick="mtTypedExport(event,${slotIndex})">내보내기</button><button class="mt-btn-delete" onclick="mtDeleteSlot(event,${slotIndex})">삭제</button>`:''}</div>${type!=='normal'?`<div id="mtTypedStatus_${slotIndex}" class="mt-wordweb-status"></div>`:''}`;
         div.onclick = () => {
             if (!hasData) mtOpenConfiguredEmptySlotModal(slotIndex);
             else if (type === 'ebook') mtOpenEbookViewer(Number(slotIndex));
@@ -9802,7 +9912,17 @@ ${JSON.stringify(finalPayload)}`;
         const rows=mtEbookTemp.rows, words=[];
         rows.forEach((r,i)=>{const main=String(r?.[mainCol]??'').trim(), sub=subCol>=0?String(r?.[subCol]??'').trim():'', eng=String(r?.[engCol]??'').trim(); if(!main||!eng)return; words.push({eng,kor:main,subKor:sub,literalKor:sub,serial:String(words.length+1),starred:false,originalIndex:words.length,ebookRead:false});});
         if(!words.length){alert('선택한 열에서 주문장과 영어문장을 함께 가진 행을 찾지 못했습니다.');return;}
-        const slot=mtEbookTemp.slotIndex, state=mtGetTypedState(slot); state.type='ebook'; state.fileName=mtEbookTemp.fileName; state.ebook={mainCol,subCol,engCol,sourceRows:rows}; state.outputRows=words.map(w=>[w.eng,w.kor,w.subKor,w.serial]); state.pattern={engCol:1,mainKorCol:2,subKorCol:3,serialCol:4}; state.ebookReadIndexes=[]; state.lastSession=null; state.lastError=''; mtSetSlotType(slot,'ebook'); mtSaveTypedState(slot,state); mtCloseEbookColumnModal(); mtInitSlots(); mtOpenEbookViewer(slot);
+        const slot=mtEbookTemp.slotIndex, state=mtGetTypedState(slot);
+        if(mtEbookTemp.addMode){
+            const base=Array.isArray(state.outputRows)?state.outputRows.slice():[];
+            const addRows=words.map((w,i)=>[w.eng,w.kor,w.subKor,String(base.length+i+1)]);
+            state.type='ebook';state.outputRows=base.concat(addRows);state.sourceRows=[...(state.sourceRows||[]),...rows];
+            state.ebook={...(state.ebook||{}),mainCol,subCol,engCol,sourceRows:[...(state.ebook?.sourceRows||[]),...rows]};
+            state.pattern={engCol:1,mainKorCol:2,subKorCol:3,serialCol:4};state.ebookReadIndexes=Array.isArray(state.ebookReadIndexes)?state.ebookReadIndexes:[];
+            state.lastSession=null;state.lastError='';mtSaveTypedState(slot,state);mtSetSlotType(slot,'ebook');mtEbookTemp=null;
+            const cm=document.getElementById('mtEbookColumnModal');if(cm)cm.style.display='none';mtInitSlots();alert(`[슬롯 ${slot+1}] 전자책 데이터 ${addRows.length}개를 추가했습니다.`);return;
+        }
+        state.type='ebook'; state.fileName=mtEbookTemp.fileName; state.ebook={mainCol,subCol,engCol,sourceRows:rows}; state.outputRows=words.map(w=>[w.eng,w.kor,w.subKor,w.serial]); state.pattern={engCol:1,mainKorCol:2,subKorCol:3,serialCol:4}; state.ebookReadIndexes=[]; state.lastSession=null; state.lastError=''; mtSetSlotType(slot,'ebook'); mtSaveTypedState(slot,state); mtCloseEbookColumnModal(); mtInitSlots(); mtOpenEbookViewer(slot);
     }
     function mtGetEbookWords(slotIndex){ const st=mtGetTypedState(slotIndex); const p=st.pattern||{engCol:1,mainKorCol:2,subKorCol:3,serialCol:4}; const read=new Set((st.ebookReadIndexes||[]).map(Number)); return (st.outputRows||[]).map((r,i)=>({eng:String(r?.[p.engCol-1]??'').trim(),kor:String(r?.[p.mainKorCol-1]??'').trim(),subKor:String(r?.[p.subKorCol-1]??'').trim(),serial:String(r?.[p.serialCol-1]??(i+1)).trim(),originalIndex:i,ebookRead:read.has(i)})).filter(w=>w.kor&&w.eng); }
     let mtEbookEditTarget = null;
@@ -10202,6 +10322,24 @@ ${JSON.stringify(finalPayload)}`;
 
     document.getElementById('mtFileUpload').addEventListener('change', async function(e) {
         const file = e.target.files && e.target.files[0];
+        if (e.target.dataset.mtAddMode === '1') {
+            const addSlot=Number(e.target.dataset.mtAddSlot), addType=String(e.target.dataset.mtAddType||'');
+            delete e.target.dataset.mtAddMode;delete e.target.dataset.mtAddSlot;delete e.target.dataset.mtAddType;
+            if(!file)return;
+            try{
+                const ext=String(file.name||'').split('.').pop().toLowerCase();
+                let rows=[];
+                if(ext==='txt'){
+                    const raw=await file.text();rows=raw.replace(/^\uFEFF/,'').normalize('NFC').split(/\r?\n/).filter(x=>x.trim()!=='').map(x=>x.split('\t'));
+                }else if(ext==='xlsx'||ext==='xls'){
+                    const wb=XLSX.read(new Uint8Array(await file.arrayBuffer()),{type:'array'});const sh=wb.Sheets[wb.SheetNames[0]];rows=XLSX.utils.sheet_to_json(sh,{header:1,defval:''});
+                }else throw new Error('Excel(.xlsx/.xls) 또는 탭으로 구분된 TXT 파일만 추가할 수 있습니다.');
+                if(addType==='normal') mtAppendNormalRows(addSlot,rows);
+                else {mtEbookTemp={slotIndex:addSlot,fileName:mtGetTypedState(addSlot).fileName,rows,sourceSheetName:file.name,addMode:true};mtOpenEbookColumnModal(rows);}
+            }catch(err){alert(`데이터 추가 중 오류가 발생했습니다.\n${err?.message||err}`);}
+            e.target.value='';return;
+        }
+
         if (!file) return;
 
         mtCurrentUploadedFileName = file.name.replace(/\.[^/.]+$/, '');
