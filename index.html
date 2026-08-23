@@ -1896,14 +1896,6 @@ body { background: var(--bench-v2-bg) !important; }
     border-radius:8px !important;
     font-weight:800 !important;
 }
-.mt-slot-meta-badge.ai,
-.mt-slot-meta-badge.success,
-.mt-slot-meta-badge.book,
-.mt-wordweb-badge {
-    background:#18181b !important;
-    color:#fff !important;
-    border-color:#18181b !important;
-}
 /* Premium is intentionally inverted like the benchmark card. */
 .mt-slot.mt-premium-slot .mt-slot-meta-badge {
     background:#fff !important;
@@ -2222,6 +2214,14 @@ body { background: var(--bench-v2-bg) !important; }
     box-shadow: 0 10px 28px rgba(0,0,0,.16) !important;
 }
 #saveReminder.save-reminder.is-visible { display: block !important; }
+
+/* v23: restore per-type badge colors without flattening all slot badges */
+.mt-slot .mt-slot-meta-badge { border-radius:8px !important; font-weight:800 !important; }
+.mt-slot .mt-slot-meta-badge.ai { background:#4b6478 !important; color:#fff !important; border-color:#4b6478 !important; }
+.mt-slot .mt-slot-meta-badge.success { background:#8a7424 !important; color:#fff !important; border-color:#8a7424 !important; }
+.mt-slot .mt-slot-meta-badge.book { background:#4b5563 !important; color:#fff !important; border-color:#4b5563 !important; }
+.mt-slot .mt-slot-meta-badge:not(.ai):not(.success):not(.book) { background:#f4f4f5 !important; color:#18181b !important; border-color:#e4e4e7 !important; }
+.mt-slot.mt-premium-slot .mt-slot-meta-badge { background:#fff !important; color:#18181b !important; border-color:#fff !important; }
 </style>
 </head>
 <body>
@@ -3873,6 +3873,43 @@ body { background: var(--bench-v2-bg) !important; }
         });
         return unique.slice(-MT_GENERATOR_ERROR_LOG_MAX);
     }
+    function mtQueueGeneratorErrorLog(slotKey, logs) {
+        const key=String(slotKey);
+        const prev=mtGeneratorErrorLogWriteQueue.get(key) || Promise.resolve();
+        const next=prev.catch(()=>{}).then(async()=>{
+            try {
+                const db=await initDB();
+                try {
+                    const tx=db.transaction(MT_GENERATOR_ERROR_LOG_STORE_NAME,'readwrite');
+                    tx.objectStore(MT_GENERATOR_ERROR_LOG_STORE_NAME).put(logs, key);
+                    await waitForTransaction(tx);
+                } finally { db.close(); }
+            } catch (e) {
+                // 최후의 호환 백업. 대용량 생성 데이터가 아니라 오류 로그만 저장합니다.
+                try { localStorage.setItem(mtGeneratorLogKey(key), JSON.stringify(logs)); } catch (_) {}
+                throw e;
+            }
+        });
+        mtGeneratorErrorLogWriteQueue.set(key,next);
+        next.finally(()=>{ if(mtGeneratorErrorLogWriteQueue.get(key)===next) mtGeneratorErrorLogWriteQueue.delete(key); }).catch(()=>{});
+        return next;
+    }
+    async function mtReadGeneratorErrorLogsFromDedicatedStore(slotKey) {
+        const key=String(slotKey);
+        const pending=mtGeneratorErrorLogWriteQueue.get(key);
+        if (pending) { try { await pending; } catch (_) {} }
+        try {
+            const db=await initDB();
+            try {
+                const tx=db.transaction(MT_GENERATOR_ERROR_LOG_STORE_NAME,'readonly');
+                const store=tx.objectStore(MT_GENERATOR_ERROR_LOG_STORE_NAME);
+                const result=await new Promise(resolve=>{ const q=store.get(key); q.onsuccess=()=>resolve(Array.isArray(q.result)?q.result:[]); q.onerror=()=>resolve([]); });
+                await waitForTransaction(tx).catch(()=>{});
+                return result;
+            } finally { db.close(); }
+        } catch (_) { return []; }
+    }
+
     function mtRecordGeneratorErrorLog(slotKey, detail = {}) {
         const key = String(slotKey);
         const now = Date.now();
@@ -3904,20 +3941,16 @@ body { background: var(--bench-v2-bg) !important; }
             window.__mtGeneratorErrorLogMemory = window.__mtGeneratorErrorLogMemory || {};
             window.__mtGeneratorErrorLogMemory[key] = logs.slice();
         } catch (_) {}
-        // IndexedDB가 오류 로그의 영구 저장소입니다. 생성 데이터 크기와 완전히 분리합니다.
-        try {
-            if (typeof mtWithGeneratorStore === 'function') {
-                mtWithGeneratorStore('readwrite', store => {
-                    store.put(logs, MT_GENERATOR_ERROR_LOG_IDB_PREFIX + key);
-                }).catch(e => console.warn('[생성형 오류로그 IndexedDB 저장]', e));
-            }
-        } catch (e) { console.warn('[생성형 오류로그 IndexedDB 저장]', e); }
-        // 구버전 호환용 localStorage는 최선 시도만 합니다. 실패해도 로그 기록 자체는 유지됩니다.
+        // 오류 로그는 생성 데이터와 완전히 분리된 전용 IndexedDB store에 저장합니다.
+        mtQueueGeneratorErrorLog(key, logs);
+        // 구버전 호환용 localStorage는 보조 저장만 시도합니다. 실패해도 전용 IndexedDB가 본 저장소입니다.
         try { localStorage.setItem(mtGeneratorLogKey(key), JSON.stringify(logs)); } catch (_) {}
         return entry;
     }
     async function mtGetGeneratorErrorLogsAsync(slotKey) {
         const key = String(slotKey);
+        const dedicated = await mtReadGeneratorErrorLogsFromDedicatedStore(key);
+        if (Array.isArray(dedicated) && dedicated.length) return dedicated.slice(-MT_GENERATOR_ERROR_LOG_MAX);
         try {
             if (typeof mtWithGeneratorStore === 'function') {
                 const logs = await mtWithGeneratorStore('readonly', store => new Promise(resolve => {
@@ -4032,6 +4065,8 @@ body { background: var(--bench-v2-bg) !important; }
     // 슬롯9 AI 오류 진단 로그
     const MT_SLOT9_ERROR_LOG_KEY = 'mt_slot9_error_log_v1';
     const MT_GENERATOR_ERROR_LOG_IDB_PREFIX = 'errorlog::';
+    const MT_GENERATOR_ERROR_LOG_STORE_NAME = 'maskingTypingGeneratorErrorLogs';
+    const mtGeneratorErrorLogWriteQueue = new Map();
     const MT_SLOT9_ERROR_LOG_MAX = 10;
     function mtGetSeoulTimestamp() {
         return new Intl.DateTimeFormat('sv-SE', {
@@ -11000,7 +11035,7 @@ Return JSON only.`;
 
     const DB_NAME = "CommunityViewerDB";
     // v2: 게시판 외에 대용량 소설 슬롯/단어장도 IndexedDB로 분리 저장
-    const DB_VERSION = 5;
+    const DB_VERSION = 6;
     const STORE_NAME = "boardsStore";
     const SLOT_STORE_NAME = "slotsStore";
     const VOCA_STORE_NAME = "vocaStore";
@@ -11043,6 +11078,9 @@ Return JSON only.`;
                 }
                 if (!db.objectStoreNames.contains(MT_GENERATOR_STORE_NAME)) {
                     db.createObjectStore(MT_GENERATOR_STORE_NAME);
+                }
+                if (!db.objectStoreNames.contains(MT_GENERATOR_ERROR_LOG_STORE_NAME)) {
+                    db.createObjectStore(MT_GENERATOR_ERROR_LOG_STORE_NAME);
                 }
             };
 
@@ -11807,3 +11845,4 @@ Return JSON only.`;
 </script>
 </body>
 </html>
+<style>.mt-slot[data-slot-type='ebook'] .mt-generator-error-log-btn{display:none!important}</style>
