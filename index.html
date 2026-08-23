@@ -2222,19 +2222,28 @@ body { background: var(--bench-v2-bg) !important; }
 .mt-slot .mt-slot-meta-badge.book { background:#4b5563 !important; color:#fff !important; border-color:#4b5563 !important; }
 .mt-slot .mt-slot-meta-badge:not(.ai):not(.success):not(.book) { background:#f4f4f5 !important; color:#18181b !important; border-color:#e4e4e7 !important; }
 .mt-slot.mt-premium-slot .mt-slot-meta-badge { background:#fff !important; color:#18181b !important; border-color:#fff !important; }
+/* v26: 오류로그 저장경로 통합 + 데이터 있는 슬롯만 유형색 적용 */
 /* v25: 유형 뱃지 최종 톤 보정
    기존 [생성유형: 자체형/참조형] 뱃지와 같은 '채도 있는 단색 배경 + 흰색 글자'
    톤을 유지하면서, 일반유형은 보라색 계열 / 전자책유형은 녹색 계열로 구분합니다. */
-.mt-slot .mt-slot-meta-badge.normal,
-.mt-slot .mt-slot-meta-badge:not(.ai):not(.success):not(.book) {
+.mt-slot.has-data .mt-slot-meta-badge.normal,
+.mt-slot.has-data .mt-slot-meta-badge:not(.ai):not(.success):not(.book) {
     background:#6d4aa2 !important;
     color:#fff !important;
     border-color:#6d4aa2 !important;
 }
-.mt-slot .mt-slot-meta-badge.book {
+.mt-slot.has-data .mt-slot-meta-badge.book {
     background:#4f8062 !important;
     color:#fff !important;
     border-color:#4f8062 !important;
+}
+/* 데이터가 없는 슬롯의 뱃지는 유형색을 적용하지 않습니다. */
+.mt-slot:not(.has-data):not(.mt-premium-slot) .mt-slot-meta-badge.normal,
+.mt-slot:not(.has-data):not(.mt-premium-slot) .mt-slot-meta-badge.book,
+.mt-slot:not(.has-data):not(.mt-premium-slot) .mt-slot-meta-badge:not(.ai):not(.success):not(.book) {
+    background:#18181b !important;
+    color:#fff !important;
+    border-color:#18181b !important;
 }
 
 /* 유형 선택 모달에서도 같은 계열을 사용하되, 기존 작은 안내 뱃지의 형태는 유지합니다. */
@@ -3995,19 +4004,36 @@ body { background: var(--bench-v2-bg) !important; }
     }
     async function mtGetGeneratorErrorLogsAsync(slotKey) {
         const key = String(slotKey);
-        const dedicated = await mtReadGeneratorErrorLogsFromDedicatedStore(key);
-        if (Array.isArray(dedicated) && dedicated.length) return dedicated.slice(-MT_GENERATOR_ERROR_LOG_MAX);
+        // 모든 저장 경로를 합칩니다. IDB에 오래된 로그가 남아 있어도
+        // 최신 localStorage 백업을 가려서 "로그가 없다"고 보이게 만들면 안 됩니다.
+        const all = [];
+        const addLogs = value => { if (Array.isArray(value)) all.push(...value); };
+        addLogs(mtGetGeneratorErrorLogs(key));
+        const readWithTimeout = (promise, ms) => Promise.race([
+            promise,
+            new Promise(resolve => setTimeout(() => resolve([]), ms))
+        ]);
+        try { addLogs(await readWithTimeout(mtReadGeneratorErrorLogsFromDedicatedStore(key), 6000)); } catch (_) {}
         try {
             if (typeof mtWithGeneratorStore === 'function') {
-                const logs = await mtWithGeneratorStore('readonly', store => new Promise(resolve => {
+                const logs = await readWithTimeout(mtWithGeneratorStore('readonly', store => new Promise(resolve => {
                     const q = store.get(MT_GENERATOR_ERROR_LOG_IDB_PREFIX + key);
                     q.onsuccess = () => resolve(Array.isArray(q.result) ? q.result : []);
                     q.onerror = () => resolve([]);
-                }));
-                if (Array.isArray(logs) && logs.length) return logs.slice(-MT_GENERATOR_ERROR_LOG_MAX);
+                })), 6000);
+                addLogs(logs);
             }
         } catch (_) {}
-        return mtGetGeneratorErrorLogs(key);
+        const seen = new Set();
+        const merged = [];
+        all.sort((a,b) => Number(a?.timestampMs || 0) - Number(b?.timestampMs || 0)).forEach(item => {
+            if (!item || typeof item !== 'object') return;
+            const sig = `${item.timestampMs||''}|${item.timestampKST||''}|${item.model||''}|${item.httpStatus??''}|${item.errorMessage||''}`;
+            if (seen.has(sig)) return;
+            seen.add(sig);
+            merged.push(item);
+        });
+        return merged.slice(-MT_GENERATOR_ERROR_LOG_MAX);
     }
     function mtFormatGeneratorErrorEntry(entry) {
         return [
