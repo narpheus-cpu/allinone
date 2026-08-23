@@ -3879,232 +3879,197 @@ body { background: var(--bench-v2-bg) !important; }
         }
     }
 
-    // 생성형 슬롯 공통 AI 오류 로그
-    const MT_GENERATOR_ERROR_LOG_PREFIX = 'mt_generator_error_log_v3_';
-    const MT_GENERATOR_ERROR_LOG_MAX = 10;
-    const MT_GENERATOR_ERROR_LOG_OLD_PREFIXES = ['mt_generator_error_log_v2_', 'mt_slot9_error_log_v1'];
+    // ============================================================
+    // 생성형 슬롯 오류 로그 v4 — 독립형 재작성
+    // ============================================================
+    const MT_GENERATOR_ERROR_LOG_PREFIX = 'mt_generator_error_log_v4_';
+    const MT_GENERATOR_ERROR_LOG_MAX = 20;
+    const MT_GENERATOR_ERROR_LOG_OLD_PREFIXES = ['mt_generator_error_log_v3_','mt_generator_error_log_v2_','mt_slot9_error_log_v1'];
+    const MT_GENERATOR_ERROR_LOG_MEMORY_KEY = '__mtGeneratorErrorLogMemoryV4';
+
     function mtGeneratorLogKey(slotKey) { return MT_GENERATOR_ERROR_LOG_PREFIX + String(slotKey); }
+    function mtNormalizeGeneratorErrorLogs(value) {
+        if (!Array.isArray(value)) return [];
+        return value.filter(x=>x && typeof x==='object').map(x=>({
+            timestampKST:String(x.timestampKST||''), timestampMs:Number(x.timestampMs||0),
+            slotKey:String(x.slotKey||''), slotLabel:String(x.slotLabel||''), model:String(x.model||''),
+            httpStatus:x.httpStatus??null, finishReason:String(x.finishReason||''),
+            promptFeedback:x.promptFeedback??null, contentParts:x.contentParts??null,
+            responseObject:x.responseObject??null, errorMessage:String(x.errorMessage||''), source:String(x.source||'')
+        })).filter(x=>x.timestampMs>0||x.timestampKST||x.errorMessage);
+    }
+    function mtMergeGeneratorErrorLogs(slotKey,...sources) {
+        const key=String(slotKey),all=[];
+        sources.forEach(src=>mtNormalizeGeneratorErrorLogs(src).forEach(item=>{if(!item.slotKey)item.slotKey=key;all.push(item);}));
+        all.sort((a,b)=>Number(a.timestampMs||0)-Number(b.timestampMs||0));
+        const seen=new Set(),merged=[];
+        all.forEach(item=>{const sig=[item.slotKey,item.timestampMs,item.timestampKST,item.model,item.httpStatus??'',item.finishReason,item.errorMessage].join('|');if(seen.has(sig))return;seen.add(sig);merged.push(item);});
+        const result=merged.slice(-MT_GENERATOR_ERROR_LOG_MAX);result.forEach((item,i)=>item.seq=i+1);return result;
+    }
     function mtGetGeneratorErrorLogs(slotKey) {
-        const key = String(slotKey);
-        let all = [];
-        const keys = [mtGeneratorLogKey(key), ...MT_GENERATOR_ERROR_LOG_OLD_PREFIXES.map(p => p + key)];
-        for (const storageKey of keys) {
-            try {
-                const raw = JSON.parse(localStorage.getItem(storageKey) || '[]');
-                if (Array.isArray(raw)) all.push(...raw);
-            } catch (_) {}
-        }
-        try {
-            const mem = window.__mtGeneratorErrorLogMemory?.[key];
-            if (Array.isArray(mem)) all.push(...mem);
-        } catch (_) {}
-        const seen = new Set();
-        const unique = [];
-        all.sort((a,b) => Number(a.timestampMs || 0) - Number(b.timestampMs || 0)).forEach(item => {
-            const sig = `${item.timestampKST||''}|${item.model||''}|${item.httpStatus??''}|${item.errorMessage||''}`;
-            if (seen.has(sig)) return;
-            seen.add(sig);
-            unique.push(item);
-        });
-        return unique.slice(-MT_GENERATOR_ERROR_LOG_MAX);
+        const key=String(slotKey),sources=[];
+        try{const raw=localStorage.getItem(mtGeneratorLogKey(key));if(raw)sources.push(JSON.parse(raw));}catch(_){}
+        for(const prefix of MT_GENERATOR_ERROR_LOG_OLD_PREFIXES){try{const raw=localStorage.getItem(prefix+key);if(raw)sources.push(JSON.parse(raw));}catch(_){}}
+        try{const mem=window[MT_GENERATOR_ERROR_LOG_MEMORY_KEY]?.[key];if(Array.isArray(mem))sources.push(mem);}catch(_){}
+        const merged=mtMergeGeneratorErrorLogs(key,...sources);
+        try{localStorage.setItem(mtGeneratorLogKey(key),JSON.stringify(merged));}catch(_){}
+        try{window[MT_GENERATOR_ERROR_LOG_MEMORY_KEY]=window[MT_GENERATOR_ERROR_LOG_MEMORY_KEY]||{};window[MT_GENERATOR_ERROR_LOG_MEMORY_KEY][key]=merged.slice();}catch(_){}
+        return merged;
     }
-    function mtQueueGeneratorErrorLog(slotKey, logs) {
-        const key=String(slotKey);
-        const prev=mtGeneratorErrorLogWriteQueue.get(key) || Promise.resolve();
-        const withTimeout = (promise, ms) => Promise.race([
-            promise,
-            new Promise((_, reject) => setTimeout(() => reject(new Error('오류 로그 IndexedDB 저장 시간 초과')), ms))
-        ]);
-        const next=prev.catch(()=>{}).then(async()=>{
-            try {
-                // IndexedDB가 다른 탭/창 때문에 blocked 상태로 무기한 대기하는 것을 방지합니다.
-                await withTimeout((async()=>{
-                    const db=await initDB();
-                    try {
-                        const tx=db.transaction(MT_GENERATOR_ERROR_LOG_STORE_NAME,'readwrite');
-                        tx.objectStore(MT_GENERATOR_ERROR_LOG_STORE_NAME).put(logs, key);
-                        await waitForTransaction(tx);
-                    } finally { db.close(); }
-                })(), 5000);
-            } catch (e) {
-                // 로그 기록은 실패시키지 않습니다. 동기 localStorage 백업은
-                // mtRecordGeneratorErrorLog()에서 이미 먼저 수행됩니다.
-                try { localStorage.setItem(mtGeneratorLogKey(key), JSON.stringify(logs)); } catch (_) {}
-                throw e;
-            }
-        });
-        mtGeneratorErrorLogWriteQueue.set(key,next);
-        next.finally(()=>{ if(mtGeneratorErrorLogWriteQueue.get(key)===next) mtGeneratorErrorLogWriteQueue.delete(key); }).catch(()=>{});
-        return next;
+    function mtPersistGeneratorErrorLogsSync(slotKey,logs) {
+        const key=String(slotKey),normalized=mtMergeGeneratorErrorLogs(key,logs);
+        try{window[MT_GENERATOR_ERROR_LOG_MEMORY_KEY]=window[MT_GENERATOR_ERROR_LOG_MEMORY_KEY]||{};window[MT_GENERATOR_ERROR_LOG_MEMORY_KEY][key]=normalized.slice();}catch(_){}
+        try{localStorage.setItem(mtGeneratorLogKey(key),JSON.stringify(normalized));return {ok:true,logs:normalized};}
+        catch(error){try{window.__mtGeneratorErrorLogLastStorageFailure=String(error?.message||error);}catch(_){}return {ok:false,logs:normalized,error};}
     }
-    async function mtReadGeneratorErrorLogsFromDedicatedStore(slotKey) {
-        const key=String(slotKey);
-        const pending=mtGeneratorErrorLogWriteQueue.get(key);
-        if (pending) {
-            try { await Promise.race([pending, new Promise(resolve => setTimeout(resolve, 5500))]); } catch (_) {}
-        }
-        try {
-            const db=await initDB();
-            try {
-                const tx=db.transaction(MT_GENERATOR_ERROR_LOG_STORE_NAME,'readonly');
-                const store=tx.objectStore(MT_GENERATOR_ERROR_LOG_STORE_NAME);
-                const result=await new Promise(resolve=>{ const q=store.get(key); q.onsuccess=()=>resolve(Array.isArray(q.result)?q.result:[]); q.onerror=()=>resolve([]); });
-                await waitForTransaction(tx).catch(()=>{});
-                return result;
-            } finally { db.close(); }
-        } catch (_) { return []; }
+    function mtRecordGeneratorErrorLog(slotKey,detail={}) {
+        try{
+            const key=String(slotKey),now=Date.now();let timestampKST='';
+            try{timestampKST=mtGetSeoulTimestamp();}catch(_){timestampKST=new Date(now).toISOString();}
+            const entry={timestampKST,timestampMs:now,slotKey:key,slotLabel:String(detail.slotLabel||key),model:String(detail.model||''),httpStatus:detail.httpStatus??null,finishReason:String(detail.finishReason||''),promptFeedback:detail.promptFeedback??null,contentParts:detail.contentParts??null,responseObject:detail.responseObject??null,errorMessage:String(detail.errorMessage||'알 수 없는 오류'),source:String(detail.source||'generator')};
+            const previous=mtGetGeneratorErrorLogs(key);
+            const duplicate=previous.find(item=>Number(item.timestampMs||0)===now&&String(item.model||'')===entry.model&&String(item.errorMessage||'')===entry.errorMessage);
+            if(duplicate)return duplicate;
+            const persisted=mtPersistGeneratorErrorLogsSync(key,[...previous,entry]);return persisted.logs[persisted.logs.length-1]||entry;
+        }catch(fatalLogError){try{window.__mtGeneratorErrorLogLastFailure=String(fatalLogError?.message||fatalLogError);}catch(_){}return null;}
+    }
+    async function mtGetGeneratorErrorLogsAsync(slotKey){return mtGetGeneratorErrorLogs(slotKey);}
+    function mtFormatGeneratorErrorEntry(entry){return [`===== ${entry.slotLabel||entry.slotKey||'생성형 슬롯'} 오류 #${entry.seq||''} =====`,`실제 기록시각(KST): ${entry.timestampKST||''}`,`모델: ${entry.model||''}`,`HTTP 상태: ${entry.httpStatus??''}`,`finishReason: ${entry.finishReason||''}`,'promptFeedback:',JSON.stringify(entry.promptFeedback??null,null,2),'candidates[0].content.parts:',JSON.stringify(entry.contentParts??null,null,2),'전체 응답 객체:',JSON.stringify(entry.responseObject??null,null,2),`오류 메시지: ${entry.errorMessage||''}`,''].join('\n');}
+    async function mtDownloadGeneratorErrorLog(event,slotKey,slotLabel){
+        if(event)event.stopPropagation();let logs=mtGetGeneratorErrorLogs(slotKey);
+        if(!logs.length){try{let fallback=null;if(slotKey==='slot9')fallback=mtSlot9GetState()?.lastDiagnostic||null;else if(slotKey==='wordweb')fallback=mtWordWebGetState()?.lastDiagnostic||null;else if(/^typed_\d+$/.test(String(slotKey)))fallback=mtGetTypedState(Number(String(slotKey).slice(6)))?.lastDiagnostic||null;if(fallback){mtRecordGeneratorErrorLog(slotKey,{...fallback,slotLabel:slotLabel||fallback.slotLabel||slotKey,source:'lastDiagnostic-fallback'});logs=mtGetGeneratorErrorLogs(slotKey);}}catch(_){}}
+        if(!logs.length){alert('저장된 오류 로그가 없습니다.');return;}
+        logs=logs.slice().sort((a,b)=>Number(b.timestampMs||0)-Number(a.timestampMs||0));
+        const text=[`[마스킹타이핑] ${slotLabel||slotKey} 오류 로그`,`로그 파일 생성시각(KST): ${mtGetSeoulTimestamp()}`,`가장 최근 실제 오류 기록시각(KST): ${logs[0]?.timestampKST||'없음'}`,`총 오류 수: ${logs.length}`,'','[최신 오류 → 과거 오류 순]','',...logs.map(mtFormatGeneratorErrorEntry)].join('\n');
+        const blob=new Blob([text],{type:'text/plain;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`[마스킹타이핑]_${String(slotLabel||slotKey).replace(/[\\/:*?"<>|]/g,'')}_오류로그_${mtGetSeoulTimestamp().replace(/[-:T]/g,'')}.txt`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
     }
 
-    function mtRecordGeneratorErrorLog(slotKey, detail = {}) {
-        const key = String(slotKey);
-        const now = Date.now();
-        const timestampKST = mtGetSeoulTimestamp();
-        const errorMessage = String(detail.errorMessage || '');
-        const model = String(detail.model || '');
-        let logs = mtGetGeneratorErrorLogs(key);
-        const duplicate = logs.find(item =>
-            String(item.errorMessage || '') === errorMessage &&
-            String(item.model || '') === model &&
-            Math.abs(Number(item.timestampMs || 0) - now) <= 10000
-        );
-        if (duplicate) return duplicate;
-        const entry = {
-            timestampKST, timestampMs: now, slotKey: key,
-            slotLabel: String(detail.slotLabel || key),
-            model, httpStatus: detail.httpStatus ?? null,
-            finishReason: detail.finishReason || '',
-            promptFeedback: detail.promptFeedback ?? null,
-            contentParts: detail.contentParts ?? null,
-            responseObject: detail.responseObject ?? null,
-            errorMessage
-        };
-        logs.push(entry);
-        logs.sort((a,b)=>Number(a.timestampMs||0)-Number(b.timestampMs||0));
-        logs = logs.slice(-MT_GENERATOR_ERROR_LOG_MAX);
-        logs.forEach((item, idx)=>{ item.seq = idx + 1; });
-        try {
-            window.__mtGeneratorErrorLogMemory = window.__mtGeneratorErrorLogMemory || {};
-            window.__mtGeneratorErrorLogMemory[key] = logs.slice();
-        } catch (_) {}
-        // 중요: IndexedDB 쓰기를 기다리지 않고도 즉시 로그가 남아야 합니다.
-        // 먼저 localStorage에 동기 백업을 기록해, DB 업그레이드/잠금/일시 오류가 있어도
-        // 오류가 사라지지 않게 합니다.
-        try {
-            localStorage.setItem(mtGeneratorLogKey(key), JSON.stringify(logs));
-        } catch (storageError) {
-            try {
-                window.__mtGeneratorErrorLogStorageFailure = String(storageError?.message || storageError || 'localStorage 오류');
-            } catch (_) {}
-        }
+    // ============================================================
+    // 생성형 프롬프트 편집기
+    // ============================================================
+    const MT_GENERATOR_PROMPT_PREFIX='mt_generator_prompt_v1_';
+    function mtGeneratorPromptStorageKey(slotKey,promptId){return `${MT_GENERATOR_PROMPT_PREFIX}${String(slotKey)}_${String(promptId)}`;}
+    function mtGetGeneratorPrompt(slotKey,promptId,fallback){try{const v=localStorage.getItem(mtGeneratorPromptStorageKey(slotKey,promptId));return v===null?fallback:v;}catch(_){return fallback;}}
+    function mtSaveGeneratorPrompt(slotKey,promptId,value){try{localStorage.setItem(mtGeneratorPromptStorageKey(slotKey,promptId),String(value??''));return true;}catch(_){return false;}}
+    function mtApplyGeneratorPrompt(template,replacements={}){let r=String(template??'');Object.entries(replacements).forEach(([k,v])=>{r=r.split(`{{${k}}}`).join(String(v??''));});return r;}
+    function mtGeneratorPromptDefinitions(slotKey,type){
+        const key=String(slotKey);
+        if(type==='self_generate')return[{id:'main',title:'자체형 생성 프롬프트',help:'{{BATCH}}=현재 데이터, {{COUNT}}=문장 수'}];
+        if(type==='reference_generate')return key==='wordweb'
+            ?[{id:'dialogue',title:'참조형 대화 생성 프롬프트',help:'{{TOPIC}}=현재 주제'},{id:'literal',title:'참조형 직독직해 프롬프트',help:'{{DATA}}=현재 6개 문장 데이터'}]
+            :[{id:'dialogue',title:'참조형 대화 생성 프롬프트',help:'{{TOPIC}}=현재 주제'},{id:'englishChunks',title:'영어 청크 생성 프롬프트',help:'{{ENGLISH}}=영어 문장'},{id:'koreanChunks',title:'한국어 청크 생성 프롬프트',help:'{{ENGLISH}}, {{KOREAN}}, {{CHUNKS}} 사용'}];
+        return [];
+    }
+    function mtGeneratorPromptDefault(slotKey,type,promptId){
+        const key=String(slotKey);
+        if(type==='self_generate'&&key==='slot9')return `You are an expert English-learning content generator.
 
-        // 오류 로그는 생성 데이터와 완전히 분리된 전용 IndexedDB store에도 저장합니다.
-        // 실패하더라도 위 localStorage 백업이 남아 있습니다.
-        mtQueueGeneratorErrorLog(key, logs).catch(() => {});
-        return entry;
+For each ORIGINAL Korean sentence, produce exactly one faithful A2 English sentence,
+one natural Korean translation, and one Korean direct-reading translation following the
+English phrase order.
+
+HARD RULES:
+1. ORIGINAL Korean is immutable. Copy it exactly into source_korean.
+2. Do not add greetings, names, dates, time expressions, farewells, or unrelated content.
+3. English must preserve the exact meaning of the original Korean.
+4. korean must be one natural Korean sentence matching the English meaning.
+5. literal_korean must be Korean-only bracket chunks in English phrase order.
+6. Use square brackets around every literal chunk.
+7. Return ONLY a JSON array with exactly {{COUNT}} objects.
+8. Follow platform safety requirements for unsafe or sensitive content rather than adding unrelated content.
+
+Required keys:
+source_korean, english, korean, literal_korean
+
+ORIGINAL KOREAN SENTENCES:
+{{BATCH}}`;
+        if(type==='self_generate')return `You are an expert English teacher. For each Korean sentence, create ONE faithful, natural everyday English sentence at CEFR A2 level. Preserve meaning exactly. Return ONLY a JSON array with exactly {{COUNT}} objects: [{"index":0,"english":"..."}]. Do not add greetings, names, time expressions, or unrelated content. DATA={{BATCH}}`;
+        if(type==='reference_generate'&&key==='wordweb'&&promptId==='dialogue')return `You are an expert English dialogue writer and English-Korean translator.
+Create a continuous, natural everyday conversation between 2 people based on this topic: "{{TOPIC}}"
+Rules:
+1. CEFR A2, simple everyday English.
+2. EXACTLY 6 sentences total.
+3. NO speaker labels.
+4. Return ONLY a JSON array of exactly 6 objects.
+5. Each object MUST contain only english and korean.
+6. Preserve exact meaning.
+7. Do not add unrelated greetings, names, farewells, time expressions, or other content.
+Return JSON only.`;
+        if(type==='reference_generate'&&key==='wordweb'&&promptId==='literal')return `You are an expert English syntax and direct-reading teacher.
+For each of the 6 English-Korean sentence pairs below, create an English phrase-chunked direct-reading Korean translation.
+Rules:
+1. Return ONLY a JSON array of exactly 6 objects.
+2. Each object MUST contain index, english_chunks, korean_chunks.
+3. Preserve every important English word. Do not omit, duplicate, or reorder words.
+4. Prefer 2-8 meaningful phrase chunks per sentence.
+5. korean_chunks length MUST equal english_chunks length.
+6. korean_chunks must contain Korean only.
+7. Keep Korean chunks in exact English chunk order.
+DATA:
+{{DATA}}
+Return JSON only.`;
+        if(type==='reference_generate'&&promptId==='dialogue')return `You are an expert English dialogue writer and English-Korean translator.
+Create a continuous, natural everyday conversation between 2 people based on this topic: "{{TOPIC}}"
+Rules:
+1. CEFR A2.
+2. EXACTLY 6 sentences.
+3. NO speaker labels.
+4. Return ONLY JSON array of 6 objects containing english and korean.
+5. Preserve exact meaning.
+6. No unrelated content.
+Return JSON only.`;
+        if(type==='reference_generate'&&promptId==='englishChunks')return `You are an expert English syntax teacher.
+Split the ENGLISH sentence into meaningful phrase chunks IN THE EXACT ORIGINAL ENGLISH ORDER.
+Do NOT translate anything in this step.
+English sentence: {{ENGLISH}}
+Rules:
+1. Return ONLY JSON object: {"english_chunks":["...","...",...]}
+2. Keep original order.
+3. Preserve all important words; do not omit, duplicate, or reorder.
+4. Prefer 2-6 meaningful chunks.`;
+        if(type==='reference_generate'&&promptId==='koreanChunks')return `You are an expert English-Korean direct-reading teacher.
+Translate EACH English phrase chunk into Korean while preserving the EXACT SAME CHUNK ORDER.
+English sentence: {{ENGLISH}}
+Natural Korean translation: {{KOREAN}}
+English chunks IN ORDER:
+{{CHUNKS}}
+Rules:
+1. Return ONLY JSON object: {"korean_chunks":["...","...",...]}
+2. Korean chunk count MUST equal English chunk count.
+3. Same-index correspondence.
+4. Korean only.
+5. Do NOT reorder chunks.`;
+        return '';
     }
-    async function mtGetGeneratorErrorLogsAsync(slotKey) {
-        const key = String(slotKey);
-        // 모든 저장 경로를 합칩니다. IDB에 오래된 로그가 남아 있어도
-        // 최신 localStorage 백업을 가려서 "로그가 없다"고 보이게 만들면 안 됩니다.
-        const all = [];
-        const addLogs = value => { if (Array.isArray(value)) all.push(...value); };
-        addLogs(mtGetGeneratorErrorLogs(key));
-        const readWithTimeout = (promise, ms) => Promise.race([
-            promise,
-            new Promise(resolve => setTimeout(() => resolve([]), ms))
-        ]);
-        try { addLogs(await readWithTimeout(mtReadGeneratorErrorLogsFromDedicatedStore(key), 6000)); } catch (_) {}
-        try {
-            if (typeof mtWithGeneratorStore === 'function') {
-                const logs = await readWithTimeout(mtWithGeneratorStore('readonly', store => new Promise(resolve => {
-                    const q = store.get(MT_GENERATOR_ERROR_LOG_IDB_PREFIX + key);
-                    q.onsuccess = () => resolve(Array.isArray(q.result) ? q.result : []);
-                    q.onerror = () => resolve([]);
-                })), 6000);
-                addLogs(logs);
-            }
-        } catch (_) {}
-        const seen = new Set();
-        const merged = [];
-        all.sort((a,b) => Number(a?.timestampMs || 0) - Number(b?.timestampMs || 0)).forEach(item => {
-            if (!item || typeof item !== 'object') return;
-            const sig = `${item.timestampMs||''}|${item.timestampKST||''}|${item.model||''}|${item.httpStatus??''}|${item.errorMessage||''}`;
-            if (seen.has(sig)) return;
-            seen.add(sig);
-            merged.push(item);
-        });
-        return merged.slice(-MT_GENERATOR_ERROR_LOG_MAX);
+    function mtOpenGeneratorPromptEditor(slotKey,type,slotLabel){
+        const defs=mtGeneratorPromptDefinitions(slotKey,type);if(!defs.length)return;
+        let modal=document.getElementById('mtGeneratorPromptEditorModal');
+        if(!modal){modal=document.createElement('div');modal.id='mtGeneratorPromptEditorModal';modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.48);z-index:100000;display:flex;align-items:center;justify-content:center;padding:18px;box-sizing:border-box;';document.body.appendChild(modal);}
+        const fields=defs.map(def=>{const value=mtGetGeneratorPrompt(slotKey,def.id,mtGeneratorPromptDefault(slotKey,type,def.id));return `<div style="margin-bottom:14px;"><div style="font-weight:800;font-size:13px;margin-bottom:5px;">${mtEscapeHTML(def.title)}</div><div style="font-size:10px;color:#6b7280;margin-bottom:5px;">${mtEscapeHTML(def.help)}</div><textarea data-prompt-id="${mtEscapeHTML(def.id)}" style="width:100%;min-height:${defs.length>1?'190px':'320px'};resize:vertical;box-sizing:border-box;border:1px solid #d1d5db;border-radius:8px;padding:9px;font-size:11px;line-height:1.45;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">${mtEscapeHTML(value)}</textarea></div>`;}).join('');
+        const sk=String(slotKey).replace(/'/g,"\\'"),ty=String(type).replace(/'/g,"\\'");
+        modal.innerHTML=`<div style="background:#fff;width:min(900px,96vw);max-height:92vh;overflow:auto;border-radius:12px;padding:16px;box-sizing:border-box;box-shadow:0 20px 60px rgba(0,0,0,.25);" onclick="event.stopPropagation()"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;"><div><div style="font-size:16px;font-weight:900;">${mtEscapeHTML(slotLabel||slotKey)} 프롬프트</div><div style="font-size:10px;color:#6b7280;margin-top:3px;">수정한 프롬프트는 이 브라우저에 저장되며 다음 생성부터 적용됩니다.</div></div><button class="mt-btn-delete" onclick="mtCloseGeneratorPromptEditor()">닫기</button></div>${fields}<div style="display:flex;justify-content:flex-end;gap:6px;position:sticky;bottom:0;background:#fff;padding-top:8px;"><button class="btn-excel" onclick="mtResetGeneratorPrompts('${sk}','${ty}')">기본값으로 초기화</button><button class="btn-download" onclick="mtSaveGeneratorPrompts('${sk}','${ty}')">저장</button></div></div>`;
+        modal.style.display='flex';modal.onclick=()=>mtCloseGeneratorPromptEditor();
     }
-    function mtFormatGeneratorErrorEntry(entry) {
-        return [
-            `===== ${entry.slotLabel || entry.slotKey || '생성형 슬롯'} 오류 #${entry.seq} =====`,
-            `실제 기록시각(KST): ${entry.timestampKST || ''}`,
-            `모델: ${entry.model || ''}`,
-            `HTTP 상태: ${entry.httpStatus ?? ''}`,
-            `finishReason: ${entry.finishReason || ''}`,
-            'promptFeedback:',
-            JSON.stringify(entry.promptFeedback ?? null, null, 2),
-            'candidates[0].content.parts:',
-            JSON.stringify(entry.contentParts ?? null, null, 2),
-            '전체 응답 객체:',
-            JSON.stringify(entry.responseObject ?? null, null, 2),
-            `오류 메시지: ${entry.errorMessage || ''}`,
-            ''
-        ].join('\n');
-    }
-    async function mtDownloadGeneratorErrorLog(event, slotKey, slotLabel) {
-        if (event) event.stopPropagation();
-        let logs = (await mtGetGeneratorErrorLogsAsync(slotKey)).sort((a,b)=>Number(b.timestampMs||0)-Number(a.timestampMs||0));
-        if (!logs.length) {
-            try {
-                let fallback = null;
-                if (slotKey === 'slot9') fallback = mtSlot9GetState()?.lastDiagnostic || null;
-                else if (slotKey === 'wordweb') fallback = mtWordWebGetState()?.lastDiagnostic || null;
-                else if (/^typed_\d+$/.test(String(slotKey))) fallback = mtGetTypedState(Number(String(slotKey).slice(6)))?.lastDiagnostic || null;
-                if (fallback) logs = [fallback];
-            } catch (_) {}
-        }
-        if (!logs.length) {
-            alert('저장된 오류 로그가 없습니다.');
-            return;
-        }
-        const latestTimestamp = logs[0]?.timestampKST || '없음';
-        const text = [
-            `[마스킹타이핑] ${slotLabel || slotKey} 오류 로그`,
-            `로그 파일 생성시각(KST): ${mtGetSeoulTimestamp()}`,
-            `가장 최근 실제 오류 기록시각(KST): ${latestTimestamp}`,
-            `총 오류 수: ${logs.length}`,
-            '',
-            '[최신 오류 → 과거 오류 순]',
-            '',
-            ...logs.map(mtFormatGeneratorErrorEntry)
-        ].join('\n');
-        const blob = new Blob([text], {type:'text/plain;charset=utf-8'});
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `[마스킹타이핑]_${String(slotLabel || slotKey).replace(/[\\/:*?"<>|]/g,'')}_오류로그_${mtGetSeoulTimestamp().replace(/[-:T]/g,'')}.txt`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-    }
+    function mtSaveGeneratorPrompts(slotKey,type){let ok=true;mtGeneratorPromptDefinitions(slotKey,type).forEach(def=>{const el=document.querySelector(`#mtGeneratorPromptEditorModal [data-prompt-id="${def.id}"]`);if(!el||!mtSaveGeneratorPrompt(slotKey,def.id,el.value))ok=false;});if(!ok){alert('프롬프트 저장에 실패했습니다. 브라우저 저장공간을 확인해 주세요.');return;}mtCloseGeneratorPromptEditor();alert('프롬프트가 저장되었습니다. 다음 생성부터 적용됩니다.');}
+    function mtResetGeneratorPrompts(slotKey,type){if(!confirm('이 생성형의 수정한 프롬프트를 모두 기본값으로 되돌리시겠습니까?'))return;mtGeneratorPromptDefinitions(slotKey,type).forEach(def=>{try{localStorage.removeItem(mtGeneratorPromptStorageKey(slotKey,def.id));}catch(_){}});const label=slotKey==='slot9'?'슬롯9':slotKey==='wordweb'?'참조형 슬롯10':`슬롯 ${Number(String(slotKey).slice(6))+1}`;mtOpenGeneratorPromptEditor(slotKey,type,label);}
+    function mtCloseGeneratorPromptEditor(){const modal=document.getElementById('mtGeneratorPromptEditorModal');if(modal)modal.style.display='none';}
+
     function mtGetGeneratorAiConfig(baseConfig, slotKey, slotLabel) {
         const cfg = {...(baseConfig || {})};
+        cfg.__generatorLogKey = String(slotKey);
+        cfg.__generatorLogLabel = String(slotLabel || slotKey);
         cfg.diagnosticHandler = (detail) => mtHandleGeneratorApiDiagnostic(slotKey, slotLabel, detail);
         return cfg;
     }
     function mtHandleGeneratorApiDiagnostic(slotKey, slotLabel, detail) {
-        const entry = mtRecordGeneratorErrorLog(slotKey, {
-            slotLabel: String(slotLabel || slotKey),
-            model: detail.model || '',
-            httpStatus: detail.httpStatus ?? null,
-            finishReason: detail.finishReason || '',
-            promptFeedback: detail.promptFeedback ?? null,
-            contentParts: detail.contentParts ?? null,
-            responseObject: detail.responseObject ?? null,
-            errorMessage: detail.errorMessage || ''
-        });
+        const entry = (detail && detail.timestampMs) ? detail : {
+            timestampKST: mtGetSeoulTimestamp(), timestampMs: Date.now(),
+            slotKey: String(slotKey), slotLabel: String(slotLabel || slotKey),
+            model: detail?.model || '', httpStatus: detail?.httpStatus ?? null,
+            finishReason: detail?.finishReason || '', promptFeedback: detail?.promptFeedback ?? null,
+            contentParts: detail?.contentParts ?? null, responseObject: detail?.responseObject ?? null,
+            errorMessage: detail?.errorMessage || ''
+        };
         const compact = [
             `AI 요청 실패: [${detail.model || 'unknown'}]`,
             detail.errorMessage || '알 수 없는 오류',
@@ -4256,8 +4221,21 @@ body { background: var(--bench-v2-bg) !important; }
 
         const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
         const recordDiagnostic = (detail) => {
-            lastDiagnostic = detail;
-            if (typeof config.diagnosticHandler === 'function') config.diagnosticHandler(detail);
+            try {
+                if (config.__generatorLogKey) {
+                    const persisted = mtRecordGeneratorErrorLog(config.__generatorLogKey, {
+                        slotLabel: config.__generatorLogLabel || config.__generatorLogKey,
+                        ...detail,
+                        source: 'fetchGemini'
+                    });
+                    lastDiagnostic = persisted || detail;
+                } else lastDiagnostic = detail;
+            } catch (_) { lastDiagnostic = detail; }
+            try {
+                if (typeof config.diagnosticHandler === 'function') config.diagnosticHandler(lastDiagnostic || detail);
+            } catch (handlerError) {
+                try { console.warn('[생성형] diagnosticHandler 오류:', handlerError); } catch (_) {}
+            }
         };
 
         // API key별 quota 상태를 분리하기 위한 간단한 fingerprint입니다.
@@ -7653,7 +7631,7 @@ Rules:
         const learningCardCount=mtGetGeneratorSuccessfulCardCount(st, words);
         const star=mtSlot9GetStarredCount(st);
         div.className='mt-slot mt-wordweb-slot '+(st.fileName?'has-data':'');
-        div.innerHTML=`<div class="mt-slot-title">${mtEscapeHTML(mtGetDisplayFileTitle(st.fileName || '슬롯 9'))}</div><div class="mt-slot-stat-row"><div><div class="mt-slot-count">${words.length}</div></div><div style="display:flex;align-items:center;gap:6px;"><div class="mt-slot-star-count">★ ${star}</div><button class="btn-excel" style="padding:4px 8px;font-size:10px;" onclick="mtDownloadGeneratorErrorLog(event,'slot9','슬롯9')">오류로그</button></div></div><div class="mt-slot-progress-row mt-generator-learning-row"><div class="mt-progress-copy"><span>학습카드수</span><span>${learningCardCount}</span></div></div><div style="width:100%;margin:6px 0 7px;" onclick="event.stopPropagation()" onpointerdown="event.stopPropagation()"><div style="display:flex;gap:4px;align-items:center;"><input id="mtSlot9ApiKeyInput" type="password" autocomplete="off" placeholder="슬롯9 전용 API Key (비워두면 메인 API 사용)" value="${mtEscapeHTML(mtGetSlotApiKey('slot9'))}" style="flex:1;min-width:0;padding:6px 7px;border:1px solid #d1d5db;border-radius:6px;font-size:10px;box-sizing:border-box;"><button class="btn-excel" style="padding:6px 8px;font-size:10px;" onclick="event.stopPropagation();mtSaveSlotApiKey('slot9')">저장</button></div></div><div class="mt-slot-actions-row"><span class="mt-slot-meta-badge ai">생성유형: 자체형</span>${st.fileName?`<button class="btn-download" onclick="mtSlot9DownloadClick(event)">내보내기</button>`:'<button class="btn-download" disabled>내보내기</button>'}${st.fileName?`<button class="mt-btn-delete" onclick="mtDeleteSlot(event,'slot9')">삭제</button>`:'<button class="mt-btn-delete" disabled>삭제</button>'}</div><div id="mtSlot9Status" class="mt-wordweb-status"></div>`;
+        div.innerHTML=`<div class="mt-slot-title">${mtEscapeHTML(mtGetDisplayFileTitle(st.fileName || '슬롯 9'))}</div><div class="mt-slot-stat-row"><div><div class="mt-slot-count">${words.length}</div></div><div style="display:flex;align-items:center;gap:6px;"><div class="mt-slot-star-count">★ ${star}</div><button class="btn-excel" style="padding:4px 8px;font-size:10px;" onclick="mtDownloadGeneratorErrorLog(event,'slot9','슬롯9')">오류로그</button></div></div><div class="mt-slot-progress-row mt-generator-learning-row"><div class="mt-progress-copy"><span>학습카드수</span><span>${learningCardCount}</span></div></div><div style="width:100%;margin:6px 0 7px;" onclick="event.stopPropagation()" onpointerdown="event.stopPropagation()"><div style="display:flex;gap:4px;align-items:center;"><input id="mtSlot9ApiKeyInput" type="password" autocomplete="off" placeholder="슬롯9 전용 API Key (비워두면 메인 API 사용)" value="${mtEscapeHTML(mtGetSlotApiKey('slot9'))}" style="flex:1;min-width:0;padding:6px 7px;border:1px solid #d1d5db;border-radius:6px;font-size:10px;box-sizing:border-box;"><button class="btn-excel" style="padding:6px 8px;font-size:10px;" onclick="event.stopPropagation();mtSaveSlotApiKey('slot9')">저장</button></div></div><div class="mt-slot-actions-row"><span class="mt-slot-meta-badge ai">생성유형: 자체형</span><button class="btn-excel" onclick="event.stopPropagation();mtOpenGeneratorPromptEditor('slot9','self_generate','슬롯9')">프롬프트</button>${st.fileName?`<button class="btn-download" onclick="mtSlot9DownloadClick(event)">내보내기</button>`:'<button class="btn-download" disabled>내보내기</button>'}${st.fileName?`<button class="mt-btn-delete" onclick="mtDeleteSlot(event,'slot9')">삭제</button>`:'<button class="mt-btn-delete" disabled>삭제</button>'}</div><div id="mtSlot9Status" class="mt-wordweb-status"></div>`;
         div.onclick=()=>{ if(!st.fileName){ mtSlot9TriggerUpload(); return;} mtPromptAction('slot9',mtSlot9BuildSlotData(st)); };
         mtSlot9RenderStatus();
     }
@@ -7751,39 +7729,7 @@ Rules:
 
             if (!batch.length) throw new Error('처리할 A열 원문이 없습니다.');
 
-const prompt = `
-You are an expert English-learning content generator.
-
-For each ORIGINAL Korean sentence, produce exactly one faithful A2 English sentence,
-one natural Korean translation, and one Korean direct-reading translation following the
-English phrase order.
-
-HARD RULES:
-1. ORIGINAL Korean is immutable. Copy it exactly into source_korean.
-2. Do not add greetings, names, dates, time expressions, farewells, or unrelated content.
-3. English must preserve the exact meaning of the original Korean.
-4. korean must be one natural Korean sentence matching the English meaning.
-5. literal_korean must be Korean-only bracket chunks in English phrase order.
-6. Use square brackets around every literal chunk.
-7. Return ONLY a JSON array with exactly ${batch.length} objects.
-8. SAFETY RULES: If the ORIGINAL Korean contains violent, offensive, or highly sensitive words (e.g., kill, blood, hit, steal, rape, dick, handjob), you MUST SOFTEN or NEUTRALIZE them in the English translation to bypass safety filters, while keeping the core context intact.
-
-Required keys:
-source_korean, english, korean, literal_korean
-
-Example:
-[
-  {
-    "source_korean":"팔을 조심스럽게 스트레칭 하세요.",
-    "english":"Please stretch your arms carefully.",
-    "korean":"팔을 조심스럽게 스트레칭 하세요.",
-    "literal_korean":"[제발] [스트레칭하세요] [당신의 팔들을] [조심스럽게]"
-  }
-]
-
-ORIGINAL KOREAN SENTENCES:
-${JSON.stringify(batch)}
-            `.trim();
+const prompt=mtApplyGeneratorPrompt(mtGetGeneratorPrompt('slot9','main',mtGeneratorPromptDefault('slot9','self_generate','main')),{COUNT:batch.length,BATCH:JSON.stringify(batch)}).trim();
 
             const raw = await fetchGemini(
                 prompt,
@@ -8085,6 +8031,7 @@ ${JSON.stringify(batch)}
             </div>
             <div class="mt-slot-actions-row">
                 <span class="mt-slot-meta-badge success">생성유형: 참조형</span>
+                <button class="btn-excel" onclick="event.stopPropagation();mtOpenGeneratorPromptEditor('wordweb','reference_generate','참조형 슬롯10')">프롬프트</button>
                 ${state.fileName ? `<button class="btn-download" onclick="mtWordWebDownloadClick(event)">내보내기</button>` : `<button class="btn-download" disabled>내보내기</button>`}
                 ${state.fileName ? `<button class="mt-btn-delete" onclick="mtDeleteSlot(event, 'wordweb')">삭제</button>` : `<button class="mt-btn-delete" disabled>삭제</button>`}
             </div>
@@ -8604,24 +8551,7 @@ ${JSON.stringify(batch)}
     }
 
     async function mtWordWebGenerateEnglishChunksForOne(item, config = null) {
-        const prompt = `
-You are an expert English syntax teacher.
-Split the ENGLISH sentence into meaningful phrase chunks IN THE EXACT ORIGINAL ENGLISH ORDER.
-Do NOT translate anything in this step.
-
-English sentence: ${JSON.stringify(item.english)}
-
-Rules:
-1. Return ONLY JSON object: {"english_chunks":["...","...",...]}
-2. Keep every chunk in the original English order.
-3. Use semantic phrase chunks, not individual words unless a word functions as its own meaningful phrase.
-4. Preserve all important words; do not omit, duplicate, or reorder words.
-5. Prefer 2-6 chunks for normal A2 sentences.
-6. This is the source alignment for the Korean direct-reading translation, so English order is authoritative.
-
-Example:
-English: "Please stretch your arms carefully."
-Output: {"english_chunks":["Please","stretch","your arms","carefully"]}`;
+        const prompt=mtApplyGeneratorPrompt(mtGetGeneratorPrompt(config?.__generatorLogKey||'wordweb','englishChunks',mtGeneratorPromptDefault(config?.__generatorLogKey||'wordweb','reference_generate','englishChunks')),{ENGLISH:JSON.stringify(item.english)}).trim();
 
         for (let attempt = 1; attempt <= 3; attempt++) {
             const raw = await fetchGemini(prompt, {
@@ -8644,30 +8574,7 @@ Output: {"english_chunks":["Please","stretch","your arms","carefully"]}`;
     }
 
     async function mtWordWebGenerateKoreanChunksForOne(item, englishChunks, config = null) {
-        const prompt = `
-You are an expert English-Korean direct-reading teacher.
-Translate EACH English phrase chunk into Korean while preserving the EXACT SAME CHUNK ORDER.
-The English chunks are authoritative. Do NOT rearrange them into natural Korean sentence order.
-
-English sentence: ${JSON.stringify(item.english)}
-Natural Korean translation: ${JSON.stringify(item.korean)}
-English chunks IN ORDER:
-${JSON.stringify(englishChunks)}
-
-Rules:
-1. Return ONLY JSON object: {"korean_chunks":["...","...",...]}
-2. The number of Korean chunks MUST equal the number of English chunks.
-3. Each Korean chunk corresponds to the English chunk at the SAME index.
-4. Keep the Korean chunks in the EXACT English chunk order.
-5. Korean chunks must contain Korean only. No English letters, roman alphabet, or mixed Korean-English text.
-6. Do NOT reorder chunks to make natural Korean word order.
-7. Do NOT collapse all chunks into one sentence.
-8. Use the natural Korean translation only as a meaning reference.
-9. The result should be understandable Korean phrase-by-phrase, even when the overall order sounds unnatural.
-
-Example:
-English chunks: ["Please","stretch","your arms","carefully"]
-Korean chunks: ["제발","스트레칭하세요","당신의 팔들을","조심스럽게"]`;
+        const prompt=mtApplyGeneratorPrompt(mtGetGeneratorPrompt(config?.__generatorLogKey||'wordweb','koreanChunks',mtGeneratorPromptDefault(config?.__generatorLogKey||'wordweb','reference_generate','koreanChunks')),{ENGLISH:JSON.stringify(item.english),KOREAN:JSON.stringify(item.korean),CHUNKS:JSON.stringify(englishChunks)}).trim();
 
         for (let attempt = 1; attempt <= 3; attempt++) {
             const raw = await fetchGemini(prompt, {
@@ -8904,7 +8811,7 @@ ${JSON.stringify(finalPayload)}`;
     // 슬롯10 전용 저호출 생성 설정: 한 생성 단계에서 모델을 최대 1회만 호출합니다.
     // quota가 있는 다른 모델로 무의미하게 연쇄 재시도하지 않고, 다음 자동 실행에서 다시 시도합니다.
     function mtGetWordWebLowCallAiConfig() {
-        const cfg = mtGetWordWebAiConfig();
+        const cfg = mtGetGeneratorAiConfig(mtGetWordWebAiConfig(), 'wordweb', '참조형 슬롯10');
         cfg.maxModelAttempts = 1;
         cfg.requestTimeoutMs = 90000;
         return cfg;
@@ -8930,24 +8837,7 @@ ${JSON.stringify(finalPayload)}`;
             const wordWebAiConfig = mtGetWordWebLowCallAiConfig();
 
             // ===== 호출 1: 영어 + 자연스러운 한국어 6개 =====
-            const dialoguePrompt = `
-You are an expert English dialogue writer and English-Korean translator.
-Create a continuous, natural everyday conversation between 2 people based on this topic: "${topic}"
-
-Rules:
-1. CEFR A2, simple everyday English.
-2. EXACTLY 6 sentences total, flowing naturally from sentence 1 to 6.
-3. NO speaker labels.
-4. Return ONLY a JSON array of exactly 6 objects.
-5. Each object MUST contain only:
-   - english: the English sentence
-   - korean: ONE faithful, natural Korean translation of that English sentence
-6. The Korean translation must preserve the exact meaning of the English sentence.
-7. Never repeat phrases unnaturally.
-8. Never add unrelated greetings, farewells, time expressions, names, or content from another sentence/topic.
-9. Do not create direct-reading/chunk translation in this step.
-
-Return JSON only.`;
+            const dialoguePrompt=mtApplyGeneratorPrompt(mtGetGeneratorPrompt('wordweb','dialogue',mtGeneratorPromptDefault('wordweb','reference_generate','dialogue')),{TOPIC:topic}).trim();
 
             const rawDialogue = await fetchGemini(dialoguePrompt, {
                 type:'ARRAY', minItems:6, maxItems:6,
@@ -8980,27 +8870,7 @@ Return JSON only.`;
             }
 
             // ===== 호출 2: 6개 전체의 직독직해를 한 번에 생성 =====
-            const literalPrompt = `
-You are an expert English syntax and direct-reading teacher.
-For each of the 6 English-Korean sentence pairs below, create an English phrase-chunked direct-reading Korean translation.
-
-Rules:
-1. Return ONLY a JSON array of exactly 6 objects.
-2. Each object MUST contain:
-   - index: 0 through 5
-   - english_chunks: English phrase chunks in EXACT original order
-   - korean_chunks: Korean chunk translations corresponding to the SAME indexes
-3. Preserve every important English word. Do not omit, duplicate, or reorder words.
-4. Prefer 2-8 meaningful phrase chunks per sentence.
-5. korean_chunks length MUST equal english_chunks length.
-6. korean_chunks must contain Korean only. No English letters.
-7. Keep Korean chunks in the exact English chunk order, even if the resulting Korean sounds unnatural.
-8. Use the supplied natural Korean sentence only as a meaning reference.
-
-DATA:
-${JSON.stringify(resultList.map((item,index)=>({index,english:item.english,korean:item.korean})))}
-
-Return JSON only.`;
+            const literalPrompt=mtApplyGeneratorPrompt(mtGetGeneratorPrompt('wordweb','literal',mtGeneratorPromptDefault('wordweb','reference_generate','literal')),{DATA:JSON.stringify(resultList.map((item,index)=>({index,english:item.english,korean:item.korean})))}).trim();
 
             const rawLiteral = await fetchGemini(literalPrompt, {
                 type:'ARRAY', minItems:6, maxItems:6,
@@ -9074,6 +8944,7 @@ Return JSON only.`;
             state.lastRun = Date.now();
             state.nextRun = Date.now() + MT_WORDWEB_INTERVAL_MS;
             state.lastError = String(error?.message || error).substring(0, 220);
+            try { state.lastDiagnostic = mtRecordGeneratorErrorLog('wordweb',{slotLabel:'참조형 슬롯10',errorMessage:state.lastError,source:'wordweb-catch'}); } catch (_) {}
             mtWordWebSaveState(state);
             mtWordWebRenderStatus();
             console.error('[워드웹회화]', error);
@@ -9371,7 +9242,7 @@ Return JSON only.`;
         const displayTitle = mtGetDisplayFileTitle(state.fileName || `슬롯 ${Number(slotIndex)}`);
         const displayBadge = mtGetSlotTypeLabel(type);
         const badgeClass = type === 'reference_generate' ? 'success' : (type === 'ebook' ? 'book' : (type === 'self_generate' ? 'ai' : (type === 'normal' || !type ? 'normal' : '')));
-        div.innerHTML = `<div class="mt-slot-title">${mtEscapeHTML(displayTitle)}</div><div class="mt-slot-stat-row"><div><div class="mt-slot-count">${words.length}</div></div><div style="display:flex;align-items:center;gap:6px;"><div class="mt-slot-star-count">★ ${star}</div>${['self_generate','reference_generate'].includes(type)?`<button class="btn-excel" style="padding:4px 8px;font-size:10px;" onclick="mtDownloadGeneratorErrorLog(event,'typed_${slotIndex}',${JSON.stringify(displayBadge)})">오류로그</button>`:''}</div></div>${type==='self_generate'||type==='reference_generate'?'':mtSlotProgressRow(mtGetSlotLearningProgress(slotIndex, mtTypedBuildSlotData(slotIndex), type))}<div class="mt-slot-actions-row"><span class="mt-slot-meta-badge ${badgeClass}">${displayBadge}</span>${hasData?`<button class="btn-download" onclick="mtTypedExport(event,${slotIndex})">내보내기</button><button class="mt-btn-delete" onclick="mtDeleteSlot(event,${slotIndex})">삭제</button>`:''}</div>${type!=='normal'?`<div id="mtTypedStatus_${slotIndex}" class="mt-wordweb-status"></div>`:''}`;
+        div.innerHTML = `<div class="mt-slot-title">${mtEscapeHTML(displayTitle)}</div><div class="mt-slot-stat-row"><div><div class="mt-slot-count">${words.length}</div></div><div style="display:flex;align-items:center;gap:6px;"><div class="mt-slot-star-count">★ ${star}</div>${['self_generate','reference_generate'].includes(type)?`<button class="btn-excel" style="padding:4px 8px;font-size:10px;" onclick="mtDownloadGeneratorErrorLog(event,'typed_${slotIndex}',${JSON.stringify(displayBadge)})">오류로그</button>`:''}</div></div>${type==='self_generate'||type==='reference_generate'?'':mtSlotProgressRow(mtGetSlotLearningProgress(slotIndex, mtTypedBuildSlotData(slotIndex), type))}<div class="mt-slot-actions-row"><span class="mt-slot-meta-badge ${badgeClass}">${displayBadge}</span><button class="btn-excel" onclick="event.stopPropagation();mtOpenGeneratorPromptEditor('typed_${slotIndex}',type,${JSON.stringify(displayBadge)})">프롬프트</button>${hasData?`<button class="btn-download" onclick="mtTypedExport(event,${slotIndex})">내보내기</button><button class="mt-btn-delete" onclick="mtDeleteSlot(event,${slotIndex})">삭제</button>`:''}</div>${type!=='normal'?`<div id="mtTypedStatus_${slotIndex}" class="mt-wordweb-status"></div>`:''}`;
         div.onclick = () => {
             if (!hasData) mtOpenConfiguredEmptySlotModal(slotIndex);
             else if (type === 'ebook') mtOpenEbookViewer(Number(slotIndex));
@@ -9393,7 +9264,7 @@ Return JSON only.`;
         const state=mtGetTypedState(slotIndex); if(state.type!=='self_generate'||!state.fileName)return;
         const start=Number(state.nextSourceIndex||0); if(start>=state.sourceRows.length)return;
         const batch=state.sourceRows.slice(start,Math.min(start+6,state.sourceRows.length));
-        const prompt=`You are an expert English teacher. For each Korean sentence, create ONE faithful, natural everyday English sentence at CEFR A2 level. Preserve meaning exactly. Return ONLY a JSON array with exactly ${batch.length} objects: [{"index":0,"english":"..."}]. Do not add greetings, names, time expressions, or unrelated content. DATA=${JSON.stringify(batch.map((k,i)=>({index:i,korean:k})))}`;
+        const prompt=mtApplyGeneratorPrompt(mtGetGeneratorPrompt(`typed_${slotIndex}`,'main',mtGeneratorPromptDefault(`typed_${slotIndex}`,'self_generate','main')),{COUNT:batch.length,BATCH:JSON.stringify(batch.map((k,i)=>({index:i,korean:k})))}).trim();
         const raw=await fetchGemini(prompt,{type:'ARRAY',minItems:batch.length,maxItems:batch.length,items:{type:'OBJECT',properties:{index:{type:'INTEGER'},english:{type:'STRING'}},required:['index','english']}},mtGetGeneratorAiConfig(mtGetSlot9AiConfig(), `typed_${slotIndex}`, `슬롯 ${Number(slotIndex)+1}`));
         const arr=Array.isArray(raw)?raw:mtWordWebExtractJsonValue(raw); if(!Array.isArray(arr)||arr.length!==batch.length) throw new Error('AI 문장 생성 결과가 정확하지 않습니다.');
         const p=state.pattern || {engCol:2,mainKorCol:3,subKorCol:4,serialCol:5}; state.pattern=p;
@@ -9404,7 +9275,7 @@ Return JSON only.`;
     async function mtTypedReferenceGenerate(slotIndex) {
         const state=mtGetTypedState(slotIndex); if(state.type!=='reference_generate'||!state.fileName||!state.topics.length)return;
         const topic=state.topics[Math.floor(Math.random()*state.topics.length)].topic;
-        const prompt=`You are an expert English dialogue writer and English-Korean translator.\nCreate a continuous, natural everyday conversation between 2 people based on this topic: "${topic}"\n\nRules:\n1. CEFR A2, simple everyday English.\n2. EXACTLY 6 sentences total, flowing naturally from sentence 1 to 6.\n3. NO speaker labels.\n4. Return ONLY a JSON array of exactly 6 objects.\n5. Each object MUST contain only: english and korean.\n6. The Korean translation must preserve the exact meaning of the English sentence.\n7. NEVER repeat phrases unnaturally.\n8. NEVER add unrelated greetings, farewells, time expressions, names, or content from another sentence/topic.\n9. Do not create any direct-reading/chunk translation in this step.`;
+        const prompt=mtApplyGeneratorPrompt(mtGetGeneratorPrompt(`typed_${slotIndex}`,'dialogue',mtGeneratorPromptDefault(`typed_${slotIndex}`,'reference_generate','dialogue')),{TOPIC:topic}).trim();
         const raw=await fetchGemini(prompt,{type:'ARRAY',minItems:6,maxItems:6,items:{type:'OBJECT',properties:{english:{type:'STRING'},korean:{type:'STRING'}},required:['english','korean']}},mtGetGeneratorAiConfig(mtGetWordWebAiConfig(), `typed_${slotIndex}`, `슬롯 ${Number(slotIndex)+1}`));
         let arr=Array.isArray(raw)?raw:mtWordWebExtractJsonValue(raw); if(!Array.isArray(arr)||arr.length!==6) throw new Error('영어/한국어 기본 문장이 정확히 6개 생성되지 않았습니다.');
         arr=arr.map(x=>({english:String(x.english||'').trim(),korean:String(x.korean||'').trim(),literal_korean:''}));
@@ -9423,7 +9294,19 @@ Return JSON only.`;
         const state=mtGetTypedState(slotIndex); const type=state.type;
         if(!state.fileName)return;
         if(immediate){
-            (async()=>{try{if(type==='self_generate')await mtTypedSelfGenerate(slotIndex); else if(type==='reference_generate')await mtTypedReferenceGenerate(slotIndex);}catch(e){const latest=mtGetTypedState(slotIndex);if(!latest.lastDiagnostic)latest.lastError=String(e?.message||e);mtSaveTypedState(slotIndex,latest);mtInitSlots();}finally{mtStartTypedTimer(slotIndex,false);}})(); return;
+            (async()=>{
+                try{
+                    if(type==='self_generate') await mtTypedSelfGenerate(slotIndex);
+                    else if(type==='reference_generate') await mtTypedReferenceGenerate(slotIndex);
+                }catch(e){
+                    const latest=mtGetTypedState(slotIndex);
+                    if(!latest.lastDiagnostic){
+                        latest.lastError=String(e?.message||e);
+                        try{latest.lastDiagnostic=mtRecordGeneratorErrorLog(`typed_${slotIndex}`,{slotLabel:`슬롯 ${Number(slotIndex)+1}`,errorMessage:latest.lastError,source:'typed-catch'});}catch(_){}
+                    }
+                    mtSaveTypedState(slotIndex,latest);mtInitSlots();
+                }finally{mtStartTypedTimer(slotIndex,false);}
+            })(); return;
         }
         const next=Number(state.nextRun||0); if(!next)return;
         const delay=Math.max(1000,next-Date.now());
