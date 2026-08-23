@@ -421,6 +421,16 @@
             color:#64748b; cursor:pointer; vertical-align:middle; transition:.15s;
         }
         .mt-ebook-item-edit-btn:hover { background:#f8fafc; border-color:#cbd5e1; color:#111827; }
+        .mt-ebook-item-delete-btn {
+            display:inline-flex; align-items:center; justify-content:center;
+            width:24px; height:24px; margin-right:5px;
+            padding:0; border:1px solid transparent; background:transparent;
+            color:#9ca3af; border-radius:6px; cursor:pointer; vertical-align:top;
+        }
+        .mt-ebook-item-delete-btn:hover {
+            background:#fef2f2; border-color:#fecaca; color:#dc2626;
+        }
+
         .mt-ebook-edit-overlay {
             display:none; position:fixed; inset:0; z-index:7000; background:rgba(15,23,42,.48);
             backdrop-filter:blur(2px); align-items:center; justify-content:center; padding:16px; box-sizing:border-box;
@@ -2266,6 +2276,42 @@ body { background: var(--bench-v2-bg) !important; }
 .mt-slot-actions-row button{min-height:24px !important;height:24px !important;padding:3px 6px !important;font-size:9px !important;line-height:1 !important;}
 @media(max-width:768px){.mt-slot-actions-row{gap:1px !important}.mt-slot-actions-row .mt-slot-meta-badge,.mt-slot-actions-row button{font-size:8.5px !important;padding-left:5px !important;padding-right:5px !important}}
 </style>
+<style id="v30ActionRowAndEbookDelete">
+        .mt-slot-actions-row {
+            display:flex !important;
+            align-items:center !important;
+            gap:2px !important;
+            flex-wrap:nowrap !important;
+            white-space:nowrap !important;
+            overflow:hidden !important;
+        }
+        .mt-slot-actions-row .mt-slot-meta-badge {
+            flex:0 1 auto !important;
+            min-width:0 !important;
+            margin:0 !important;
+            white-space:nowrap !important;
+        }
+        .mt-slot-actions-row > button {
+            flex:0 0 auto !important;
+            margin:0 !important;
+            min-width:0 !important;
+            padding:4px 6px !important;
+            font-size:9px !important;
+            line-height:1.1 !important;
+            white-space:nowrap !important;
+        }
+        .mt-slot-actions-row .btn-download,
+        .mt-slot-actions-row .mt-btn-delete,
+        .mt-slot-actions-row .mt-prompt-btn {
+            width:auto !important;
+        }
+        @media (max-width:768px){
+            .mt-slot-actions-row { gap:1px !important; }
+            .mt-slot-actions-row > button { padding:3px 5px !important; font-size:8.5px !important; }
+            .mt-slot-actions-row .mt-slot-meta-badge { padding:3px 6px !important; font-size:9px !important; }
+        }
+</style>
+</style>
 </head>
 <body>
 
@@ -3890,10 +3936,79 @@ body { background: var(--bench-v2-bg) !important; }
     // ============================================================
     // 생성형 슬롯 오류 로그 v4 — 독립형 재작성
     // ============================================================
-    const MT_GENERATOR_ERROR_LOG_PREFIX = 'mt_generator_error_log_v4_';
-    const MT_GENERATOR_ERROR_LOG_MAX = 20;
+    const MT_GENERATOR_ERROR_LOG_PREFIX = 'mt_generator_error_log_v5_';
+    const MT_GENERATOR_ERROR_LOG_MAX = 50;
     const MT_GENERATOR_ERROR_LOG_OLD_PREFIXES = ['mt_generator_error_log_v3_','mt_generator_error_log_v2_','mt_slot9_error_log_v1'];
     const MT_GENERATOR_ERROR_LOG_MEMORY_KEY = '__mtGeneratorErrorLogMemoryV4';
+    const MT_GENERATOR_ERROR_LOG_GLOBAL_KEY = 'mt_generator_error_log_global_v5';
+    const MT_GENERATOR_ERROR_LOG_HEALTH_KEY = 'mt_generator_error_log_health_v5';
+    let mtGeneratorErrorGlobalHookInstalled = false;
+
+    function mtGeneratorSafeJson(value, fallback = null) {
+        try { return JSON.parse(JSON.stringify(value)); } catch (_) { return fallback; }
+    }
+
+    function mtAppendGeneratorGlobalJournal(entry) {
+        try {
+            const raw = localStorage.getItem(MT_GENERATOR_ERROR_LOG_GLOBAL_KEY);
+            const current = Array.isArray(raw ? JSON.parse(raw) : []) ? JSON.parse(raw) : [];
+            const normalized = mtNormalizeGeneratorErrorLogs(current);
+            normalized.push(entry);
+            normalized.sort((a,b)=>Number(a.timestampMs||0)-Number(b.timestampMs||0));
+            const trimmed = normalized.slice(-200);
+            localStorage.setItem(MT_GENERATOR_ERROR_LOG_GLOBAL_KEY, JSON.stringify(trimmed));
+            return true;
+        } catch (error) {
+            try {
+                window.__mtGeneratorGlobalJournalFailure = String(error?.message || error);
+            } catch (_) {}
+            return false;
+        }
+    }
+
+    function mtInstallGeneratorGlobalErrorHooks() {
+        if (mtGeneratorErrorGlobalHookInstalled) return;
+        mtGeneratorErrorGlobalHookInstalled = true;
+
+        window.addEventListener('error', function(event) {
+            try {
+                mtRecordGeneratorErrorLog('__global__', {
+                    slotLabel:'전역 JavaScript 오류',
+                    model:'',
+                    httpStatus:null,
+                    errorMessage:String(event?.error?.stack || event?.message || '전역 JavaScript 오류'),
+                    responseObject: {
+                        source: event?.filename || '',
+                        line: event?.lineno || null,
+                        column: event?.colno || null
+                    },
+                    source:'window-error'
+                });
+            } catch (_) {}
+        });
+
+        window.addEventListener('unhandledrejection', function(event) {
+            try {
+                const reason = event?.reason;
+                mtRecordGeneratorErrorLog('__global__', {
+                    slotLabel:'처리되지 않은 Promise 오류',
+                    model:'',
+                    httpStatus:null,
+                    errorMessage:String(reason?.stack || reason?.message || reason || '처리되지 않은 Promise 오류'),
+                    responseObject: mtGeneratorSafeJson(reason, null),
+                    source:'unhandledrejection'
+                });
+            } catch (_) {}
+        });
+
+        try {
+            localStorage.setItem(MT_GENERATOR_ERROR_LOG_HEALTH_KEY, JSON.stringify({
+                installedAt: Date.now(),
+                installedAtKST: mtGetSeoulTimestamp()
+            }));
+        } catch (_) {}
+    }
+
     // 오류 로그 전용 독립 IndexedDB: 앱 본체 DB/스토리지와 완전히 분리합니다.
     const MT_ERROR_LOG_DB_NAME = 'MaskingTypingErrorLogDB_v1';
     const MT_ERROR_LOG_DB_VERSION = 1;
@@ -4008,6 +4123,13 @@ body { background: var(--bench-v2-bg) !important; }
         try{localStorage.setItem(mtGeneratorLogKey(key),JSON.stringify(normalized));storageOk=true;}
         catch(error){storageError=error;try{window.__mtGeneratorErrorLogLastStorageFailure=String(error?.message||error);}catch(_){}
         }
+        // 핵심: 현재 슬롯별 로그뿐 아니라 전역 append-only journal에도 즉시 기록합니다.
+        // 이 journal은 오류가 어떤 호출 경로에서 발생했는지 확인하기 위한 최종 안전장치입니다.
+        try {
+            const newest = normalized[normalized.length - 1];
+            if (newest) mtAppendGeneratorGlobalJournal(newest);
+        } catch (_) {}
+
         // localStorage가 꽉 차도 독립 DB에는 반드시 비동기 저장을 시도합니다.
         mtWriteErrorLogsToDedicatedDb(key, normalized).catch(error=>{try{window.__mtGeneratorErrorLogLastDbFailure=String(error?.message||error);}catch(_){}});
         return {ok:storageOk,logs:normalized,error:storageError};
@@ -4023,6 +4145,9 @@ body { background: var(--bench-v2-bg) !important; }
             const persisted=mtPersistGeneratorErrorLogsSync(key,[...previous,entry]);return persisted.logs[persisted.logs.length-1]||entry;
         }catch(fatalLogError){try{window.__mtGeneratorErrorLogLastFailure=String(fatalLogError?.message||fatalLogError);}catch(_){}return null;}
     }
+    // 페이지가 로드되는 즉시 전역 JS/Promise 오류도 별도로 기록할 수 있게 합니다.
+    try { mtInstallGeneratorGlobalErrorHooks(); } catch (_) {}
+
     function mtRecordGeneratorFailureDirect(config, detail = {}) {
         try {
             const key = config?.__generatorLogKey;
@@ -4053,6 +4178,14 @@ body { background: var(--bench-v2-bg) !important; }
     async function mtDownloadGeneratorErrorLog(event,slotKey,slotLabel){
         if(event)event.stopPropagation();let logs=await mtGetGeneratorErrorLogsAsync(slotKey);
         if(!logs.length){try{let fallback=null;if(slotKey==='slot9')fallback=mtSlot9GetState()?.lastDiagnostic||null;else if(slotKey==='wordweb')fallback=mtWordWebGetState()?.lastDiagnostic||null;else if(/^typed_\d+$/.test(String(slotKey)))fallback=mtGetTypedState(Number(String(slotKey).slice(6)))?.lastDiagnostic||null;if(fallback){mtRecordGeneratorErrorLog(slotKey,{...fallback,slotLabel:slotLabel||fallback.slotLabel||slotKey,source:'lastDiagnostic-fallback'});logs=mtGetGeneratorErrorLogs(slotKey);}}catch(_){}}
+        if(!logs.length){
+            try {
+                const rawGlobal = localStorage.getItem(MT_GENERATOR_ERROR_LOG_GLOBAL_KEY);
+                const globalLogs = mtNormalizeGeneratorErrorLogs(rawGlobal ? JSON.parse(rawGlobal) : []);
+                const slotOnly = globalLogs.filter(x => String(x.slotKey||'') === String(slotKey));
+                if (slotOnly.length) logs = slotOnly.slice(-MT_GENERATOR_ERROR_LOG_MAX);
+            } catch (_) {}
+        }
         if(!logs.length){alert('저장된 오류 로그가 없습니다.');return;}
         logs=logs.slice().sort((a,b)=>Number(b.timestampMs||0)-Number(a.timestampMs||0));
         const text=[`[마스킹타이핑] ${slotLabel||slotKey} 오류 로그`,`로그 파일 생성시각(KST): ${mtGetSeoulTimestamp()}`,`가장 최근 실제 오류 기록시각(KST): ${logs[0]?.timestampKST||'없음'}`,`총 오류 수: ${logs.length}`,'','[최신 오류 → 과거 오류 순]','',...logs.map(mtFormatGeneratorErrorEntry)].join('\n');
@@ -4470,6 +4603,29 @@ Rules:
                 lastError = quotaModels.length
                     ? `Gemini API 사용량 한도로 인해 현재 사용할 수 있는 모델이 없습니다.${quotaRemain ? ` (${quotaRemain})` : ''}`
                     : (lastError || '현재 요청에서 사용할 수 있는 텍스트 생성 모델이 없습니다.');
+
+                // 실제 HTTP 요청이 0회였더라도 "왜 요청이 실행되지 않았는지" 자체가 오류이므로 기록합니다.
+                mtRecordGeneratorFailureDirect(config, {
+                    model:'',
+                    httpStatus:null,
+                    finishReason:'',
+                    promptFeedback:null,
+                    contentParts:null,
+                    responseObject:{attemptedModels:Array.from(attemptedModels), quotaModels},
+                    errorMessage:lastError,
+                    source:'fetchGemini-no-eligible-model'
+                });
+                try {
+                    if (typeof config.diagnosticHandler === 'function') {
+                        config.diagnosticHandler({
+                            model:'',httpStatus:null,finishReason:'',
+                            promptFeedback:null,contentParts:null,
+                            responseObject:{attemptedModels:Array.from(attemptedModels), quotaModels},
+                            errorMessage:lastError,
+                            source:'fetchGemini-no-eligible-model'
+                        });
+                    }
+                } catch (_) {}
                 break;
             }
 
@@ -9651,6 +9807,55 @@ ${JSON.stringify(finalPayload)}`;
     function mtGetEbookWords(slotIndex){ const st=mtGetTypedState(slotIndex); const p=st.pattern||{engCol:1,mainKorCol:2,subKorCol:3,serialCol:4}; const read=new Set((st.ebookReadIndexes||[]).map(Number)); return (st.outputRows||[]).map((r,i)=>({eng:String(r?.[p.engCol-1]??'').trim(),kor:String(r?.[p.mainKorCol-1]??'').trim(),subKor:String(r?.[p.subKorCol-1]??'').trim(),serial:String(r?.[p.serialCol-1]??(i+1)).trim(),originalIndex:i,ebookRead:read.has(i)})).filter(w=>w.kor&&w.eng); }
     let mtEbookEditTarget = null;
 
+    function mtDeleteEbookItem(slotIndex, index, event) {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        const slot = Number(slotIndex);
+        const displayIndex = Number(index);
+        if (!Number.isInteger(slot) || !Number.isInteger(displayIndex)) return;
+
+        const st = mtGetTypedState(slot);
+        if (!Array.isArray(st.outputRows) || displayIndex < 0 || displayIndex >= st.outputRows.length) return;
+
+        const row = st.outputRows[displayIndex] || [];
+        const mainText = String(row?.[Number(st.pattern?.mainKorCol || 2) - 1] || '').trim();
+        const message = mainText
+            ? `전자책 목록의 ${displayIndex + 1}번 항목을 삭제하시겠습니까?\n\n${mainText}`
+            : `전자책 목록의 ${displayIndex + 1}번 항목을 삭제하시겠습니까?`;
+        if (!confirm(message)) return;
+
+        st.outputRows.splice(displayIndex, 1);
+
+        // 원본 행도 같은 인덱스로 관리되는 현재 전자책 구조에 맞춰 함께 삭제합니다.
+        if (st.ebook && Array.isArray(st.ebook.sourceRows) && displayIndex < st.ebook.sourceRows.length) {
+            st.ebook.sourceRows.splice(displayIndex, 1);
+        }
+
+        // 삭제한 인덱스 이후의 읽음 완료 인덱스를 한 칸씩 당깁니다.
+        if (Array.isArray(st.ebookReadIndexes)) {
+            st.ebookReadIndexes = st.ebookReadIndexes
+                .map(Number)
+                .filter(Number.isInteger)
+                .filter(i => i !== displayIndex)
+                .map(i => i > displayIndex ? i - 1 : i);
+        }
+
+        st.lastSession = null;
+        st.lastError = '';
+        mtSaveTypedState(slot, st);
+
+        // 현재 페이지가 전체 페이지 수를 초과하지 않도록 보정한 뒤 다시 렌더링합니다.
+        const remaining = mtGetEbookWords(slot).length;
+        const totalPages = Math.max(1, Math.ceil(remaining / MT_EBOOK_PAGE_SIZE));
+        const key = String(slot);
+        mtEbookPage[key] = Math.min(Math.max(Number(mtEbookPage[key] || 1), 1), totalPages);
+
+        mtOpenEbookViewer(slot);
+        mtInitSlots();
+    }
+
     function mtOpenEbookEditModal(slotIndex, index){
         const words=mtGetEbookWords(slotIndex);
         const word=words[index];
@@ -9755,11 +9960,16 @@ ${JSON.stringify(finalPayload)}`;
             item.className='mt-ebook-item'+(w.ebookRead?' read':'');
             item.dataset.index=absoluteIndex;
             const displayText = (mtEbookDisplayMode === 'eng' && w.ebookRead) ? w.eng : w.kor;
-            item.innerHTML=`<button type="button" class="mt-ebook-item-edit-btn" title="문장 수정" aria-label="문장 수정">
+            item.innerHTML=`<button type="button" class="mt-ebook-item-delete-btn" title="항목 삭제" aria-label="항목 삭제">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v5"></path><path d="M14 11v5"></path>
+                </svg>
+            </button><button type="button" class="mt-ebook-item-edit-btn" title="문장 수정" aria-label="문장 수정">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z"></path>
                 </svg>
             </button><span class="mt-ebook-item-num">${absoluteIndex+1}</span><span class="mt-ebook-item-main">${mtEscapeHTML(displayText)}</span>`;
+            item.querySelector('.mt-ebook-item-delete-btn').onclick=(e)=>mtDeleteEbookItem(Number(slotIndex),absoluteIndex,e);
             item.querySelector('.mt-ebook-item-edit-btn').onclick=(e)=>{ e.preventDefault(); e.stopPropagation(); mtOpenEbookEditModal(Number(slotIndex),absoluteIndex); };
             item.onclick=()=>mtOpenEbookTyping(Number(slotIndex),absoluteIndex);
             list.appendChild(item);
