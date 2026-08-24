@@ -11008,6 +11008,21 @@ ${JSON.stringify(finalPayload)}`;
     }
 
     function mtPrevWord() {
+        if (mtEbookTypingActive) {
+            const slot = Number(mtEbookActiveSlot);
+            const words = Number.isFinite(slot) ? mtGetEbookWords(slot) : [];
+            const currentWord = mtCurrentStudyWords?.[mtCurrentIndex] || null;
+            const currentOriginalIndex = Number(currentWord?.originalIndex);
+            if (Number.isInteger(currentOriginalIndex)) {
+                const prevIndex = currentOriginalIndex - 1;
+                if (prevIndex >= 0 && prevIndex < words.length) {
+                    mtOpenEbookTyping(slot, prevIndex);
+                    return;
+                }
+            }
+            alert("첫 번째 카드입니다.");
+            return;
+        }
         if (mtCurrentIndex > 0) {
             mtCurrentIndex--;
             mtLoadWord(mtCurrentIndex);
