@@ -356,6 +356,9 @@
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(17, 24, 39, 0.4); backdrop-filter: blur(2px); justify-content: center; align-items: center; z-index: 1000; }
         .modal-card { background: #ffffff; width: 90%; max-width: 520px; border-radius: 14px; padding: 20px; border: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 12px; }
         .modal-card textarea { width: 100%; height: 160px; border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; font-size: 13px; box-sizing: border-box; resize: vertical; outline: none; }
+        #mtGeneratorErrorLogModal .mt-error-log-card { width:min(900px,94vw); max-height:88vh; overflow:hidden; text-align:left; }
+        #mtGeneratorErrorLogText { width:100%; min-height:420px; max-height:62vh; box-sizing:border-box; resize:vertical; border:1px solid #cbd5e1; border-radius:8px; padding:12px; font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace; color:#111827; background:#f8fafc; outline:none; }
+        #mtGeneratorErrorLogText:focus { border-color:#64748b; box-shadow:0 0 0 3px rgba(100,116,139,.10); }
 
         .btn-star-group {
             background: #ffffff !important; 
@@ -2807,6 +2810,24 @@ body { background: var(--bench-v2-bg) !important; }
             </div>
         </div>
 
+        <!-- 생성형 오류 로그 팝업 -->
+        <div id="mtGeneratorErrorLogModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)mtCloseGeneratorErrorLogModal()">
+            <div class="modal-card mt-error-log-card">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+                    <div>
+                        <div id="mtGeneratorErrorLogTitle" style="font-size:16px;font-weight:800;color:#111827;">오류로그</div>
+                        <div id="mtGeneratorErrorLogSummary" style="font-size:11px;color:#64748b;margin-top:3px;"></div>
+                    </div>
+                    <button class="btn-excel" type="button" onclick="mtCloseGeneratorErrorLogModal()">닫기</button>
+                </div>
+                <textarea id="mtGeneratorErrorLogText" readonly spellcheck="false" aria-label="오류 로그"></textarea>
+                <div style="display:flex;justify-content:flex-end;gap:6px;">
+                    <button class="btn-excel" type="button" onclick="mtCopyGeneratorErrorLog()">복사</button>
+                    <button class="btn-primary" type="button" onclick="mtCloseGeneratorErrorLogModal()">확인</button>
+                </div>
+            </div>
+        </div>
+
         <!-- 슬롯 액션 선택 모달 (새로시작 / 이어서하기) -->
         <div id="mtActionModal" class="modal-overlay">
             <div class="modal-card" style="width: 300px; text-align: center; padding: 25px;">
@@ -4210,9 +4231,50 @@ body { background: var(--bench-v2-bg) !important; }
         return merged;
     }
     function mtFormatGeneratorErrorEntry(entry){return [`===== ${entry.slotLabel||entry.slotKey||'생성형 슬롯'} 오류 #${entry.seq||''} =====`,`실제 기록시각(KST): ${entry.timestampKST||''}`,`모델: ${entry.model||''}`,`HTTP 상태: ${entry.httpStatus??''}`,`finishReason: ${entry.finishReason||''}`,'promptFeedback:',JSON.stringify(entry.promptFeedback??null,null,2),'candidates[0].content.parts:',JSON.stringify(entry.contentParts??null,null,2),'전체 응답 객체:',JSON.stringify(entry.responseObject??null,null,2),`오류 메시지: ${entry.errorMessage||''}`,''].join('\n');}
+    function mtCloseGeneratorErrorLogModal(){
+        const modal=document.getElementById('mtGeneratorErrorLogModal');
+        if(modal) modal.style.display='none';
+    }
+    function mtOpenGeneratorErrorLogModal(slotLabel, logs, text){
+        const modal=document.getElementById('mtGeneratorErrorLogModal');
+        const title=document.getElementById('mtGeneratorErrorLogTitle');
+        const summary=document.getElementById('mtGeneratorErrorLogSummary');
+        const area=document.getElementById('mtGeneratorErrorLogText');
+        if(!modal||!title||!summary||!area)return;
+        title.textContent=`${slotLabel||'생성형 슬롯'} 오류로그`;
+        summary.textContent=`총 ${logs.length}건 · 최신 오류부터 표시 · 로그는 파일로 저장하지 않습니다.`;
+        area.value=String(text||'');
+        modal.style.display='flex';
+        requestAnimationFrame(()=>{area.focus();area.setSelectionRange(0,0);});
+    }
+    async function mtCopyGeneratorErrorLog(){
+        const area=document.getElementById('mtGeneratorErrorLogText');
+        if(!area)return;
+        const value=area.value||'';
+        try{
+            if(navigator.clipboard?.writeText) await navigator.clipboard.writeText(value);
+            else { area.focus(); area.select(); document.execCommand('copy'); }
+            alert('오류 로그를 클립보드에 복사했습니다.');
+        }catch(_){
+            area.focus(); area.select();
+            alert('자동 복사에 실패했습니다. 선택된 로그를 직접 복사해 주세요.');
+        }
+    }
     async function mtDownloadGeneratorErrorLog(event,slotKey,slotLabel){
-        if(event)event.stopPropagation();let logs=await mtGetGeneratorErrorLogsAsync(slotKey);
-        if(!logs.length){try{let fallback=null;if(slotKey==='slot9')fallback=mtSlot9GetState()?.lastDiagnostic||null;else if(slotKey==='wordweb')fallback=mtWordWebGetState()?.lastDiagnostic||null;else if(/^typed_\d+$/.test(String(slotKey)))fallback=mtGetTypedState(Number(String(slotKey).slice(6)))?.lastDiagnostic||null;if(fallback){mtRecordGeneratorErrorLog(slotKey,{...fallback,slotLabel:slotLabel||fallback.slotLabel||slotKey,source:'lastDiagnostic-fallback'});logs=mtGetGeneratorErrorLogs(slotKey);}}catch(_){}}
+        if(event)event.stopPropagation();
+        let logs=await mtGetGeneratorErrorLogsAsync(slotKey);
+        if(!logs.length){
+            try{
+                let fallback=null;
+                if(slotKey==='slot9')fallback=mtSlot9GetState()?.lastDiagnostic||null;
+                else if(slotKey==='wordweb')fallback=mtWordWebGetState()?.lastDiagnostic||null;
+                else if(/^typed_\d+$/.test(String(slotKey)))fallback=mtGetTypedState(Number(String(slotKey).slice(6)))?.lastDiagnostic||null;
+                if(fallback){
+                    mtRecordGeneratorErrorLog(slotKey,{...fallback,slotLabel:slotLabel||fallback.slotLabel||slotKey,source:'lastDiagnostic-fallback'});
+                    logs=mtGetGeneratorErrorLogs(slotKey);
+                }
+            }catch(_){}
+        }
         if(!logs.length){
             try {
                 const rawGlobal = localStorage.getItem(MT_GENERATOR_ERROR_LOG_GLOBAL_KEY);
@@ -4221,10 +4283,17 @@ body { background: var(--bench-v2-bg) !important; }
                 if (slotOnly.length) logs = slotOnly.slice(-MT_GENERATOR_ERROR_LOG_MAX);
             } catch (_) {}
         }
-        if(!logs.length){alert('저장된 오류 로그가 없습니다.');return;}
+        if(!logs.length){alert(`저장된 ${slotLabel||slotKey} 오류 로그가 없습니다.`);return;}
         logs=logs.slice().sort((a,b)=>Number(b.timestampMs||0)-Number(a.timestampMs||0));
-        const text=[`[마스킹타이핑] ${slotLabel||slotKey} 오류 로그`,`로그 파일 생성시각(KST): ${mtGetSeoulTimestamp()}`,`가장 최근 실제 오류 기록시각(KST): ${logs[0]?.timestampKST||'없음'}`,`총 오류 수: ${logs.length}`,'','[최신 오류 → 과거 오류 순]','',...logs.map(mtFormatGeneratorErrorEntry)].join('\n');
-        const blob=new Blob([text],{type:'text/plain;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`[마스킹타이핑]_${String(slotLabel||slotKey).replace(/[\\/:*?"<>|]/g,'')}_오류로그_${mtGetSeoulTimestamp().replace(/[-:T]/g,'')}.txt`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+        const text=[
+            `[마스킹타이핑] ${slotLabel||slotKey} 오류 로그`,
+            `화면 표시시각(KST): ${mtGetSeoulTimestamp()}`,
+            `가장 최근 실제 오류 기록시각(KST): ${logs[0]?.timestampKST||'없음'}`,
+            `총 오류 수: ${logs.length}`,
+            '', '[최신 오류 → 과거 오류 순]', '',
+            ...logs.map(mtFormatGeneratorErrorEntry)
+        ].join('\n');
+        mtOpenGeneratorErrorLogModal(slotLabel||slotKey,logs,text);
     }
 
     // ============================================================
@@ -4416,25 +4485,7 @@ Rules:
         return lines.join('\n');
     }
     async function mtDownloadSlot9ErrorLog(event) {
-        event?.stopPropagation();
-        const logs = (await mtGetGeneratorErrorLogsAsync('slot9')).sort((a,b)=>Number(b.timestampMs||0)-Number(a.timestampMs||0));
-        if (!logs.length) { alert('저장된 슬롯9 오류 로그가 없습니다.'); return; }
-        const latestTimestamp = logs[0]?.timestampKST || '없음';
-        const text = [
-            '[마스킹타이핑] 슬롯9 오류 로그',
-            `로그 파일 생성시각(KST): ${mtGetSeoulTimestamp()}`,
-            `가장 최근 실제 오류 기록시각(KST): ${latestTimestamp}`,
-            `총 오류 수: ${logs.length}`,
-            '', '[최신 오류 → 과거 오류 순]', '',
-            ...logs.map(mtFormatGeneratorErrorEntry)
-        ].join('\n');
-        const blob = new Blob([text], {type:'text/plain;charset=utf-8'});
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `[마스킹타이핑]_슬롯9_오류로그_${mtGetSeoulTimestamp().replace(/[-:T]/g,'')}.txt`;
-        document.body.appendChild(a); a.click(); a.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        return mtDownloadGeneratorErrorLog(event,'slot9','슬롯9');
     }
     function mtRecordSlot9ApiDiagnostic(detail) {
         const entry = mtRecordSlot9ErrorLog(detail);
@@ -8010,18 +8061,36 @@ Rules:
  async function mtSlot9GenerateSix() {
         if (mtSlot9Busy) return;
 
-        const st = mtSlot9GetState();
-        const retryRows = Array.isArray(st.retryRows) ? st.retryRows : [];
-        const canUseRetry = retryRows.length > 0;
-        const canUseFresh = Array.isArray(st.sourceRows) && st.nextSourceIndex < st.sourceRows.length;
-        if (!st.fileName || (!canUseRetry && !canUseFresh)) return;
-
+        // 상태 조회/정규화 단계까지 포함해 전체 생성 시퀀스를 보호합니다.
+        // 이전 버전은 이 구간이 try 바깥이어서 예외/비정상 상태가 발생하면 로그 없이 종료될 수 있었습니다.
         mtSlot9Busy = true;
-        st.lastError = '';
-        mtSlot9SaveState(st);
-        mtSlot9RenderStatus();
-
         try {
+            const st = mtSlot9GetState();
+            const retryRows = Array.isArray(st.retryRows) ? st.retryRows : [];
+            const canUseRetry = retryRows.length > 0;
+            const canUseFresh = Array.isArray(st.sourceRows) && st.nextSourceIndex < st.sourceRows.length;
+
+            // 파일이 없는 초기 대기 상태 또는 모든 생성이 끝난 정상 상태는 기록하지 않습니다.
+            // 다만 파일명이 사라졌는데 실제 데이터가 남아 있으면 상태 불일치로 기록합니다.
+            if (!st.fileName || (!canUseRetry && !canUseFresh)) {
+                const hasResidualData = !st.fileName && (
+                    (Array.isArray(st.sourceRows) && st.sourceRows.length > 0) ||
+                    (Array.isArray(st.outputRows) && st.outputRows.length > 0) ||
+                    retryRows.length > 0
+                );
+                if (hasResidualData) {
+                    mtForceRecordSlot9Failure(new Error('슬롯9 생성 상태 불일치: fileName이 없는데 생성 데이터가 남아 있습니다.'), {
+                        source:'slot9-preflight',
+                        responseObject:{fileName:st.fileName||'',sourceCount:Array.isArray(st.sourceRows)?st.sourceRows.length:0,outputCount:Array.isArray(st.outputRows)?st.outputRows.length:0,retryCount:retryRows.length,nextSourceIndex:st.nextSourceIndex}
+                    });
+                }
+                return;
+            }
+
+            st.lastError = '';
+            mtSlot9SaveState(st);
+            mtSlot9RenderStatus();
+
             const aiConfig = mtGetSlot9AiConfig();
             // [수정점 1] 에러 로그 기록기(diagnosticHandler)를 API 설정에 정상적으로 부착
             const wrappedAiConfig = mtGetGeneratorAiConfig(aiConfig, 'slot9', '슬롯9');
@@ -8172,10 +8241,15 @@ const prompt=mtApplyGeneratorPrompt(mtGetGeneratorPrompt('slot9','main',mtGenera
             const msg = String(e?.message || e || '알 수 없는 오류');
             const diagMsg = String(lastDiag?.errorMessage || '');
             const sameRecent = !!lastDiag && diagMsg.includes(msg) && (Date.now() - Number(lastDiag.timestampMs || 0) <= 10000);
-            if (!sameRecent) mtForceRecordSlot9Failure(e, lastDiag || {});
+            if (!sameRecent) mtForceRecordSlot9Failure(e, {...(lastDiag || {}), source:'slot9-generate-catch'});
             // 실패 원인별로 다음 실행 시점을 다르게 잡습니다.
             // 일일 quota 초과는 5분마다 무의미하게 재요청하지 않고 24시간 후 다시 확인합니다.
-            const latestSt = mtSlot9GetState();
+            let latestSt = null;
+            try { latestSt = mtSlot9GetState(); } catch (_) {}
+            if (!latestSt) {
+                mtSlot9Busy = false;
+                return;
+            }
             latestSt.lastRun = Date.now();
             const errorText = String(e?.message || e || '');
             const isDailyQuota = /PerDayPerProjectPerModel-FreeTier|일일 Gemini API quota|quota.*PerDay/i.test(errorText);
