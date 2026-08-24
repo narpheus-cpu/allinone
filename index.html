@@ -6187,7 +6187,27 @@ Rules:
     let mtEbookActiveSlot = null;
     let mtEbookDisplayMode = 'kor'; // 'kor': 주문장, 'eng': 언마스킹 완료 문장만 영어로 표시
     const MT_EBOOK_PAGE_SIZE = 30;
-    const mtEbookPage = {};
+    const MT_EBOOK_LAST_PAGE_STORAGE_KEY = 'mt_ebook_last_page_v1';
+    const mtEbookPage = (() => {
+        try {
+            const raw = JSON.parse(localStorage.getItem(MT_EBOOK_LAST_PAGE_STORAGE_KEY) || '{}');
+            return raw && typeof raw === 'object' ? raw : {};
+        } catch (_) {
+            return {};
+        }
+    })();
+    function mtSaveEbookPage(slotIndex, page){
+        const key = String(slotIndex);
+        const safePage = Math.max(1, Math.floor(Number(page) || 1));
+        mtEbookPage[key] = safePage;
+        try {
+            localStorage.setItem(MT_EBOOK_LAST_PAGE_STORAGE_KEY, JSON.stringify(mtEbookPage));
+        } catch (_) {}
+    }
+    function mtGetEbookPage(slotIndex, fallback=1){
+        const value = Number(mtEbookPage[String(slotIndex)]);
+        return Number.isFinite(value) && value >= 1 ? Math.floor(value) : fallback;
+    }
 
     // 타이핑 to 언마스크 영구 통계
     const MT_STATS_STORAGE_KEY = 'typing_unmask_stats_v1';
@@ -10056,7 +10076,7 @@ ${JSON.stringify(finalPayload)}`;
         const remaining = mtGetEbookWords(slot).length;
         const totalPages = Math.max(1, Math.ceil(remaining / MT_EBOOK_PAGE_SIZE));
         const key = String(slot);
-        mtEbookPage[key] = Math.min(Math.max(Number(mtEbookPage[key] || 1), 1), totalPages);
+        mtSaveEbookPage(key, Math.min(Math.max(mtGetEbookPage(key), 1), totalPages));
 
         mtOpenEbookViewer(slot);
         mtInitSlots();
@@ -10143,10 +10163,10 @@ ${JSON.stringify(finalPayload)}`;
         }
         mtEbookActiveSlot=Number(slotIndex);
         const key=String(slotIndex);
-        let page=Number(mtEbookPage[key]||1);
+        let page=mtGetEbookPage(key);
         const totalPages=Math.max(1,Math.ceil(words.length/MT_EBOOK_PAGE_SIZE));
         page=Math.min(Math.max(page,1),totalPages);
-        mtEbookPage[key]=page;
+        mtSaveEbookPage(key, page);
         const main=document.getElementById('mt-main-menu'), viewer=document.getElementById('mtEbookViewer');
         if(main) main.style.display='none';
         if(viewer) viewer.style.display='block';
@@ -10184,13 +10204,13 @@ ${JSON.stringify(finalPayload)}`;
         if(pg){
             pg.innerHTML='';
             const prev=document.createElement('button'); prev.className='mt-ebook-page-btn'; prev.textContent='이전'; prev.disabled=page<=1;
-            prev.onclick=()=>{ if(page>1){ mtEbookPage[key]=page-1; mtOpenEbookViewer(slotIndex); } };
+            prev.onclick=()=>{ if(page>1){ mtSaveEbookPage(key, page-1); mtOpenEbookViewer(slotIndex); } };
             const input=document.createElement('input'); input.className='mt-ebook-page-input'; input.type='number'; input.min='1'; input.max=String(totalPages); input.value=String(page);
-            const go=()=>{ let v=parseInt(input.value,10); if(!Number.isFinite(v)) v=page; v=Math.min(Math.max(v,1),totalPages); mtEbookPage[key]=v; mtOpenEbookViewer(slotIndex); };
+            const go=()=>{ let v=parseInt(input.value,10); if(!Number.isFinite(v)) v=page; v=Math.min(Math.max(v,1),totalPages); mtSaveEbookPage(key, v); mtOpenEbookViewer(slotIndex); };
             input.onkeydown=(e)=>{ if(e.key==='Enter'){ e.preventDefault(); go(); } }; input.onchange=go;
             const info=document.createElement('span'); info.className='mt-ebook-page-info'; info.textContent=`/ ${totalPages} 페이지`;
             const next=document.createElement('button'); next.className='mt-ebook-page-btn'; next.textContent='다음'; next.disabled=page>=totalPages;
-            next.onclick=()=>{ if(page<totalPages){ mtEbookPage[key]=page+1; mtOpenEbookViewer(slotIndex); } };
+            next.onclick=()=>{ if(page<totalPages){ mtSaveEbookPage(key, page+1); mtOpenEbookViewer(slotIndex); } };
             pg.append(prev,input,info,next);
         }
     }
@@ -10975,7 +10995,13 @@ ${JSON.stringify(finalPayload)}`;
         document.getElementById('mtStarBtn').innerText = currentWord.starred ? '★' : '☆';
 
         let realSerialNumber = currentWord.serial || (currentWord.originalIndex + 1);
-        document.getElementById('mtProgressText').innerText = `[${realSerialNumber}] ${index + 1} / ${mtCurrentStudyWords.length}`;
+        const ebookPosition = mtEbookTypingActive && Number.isInteger(Number(currentWord.originalIndex))
+            ? Number(currentWord.originalIndex) + 1
+            : index + 1;
+        const ebookTotal = mtEbookTypingActive && mtEbookActiveSlot !== null && mtEbookActiveSlot !== undefined
+            ? mtGetEbookWords(Number(mtEbookActiveSlot)).length
+            : mtCurrentStudyWords.length;
+        document.getElementById('mtProgressText').innerText = `[${realSerialNumber}] ${ebookPosition} / ${ebookTotal}`;
 
         mtRenderMask('');
         mtSaveSessionState();
@@ -10996,7 +11022,7 @@ ${JSON.stringify(finalPayload)}`;
         const target = String(currentWord.eng || '');
         const input = document.getElementById('mtEngInput');
         const typed = String(input?.value || '');
-        const typingTarget = target.replace(/[.!?,"。！？]+\s*$/, '');
+        const typingTarget = target.replace(/[.!?,'"。！？]+\s*$/, '');
         return typed.toLowerCase() === typingTarget.toLowerCase() ||
                typed.toLowerCase() === target.toLowerCase();
     }
@@ -11062,7 +11088,7 @@ ${JSON.stringify(finalPayload)}`;
         const typed = String(input?.value || '');
 
         // 입력으로 문장 전체가 완성된 경우
-        const typingTarget = target.replace(/[.!?,"。！？]+\s*$/, '');
+        const typingTarget = target.replace(/[.!?,'"。！？]+\s*$/, '');
         if (typed.toLowerCase() === typingTarget.toLowerCase() || typed.toLowerCase() === target.toLowerCase()) return true;
 
         // 마스킹 대상(영문/숫자) 전체가 직접 입력 또는 힌트 공개되었는지 확인
@@ -11495,9 +11521,9 @@ ${JSON.stringify(finalPayload)}`;
                     let target = mtCurrentStudyWords[mtCurrentIndex].eng;
                     let typed = this.value;
 
-                    // 문장 끝의 구두점(. ! ? , " 。 ！ ？)은 입력하지 않아도 정답 처리합니다.
+                    // 문장 끝의 구두점(. ! ? , ' " 。 ！ ？)은 입력하지 않아도 정답 처리합니다.
                     // 중간의 어퍼스트러피, 쉼표, 대시 등은 그대로 입력해야 합니다.
-                    const typingTarget = target.replace(/[.!?,"。！？]+\s*$/, '');
+                    const typingTarget = target.replace(/[.!?,'"。！？]+\s*$/, '');
                     const isComplete = typed.toLowerCase() === typingTarget.toLowerCase() ||
                                        typed.toLowerCase() === target.toLowerCase();
 
