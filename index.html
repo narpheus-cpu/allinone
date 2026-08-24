@@ -9855,13 +9855,22 @@ ${JSON.stringify(finalPayload)}`;
         const data = new Uint8Array(await file.arrayBuffer());
         const wb = XLSX.read(data, {type:'array', cellDates:false});
         if (!wb.SheetNames || wb.SheetNames.length === 0) throw new Error('엑셀 파일에 시트가 없습니다.');
-        const sheetName = wb.SheetNames[0];
+
+        // 앱 자체 내보내기 파일은 [전자책원본]과 별표가 포함된 [전자책] 시트를 함께 가집니다.
+        // 별표 이력을 복원할 수 있도록 [중요] 열이 있는 시트를 우선 사용합니다.
+        const exportCandidate = wb.SheetNames.find(name => {
+            const sh = wb.Sheets[name];
+            if (!sh) return false;
+            const probe = XLSX.utils.sheet_to_json(sh, {header:1, defval:'', raw:false}).slice(0,3);
+            return probe.some(r => Array.isArray(r) && r.some(v => String(v ?? '').trim() === '중요'));
+        });
+        const sheetName = exportCandidate || wb.SheetNames[0];
         const sheet = wb.Sheets[sheetName];
-        if (!sheet) throw new Error('첫 번째 시트를 읽을 수 없습니다.');
+        if (!sheet) throw new Error('전자책 데이터를 읽을 수 없습니다.');
         const rows = XLSX.utils.sheet_to_json(sheet, {header:1, defval:'', raw:false})
             .map(r => Array.isArray(r) ? r.map(v => v == null ? '' : String(v)) : [])
             .filter(r => r.some(v => String(v).trim() !== ''));
-        if (!rows.length) throw new Error('첫 번째 시트에 데이터가 없습니다.');
+        if (!rows.length) throw new Error('전자책 시트에 데이터가 없습니다.');
         const state = mtGetTypedState(idx);
         state.type = 'ebook';
         state.fileName = String(file.name || '').replace(/\.[^/.]+$/, '').trim() || `슬롯 ${idx+1}`;
@@ -10072,21 +10081,59 @@ ${JSON.stringify(finalPayload)}`;
         if(!mtEbookTemp)return;
         const mainCol=Number(document.getElementById('mtEbookMainCol').value), subCol=Number(document.getElementById('mtEbookSubCol').value), engCol=Number(document.getElementById('mtEbookEngCol').value);
         if(!Number.isInteger(mainCol)||!Number.isInteger(engCol)||mainCol<0||engCol<0){alert('주문장 열과 영어문장 열을 선택해 주세요.');return;}
-        const rows=mtEbookTemp.rows, words=[];
-        rows.forEach((r,i)=>{const main=String(r?.[mainCol]??'').trim(), sub=subCol>=0?String(r?.[subCol]??'').trim():'', eng=String(r?.[engCol]??'').trim(); if(!main||!eng)return; words.push({eng,kor:main,subKor:sub,literalKor:sub,serial:String(words.length+1),starred:false,originalIndex:words.length,ebookRead:false});});
+
+        const rows=Array.isArray(mtEbookTemp.rows)?mtEbookTemp.rows:[];
+        const header=Array.isArray(rows[0]) ? rows[0].map(v=>String(v??'').trim().toLowerCase()) : [];
+        const importantCol=header.findIndex(v=>v==='중요'||v==='별표'||v.includes('important')||v.includes('star'));
+        const looksLikeExportHeader=header.some(v=>v==='no'||v==='번호') && header.some(v=>v.includes('한국어')||v.includes('주문장')) && header.some(v=>v.includes('영어'));
+        const start=looksLikeExportHeader?1:0;
+        const words=[];
+        for(let i=start;i<rows.length;i++){
+            const r=rows[i]||[];
+            const main=String(r?.[mainCol]??'').trim();
+            const sub=subCol>=0?String(r?.[subCol]??'').trim():'';
+            const eng=String(r?.[engCol]??'').trim();
+            if(!main||!eng) continue;
+            const serial=String(words.length+1);
+            const starred=importantCol>=0 && /★/.test(String(r?.[importantCol]??''));
+            words.push({eng,kor:main,subKor:sub,literalKor:sub,serial,starred,originalIndex:words.length,ebookRead:false});
+        }
         if(!words.length){alert('선택한 열에서 주문장과 영어문장을 함께 가진 행을 찾지 못했습니다.');return;}
+        const importedStarredSerials=words.filter(w=>w.starred).map(w=>String(w.serial));
         const slot=mtEbookTemp.slotIndex, state=mtGetTypedState(slot);
+
         if(mtEbookTemp.addMode){
             const base=Array.isArray(state.outputRows)?state.outputRows.slice():[];
             const addRows=words.map((w,i)=>[w.eng,w.kor,w.subKor,String(base.length+i+1)]);
-            state.type='ebook';state.outputRows=base.concat(addRows);state.sourceRows=[...(state.sourceRows||[]),...rows];
-            state.ebook={...(state.ebook||{}),mainCol,subCol,engCol,sourceRows:[...(state.ebook?.sourceRows||[]),...rows]};
-            state.pattern={engCol:1,mainKorCol:2,subKorCol:3,serialCol:4};state.ebookReadIndexes=Array.isArray(state.ebookReadIndexes)?state.ebookReadIndexes:[];
-            state.lastSession=null;state.lastError='';mtSaveTypedState(slot,state);mtSetSlotType(slot,'ebook');mtEbookTemp=null;
-            const cm=document.getElementById('mtEbookColumnModal');if(cm)cm.style.display='none';mtInitSlots();alert(`[슬롯 ${slot+1}] 전자책 데이터 ${addRows.length}개를 추가했습니다.`);return;
+            const priorStars=new Set((state.starredSerials||[]).map(String));
+            words.forEach((w,i)=>{if(w.starred) priorStars.add(String(base.length+i+1));});
+            state.type='ebook';
+            state.outputRows=base.concat(addRows);
+            state.starredSerials=Array.from(priorStars);
+            state.sourceRows=[...(state.sourceRows||[]),...rows.slice(start)];
+            state.ebook={...(state.ebook||{}),mainCol,subCol,engCol,sourceRows:[...(state.ebook?.sourceRows||[]),...rows.slice(start)]};
+            state.pattern={engCol:1,mainKorCol:2,subKorCol:3,serialCol:4};
+            state.ebookReadIndexes=Array.isArray(state.ebookReadIndexes)?state.ebookReadIndexes:[];
+            state.lastSession=null;state.lastError='';
+            mtSaveTypedState(slot,state);mtSetSlotType(slot,'ebook');mtEbookTemp=null;
+            const cm=document.getElementById('mtEbookColumnModal');if(cm)cm.style.display='none';
+            mtInitSlots();alert(`[슬롯 ${slot+1}] 전자책 데이터 ${addRows.length}개를 추가했습니다.`);return;
         }
-        state.type='ebook'; state.fileName=mtEbookTemp.fileName; state.ebook={mainCol,subCol,engCol,sourceRows:rows}; state.outputRows=words.map(w=>[w.eng,w.kor,w.subKor,w.serial]); state.pattern={engCol:1,mainKorCol:2,subKorCol:3,serialCol:4}; state.ebookReadIndexes=[]; state.lastSession=null; state.lastError=''; mtSetSlotType(slot,'ebook'); mtSaveTypedState(slot,state); mtCloseEbookColumnModal(); mtInitSlots(); mtOpenEbookViewer(slot);
+
+        state.type='ebook';
+        state.fileName=mtEbookTemp.fileName;
+        state.ebook={mainCol,subCol,engCol,sourceRows:rows.slice(start)};
+        state.outputRows=words.map(w=>[w.eng,w.kor,w.subKor,w.serial]);
+        state.pattern={engCol:1,mainKorCol:2,subKorCol:3,serialCol:4};
+        state.starredSerials=importedStarredSerials;
+        state.ebookReadIndexes=[];
+        state.lastSession=null;
+        state.lastError='';
+        mtSetSlotType(slot,'ebook');
+        mtSaveTypedState(slot,state);
+        mtCloseEbookColumnModal();mtInitSlots();mtOpenEbookViewer(slot);
     }
+
     function mtGetEbookWords(slotIndex){ const st=mtGetTypedState(slotIndex); const p=st.pattern||{engCol:1,mainKorCol:2,subKorCol:3,serialCol:4}; const read=new Set((st.ebookReadIndexes||[]).map(Number)); return (st.outputRows||[]).map((r,i)=>({eng:String(r?.[p.engCol-1]??'').trim(),kor:String(r?.[p.mainKorCol-1]??'').trim(),subKor:String(r?.[p.subKorCol-1]??'').trim(),serial:String(r?.[p.serialCol-1]??(i+1)).trim(),originalIndex:i,ebookRead:read.has(i)})).filter(w=>w.kor&&w.eng); }
     let mtEbookEditTarget = null;
 
