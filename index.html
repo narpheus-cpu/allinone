@@ -10277,8 +10277,7 @@ ${JSON.stringify(finalPayload)}`;
             </button><span class="mt-ebook-item-num">${absoluteIndex+1}</span><span class="mt-ebook-item-main">${mtEscapeHTML(displayText)}</span></div></div>`;
             const check=item.querySelector('.mt-ebook-item-select');
             // 체크박스 클릭은 선택 상태만 변경하고 카드 열기 이벤트가 부모 행으로 전파되지 않도록 합니다.
-            check.onclick=(e)=>{ e.preventDefault(); e.stopPropagation(); check.checked=!check.checked; check.dispatchEvent(new Event('change',{bubbles:false})); };
-            check.onchange=(e)=>{ e.stopPropagation(); if(check.checked) mtEbookSelectedIndexes.add(absoluteIndex); else mtEbookSelectedIndexes.delete(absoluteIndex); mtEbookUpdateSelectionUi(Number(slotIndex), pageWords, start); };
+            check.addEventListener('click',(e)=>{ e.stopPropagation(); }); check.addEventListener('change',(e)=>{ e.stopPropagation(); if(check.checked) mtEbookSelectedIndexes.add(absoluteIndex); else mtEbookSelectedIndexes.delete(absoluteIndex); mtEbookUpdateSelectionUi(Number(slotIndex), pageWords, start); });
             item.querySelector('.mt-ebook-item-delete-btn').onclick=(e)=>mtDeleteEbookItem(Number(slotIndex),absoluteIndex,e);
             item.querySelector('.mt-ebook-item-edit-btn').onclick=(e)=>{ e.preventDefault(); e.stopPropagation(); mtOpenEbookEditModal(Number(slotIndex),absoluteIndex); };
             item.onclick=()=>mtOpenEbookTyping(Number(slotIndex),absoluteIndex);
