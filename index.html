@@ -8334,7 +8334,43 @@ const prompt=mtApplyGeneratorPrompt(mtGetGeneratorPrompt('slot9','main',mtGenera
         },delay);
         mtSlot9RenderStatus();
     }
-    function mtSlot9DownloadClick(e){if(e)e.stopPropagation(); const st=mtSlot9GetState(); const p=mtSlot9GetPattern(st); const src=st.sourceRows.map(x=>[x]); const out=(st.outputRows||[]); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(src),'원본'); XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(out),'생성결과'); XLSX.writeFile(wb,`${String(st.fileName||'슬롯9').replace(/\.(xlsx|xls)$/i,'')}_슬롯9.xlsx`);}
+    // 내보내기 시 생성형/전자책의 별표 이력을 카드 데이터에 함께 반영합니다.
+    function mtBuildExportRowsWithStarred(rows, pattern, starredSerials, headerLabel='중요') {
+        const list = Array.isArray(rows) ? rows : [];
+        const p = pattern || { serialCol: 4 };
+        const serialIdx = Math.max(0, Number(p.serialCol || 1) - 1);
+        const starSet = new Set((Array.isArray(starredSerials) ? starredSerials : []).map(String));
+        if (!list.length) return [['중요']];
+        const width = Math.max(...list.map(r => Array.isArray(r) ? r.length : 0), serialIdx + 1);
+        const out = list.map(r => {
+            const row = Array.isArray(r) ? r.slice() : [];
+            while (row.length < width) row.push('');
+            const serial = String(row[serialIdx] ?? '').trim();
+            row.push(starSet.has(serial) ? '★' : '');
+            return row;
+        });
+        return out;
+    }
+
+    function mtAddExportHeader(rows, headerLabel='중요') {
+        const data = Array.isArray(rows) ? rows.map(r => Array.isArray(r) ? r.slice() : []) : [];
+        if (!data.length) return [[headerLabel]];
+        const width = Math.max(...data.map(r => r.length));
+        const header = Array(width).fill('');
+        header[width - 1] = headerLabel;
+        return [header, ...data];
+    }
+
+    function mtSlot9DownloadClick(e){
+        if(e)e.stopPropagation();
+        const st=mtSlot9GetState(), p=mtSlot9GetPattern(st);
+        const src=st.sourceRows.map(x=>[x]);
+        const out=mtAddExportHeader(mtBuildExportRowsWithStarred(st.outputRows||[],p,st.starredSerials,'중요'),'중요');
+        const wb=XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(src),'원본');
+        XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(out),'생성결과');
+        XLSX.writeFile(wb,`${String(st.fileName||'슬롯9').replace(/\.(xlsx|xls)$/i,'')}_슬롯9.xlsx`);
+    }
     function mtSetSlot9PatternInputs(){const st=mtSlot9GetState(),p=mtSlot9GetPattern(st); ['SourceKorCol','EngCol','MainKorCol','SubKorCol','SerialCol'].forEach(k=>{const el=document.getElementById('mtSlot9'+k); if(el)el.value=p[k.charAt(0).toLowerCase()+k.slice(1)];});}
     function mtOpenSlot9PatternEditor(){mtSetSlot9PatternInputs();document.getElementById('mtSlot9PatternModal').style.display='flex';}
     function mtCloseSlot9PatternEditor(){document.getElementById('mtSlot9PatternModal').style.display='none';}
@@ -9416,8 +9452,9 @@ ${JSON.stringify(finalPayload)}`;
                 return [parts[0] || '', parts[1] || '', parts.slice(2).join(' - ') || ''];
             });
         const pattern = mtWordWebGetPattern(state);
+        const outputAoA = mtAddExportHeader(mtBuildExportRowsWithStarred(state.outputRows || [], pattern, state.starredSerials, '중요'), '중요');
         XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(topicAoA), pattern.topicSheet);
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(state.outputRows), pattern.outputSheet);
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(outputAoA), pattern.outputSheet);
         const baseName = state.fileName.replace(/\.(xlsx|xls)$/i, '');
         XLSX.writeFile(wb, `${baseName}_워드웹회화.xlsx`);
     }
@@ -9609,13 +9646,14 @@ ${JSON.stringify(finalPayload)}`;
         try{
             if(targetType==='normal'){
                 const st=mtGetTypedState(slot),p=st.pattern||{engCol:1,mainKorCol:2,subKorCol:3,serialCol:4};
-                const words=(st.outputRows||[]).map((r,i)=>({id:Date.now()+i,number:String(r?.[p.serialCol-1]??i+1),createdAt:Date.now(),eng:String(r?.[p.engCol-1]??''),kor:String(r?.[p.mainKorCol-1]??''),subKor:String(r?.[p.subKorCol-1]??''),score:0,lastQueriedAt:0,selected:false,isEditing:false,starred:false})).filter(w=>w.eng.trim()&&w.kor.trim());
+                const starSet=new Set((st.starredSerials||[]).map(String));
+                const words=(st.outputRows||[]).map((r,i)=>{const serial=String(r?.[p.serialCol-1]??i+1); return {id:Date.now()+i,number:serial,createdAt:Date.now(),eng:String(r?.[p.engCol-1]??''),kor:String(r?.[p.mainKorCol-1]??''),subKor:String(r?.[p.subKorCol-1]??''),score:0,lastQueriedAt:0,selected:false,isEditing:false,starred:starSet.has(serial)};}).filter(w=>w.eng.trim()&&w.kor.trim());
                 mtSetNormalSlotSync(slot,{name:st.fileName||`슬롯 ${slot+1}`,words,lastSession:null,type:'normal',completedMaskKeys:[],columnPattern:{mainKorCol:2,subKorCol:3,engCol:1}});
                 mtSetSlotType(slot,'normal');
                 mtSaveTypedState(slot,{...st,type:'normal'});
             }else{
                 const data=mtGetNormalSlotSync(slot)||{name:`슬롯 ${slot+1}`,words:[]},rows=(data.words||[]).map((w,i)=>[String(w.eng??w.english??''),String(w.kor??w.meaning??''),String(w.subKor??w.literalKor??w.hint??''),String(w.number??i+1)]).filter(r=>r[0]&&r[1]);
-                const st=mtGetTypedState(slot);st.type='ebook';st.fileName=data.name||`슬롯 ${slot+1}`;st.pattern={engCol:1,mainKorCol:2,subKorCol:3,serialCol:4};st.outputRows=rows;st.ebook={mainCol:1,subCol:2,engCol:0,sourceRows:rows.slice()};st.ebookReadIndexes=[];mtSetSlotType(slot,'ebook');mtSaveTypedState(slot,st);
+                const st=mtGetTypedState(slot);st.type='ebook';st.fileName=data.name||`슬롯 ${slot+1}`;st.pattern={engCol:1,mainKorCol:2,subKorCol:3,serialCol:4};st.outputRows=rows;st.ebook={mainCol:1,subCol:2,engCol:0,sourceRows:rows.slice()};st.ebookReadIndexes=[];st.starredSerials=(data.words||[]).filter(w=>w?.starred).map(w=>String(w.number??'')).filter(Boolean);mtSetSlotType(slot,'ebook');mtSaveTypedState(slot,st);
             }
             mtCloseTypeChangeModal();mtInitSlots();
         }catch(e){alert(`유형 변경 중 오류가 발생했습니다.\n${e?.message||e}`);}
@@ -10511,7 +10549,27 @@ ${JSON.stringify(finalPayload)}`;
         else mtInitSlots();
     }
 
-    function mtTypedExport(e,slotIndex){ if(e)e.stopPropagation(); const type=mtGetSlotType(slotIndex),state=mtGetTypedState(slotIndex),wb=XLSX.utils.book_new(); if(type==='self_generate'){XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet((state.sourceRows||[]).map(x=>[x])),'원본');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(state.outputRows||[]),'생성결과');XLSX.writeFile(wb,`${state.fileName||'슬롯'}_자체형.xlsx`);} else if(type==='reference_generate'){XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(state.topicRows||[]),'차례');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(state.outputRows||[]),'시트1');XLSX.writeFile(wb,`${state.fileName||'슬롯'}_참조형.xlsx`);} else if(type==='ebook'){XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet((state.ebook?.sourceRows||[])),'전자책원본');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(state.outputRows||[]),'전자책');XLSX.writeFile(wb,`${state.fileName||'슬롯'}_전자책.xlsx`);} }
+    function mtTypedExport(e,slotIndex){
+        if(e)e.stopPropagation();
+        const type=mtGetSlotType(slotIndex), state=mtGetTypedState(slotIndex), wb=XLSX.utils.book_new();
+        const pattern=state.pattern || {engCol:1,mainKorCol:2,subKorCol:3,serialCol:4};
+        if(type==='self_generate'){
+            XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet((state.sourceRows||[]).map(x=>[x])),'원본');
+            const out=mtAddExportHeader(mtBuildExportRowsWithStarred(state.outputRows||[],pattern,state.starredSerials,'중요'),'중요');
+            XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(out),'생성결과');
+            XLSX.writeFile(wb,`${state.fileName||'슬롯'}_자체형.xlsx`);
+        } else if(type==='reference_generate'){
+            XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(state.topicRows||[]),'차례');
+            const out=mtAddExportHeader(mtBuildExportRowsWithStarred(state.outputRows||[],pattern,state.starredSerials,'중요'),'중요');
+            XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(out),'시트1');
+            XLSX.writeFile(wb,`${state.fileName||'슬롯'}_참조형.xlsx`);
+        } else if(type==='ebook'){
+            XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet((state.ebook?.sourceRows||[])),'전자책원본');
+            const out=mtAddExportHeader(mtBuildExportRowsWithStarred(state.outputRows||[],pattern,state.starredSerials,'중요'),'중요');
+            XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(out),'전자책');
+            XLSX.writeFile(wb,`${state.fileName||'슬롯'}_전자책.xlsx`);
+        }
+    }
 
 
     document.getElementById('mtFileUpload').addEventListener('change', async function(e) {
