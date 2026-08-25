@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v52</title>
+    <title>올인원 영작-단어장 시스템 · v53</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -2338,6 +2338,10 @@ body { background: var(--bench-v2-bg) !important; }
     transform: none !important;
     transition: none !important;
 }
+
+<style id="mtNoSlotHoverMotionV53">
+.mt-slot, .mt-slot:hover, .mt-slot.mt-special-slot:hover, .mt-slot.mt-generator-slot:hover { transform:none !important; transition: box-shadow .18s ease, border-color .18s ease, background-color .18s ease !important; }
+</style>
 </style>
 </head>
 <body>
@@ -4144,31 +4148,31 @@ body { background: var(--bench-v2-bg) !important; }
         }
     }
     async function mtDownloadGeneratorErrorLog(event,slotKey,slotLabel){
-        if(event)event.stopPropagation();
+        if(event){event.preventDefault();event.stopPropagation();}
         const requestedKey=String(slotKey||'');
         const key=mtNormalizeGeneratorTypeKey(requestedKey,'');
-        let logs=await mtGetGeneratorErrorLogsAsync(key);
+        let logs=[];
+        let loadError='';
+        try{
+            logs=await mtGetGeneratorErrorLogsAsync(key);
+        }catch(e){
+            loadError=String(e?.message||e||'오류 로그 조회 실패');
+            try{logs=mtGetGeneratorErrorLogs(key);}catch(_){logs=[];}
+        }
+        // 현재 슬롯 상태의 마지막 진단은 저장소 조회가 실패해도 팝업에 표시합니다.
         if(!logs.length){
             try{
                 let fallback=null;
-                if(key==='self_generate'){ fallback=mtGetTypedState(9)?.lastDiagnostic||null; }
-                else if(key==='reference_generate'){ fallback=mtGetTypedState(10)?.lastDiagnostic||null; }
-                else if(/^typed_\d+$/.test(String(requestedKey)))fallback=mtGetTypedState(Number(String(requestedKey).slice(6)))?.lastDiagnostic||null;
-                if(fallback){
-                    mtRecordGeneratorErrorLog(key,{...fallback,slotLabel:slotLabel||fallback.slotLabel||key,source:'lastDiagnostic-fallback'});
-                    logs=mtGetGeneratorErrorLogs(key);
+                for(let i=1;i<=11;i++){
+                    if(mtGetSlotType(i)===key){ fallback=mtGetTypedState(i)?.lastDiagnostic||null; if(fallback)break; }
                 }
-            }catch(_){}
+                if(fallback){
+                    const entry=mtRecordGeneratorErrorLog(key,{...fallback,slotLabel:slotLabel||fallback.slotLabel||key,source:'lastDiagnostic-fallback'});
+                    logs=entry?mtGetGeneratorErrorLogs(key):[];
+                }
+            }catch(_){ }
         }
-        if(!logs.length){
-            try {
-                const rawGlobal = localStorage.getItem(MT_GENERATOR_ERROR_LOG_GLOBAL_KEY);
-                const globalLogs = mtNormalizeGeneratorErrorLogs(rawGlobal ? JSON.parse(rawGlobal) : []);
-                const slotOnly = globalLogs.filter(x => mtNormalizeGeneratorTypeKey(x.slotKey||'', '') === key || String(x.slotKey||'') === key);
-                if (slotOnly.length) logs = slotOnly.slice(-MT_GENERATOR_ERROR_LOG_MAX);
-            } catch (_) {}
-        }
-        logs=logs.slice().sort((a,b)=>Number(b.timestampMs||0)-Number(a.timestampMs||0));
+        logs=Array.isArray(logs)?logs.slice().sort((a,b)=>Number(b.timestampMs||0)-Number(a.timestampMs||0)):[];
         const text=logs.length ? [
             `[마스킹타이핑] ${slotLabel||key} 오류 로그`,
             `화면 표시시각(KST): ${mtGetSeoulTimestamp()}`,
@@ -4180,9 +4184,11 @@ body { background: var(--bench-v2-bg) !important; }
             `[마스킹타이핑] ${slotLabel||key} 오류 로그`,
             `화면 표시시각(KST): ${mtGetSeoulTimestamp()}`,
             `총 오류 수: 0`,
+            loadError ? `로그 조회 경고: ${loadError}` : '',
             '',
             '현재 저장된 오류 로그가 없습니다.'
         ].join('\n');
+        // 어떤 조회 경로가 실패하더라도 여기까지 도달하면 반드시 팝업을 엽니다.
         mtOpenGeneratorErrorLogModal(slotLabel||key,logs,text);
     }
 
@@ -8314,13 +8320,11 @@ ${JSON.stringify(finalPayload)}`;
     async function mtTypedSelfGenerate(slotIndex) {
         const state=mtGetTypedState(slotIndex);
         if(state.type!=='self_generate'||!state.fileName)return;
-
         const settings=mtGetGeneratorSettings('self_generate');
         const sourceRows=Array.isArray(state.sourceRows)?state.sourceRows:[];
         if(!sourceRows.length)return;
         if(!Array.isArray(state.retryRows)) state.retryRows=[];
 
-        // 실패했던 행을 먼저 재시도하고, 부족한 만큼 새 원문을 추가합니다.
         const retryItems=state.retryRows
             .map(x=>({sourceIndex:Number(x?.sourceIndex),korean:String(x?.korean??'').trim()}))
             .filter(x=>Number.isInteger(x.sourceIndex)&&x.sourceIndex>=0&&x.korean);
@@ -8328,12 +8332,13 @@ ${JSON.stringify(finalPayload)}`;
         const freshCapacity=Math.max(0,settings.batchSize-retryTake.length);
         const freshStart=Number(state.nextSourceIndex||0);
         const freshRows=[];
-        for(let i=0;i<sourceRows.length&&freshRows.length<freshCapacity;i++){
+        for(let i=0;i<freshCapacity;i++){
             const idx=freshStart+i;
             if(idx>=sourceRows.length)break;
-            freshRows.push({sourceIndex:idx,korean:String(sourceRows[idx]??'').trim()});
+            const korean=String(sourceRows[idx]??'').trim();
+            if(korean) freshRows.push({sourceIndex:idx,korean});
         }
-        const work=[...retryTake,...freshRows].filter(x=>x.korean);
+        const work=[...retryTake,...freshRows];
         if(!work.length)return;
 
         const batch=work.map(x=>x.korean);
@@ -8342,7 +8347,7 @@ ${JSON.stringify(finalPayload)}`;
             {COUNT:batch.length,BATCH:batch.join('\n')}
         ).trim();
 
-        // 자체형은 JSON Schema를 사용하지 않고 순수 텍스트(TAB 3열)로 생성합니다.
+        // 자체형은 API-level JSON Schema를 사용하지 않습니다. 자유 텍스트 TAB 3열을 요청합니다.
         const raw=await fetchGemini(
             prompt,
             null,
@@ -8350,14 +8355,15 @@ ${JSON.stringify(finalPayload)}`;
         );
         if(raw==null||String(raw).trim()==='') throw new Error('AI 응답이 비어 있습니다.');
 
-        const lines=String(raw)
-            .replace(/^```(?:text|tsv)?\s*/i,'')
-            .replace(/\s*```$/i,'')
-            .split(/\r?\n/)
-            .map(v=>v.trim())
-            .filter(Boolean);
+        const cleanText=String(raw)
+            .replace(/^\s*```(?:text|tsv|plaintext)?\s*/i,'')
+            .replace(/\s*```\s*$/i,'')
+            .trim();
 
-        const parsed=lines.map(line=>{
+        let parsed=[];
+        // 1차: 권장 TSV/탭 3열 파싱
+        const tsvLines=cleanText.split(/\r?\n/).map(v=>v.trim()).filter(Boolean);
+        parsed=tsvLines.map(line=>{
             const cols=line.split('\t');
             return {
                 source_korean:String(cols[0]??'').trim(),
@@ -8366,12 +8372,28 @@ ${JSON.stringify(finalPayload)}`;
             };
         });
 
+        // 2차 호환 파싱: 기존에 저장돼 있던 JSON형 자체생성 프롬프트/응답이 남아 있어도 생성 자체가 막히지 않도록 합니다.
+        // API 스키마를 다시 강제하는 것이 아니라, 텍스트 응답이 JSON으로 돌아온 경우에만 수용합니다.
+        const looksLikeJson=cleanText.startsWith('[')||cleanText.startsWith('{');
+        if(looksLikeJson){
+            try{
+                const maybe=mtExtractJsonValue(cleanText);
+                if(Array.isArray(maybe)){
+                    parsed=maybe.map((x,i)=>({
+                        source_korean:String(x?.source_korean??x?.korean_source??'').trim(),
+                        english:String(x?.english??'').trim(),
+                        literal_korean:String(x?.literal_korean??'').trim(),
+                        __idx:Number.isFinite(Number(x?.index))?Number(x.index):i
+                    })).sort((a,b)=>a.__idx-b.__idx);
+                }
+            }catch(_){ }
+        }
+
         const normalize=v=>String(v??'').normalize('NFC').replace(/\s+/g,' ').trim();
         const koreanChunkList=v=>{
             const text=String(v??'').trim();
             const chunks=text.match(/\[[^\[\]]+\]/g)||[];
             if(!text||chunks.length<1||chunks.length>12)return false;
-            // 대괄호 청크 외부의 설명은 허용하지 않되, 앞뒤 공백/일반 문장부호만 무시합니다.
             const outside=text.replace(/\[[^\[\]]+\]/g,'').replace(/[\s.,!?;:·]+/g,'');
             if(outside!=='')return false;
             return chunks.every(c=>{
@@ -8380,7 +8402,6 @@ ${JSON.stringify(finalPayload)}`;
             });
         };
 
-        // 행 단위로 검증: 정상 행은 즉시 저장하고 실패 행만 retryRows로 넘깁니다.
         const accepted=[];
         const failed=[];
         for(let i=0;i<work.length;i++){
@@ -8404,23 +8425,20 @@ ${JSON.stringify(finalPayload)}`;
         let current=mtTypedSerialNext(state);
         accepted.forEach((x,i)=>{
             const row=Array(4).fill('');
-            row[0]=x.source_korean; // 1열 주문장
-            row[1]=x.english;       // 2열 영어문장
-            row[2]=x.literal_korean; // 3열 보조문장
+            row[0]=x.source_korean;
+            row[1]=x.english;
+            row[2]=x.literal_korean;
             row[3]=String(current+i);
             state.outputRows.push(row);
         });
 
-        const retryKey=new Set(failed.map(x=>`${x.sourceIndex}::${x.korean}`));
-        const remainingRetry=retryItems.slice(retryTake.length).filter(x=>!retryKey.has(`${x.sourceIndex}::${x.korean}`));
+        const retryKeys=new Set(failed.map(x=>`${x.sourceIndex}::${x.korean}`));
+        const remainingRetry=retryItems.slice(retryTake.length).filter(x=>!retryKeys.has(`${x.sourceIndex}::${x.korean}`));
         state.retryRows=[...remainingRetry,...failed];
-        // 새 원문은 이번 실행에서 모두 소비 대상으로 이동. 실패한 것은 retryRows가 다음 배치에서 우선 재시도합니다.
         state.nextSourceIndex=Math.min(sourceRows.length,freshStart+freshRows.length);
         state.lastRun=Date.now();
         state.nextRun=Date.now()+mtGetGeneratorTypeIntervalMs(state.type);
-        state.lastError=failed.length
-            ? `${accepted.length}개 저장, ${failed.length}개는 다음 자동 실행에서 재시도합니다.`
-            : '';
+        state.lastError=failed.length?`${accepted.length}개 저장, ${failed.length}개는 다음 자동 실행에서 재시도합니다.`:'';
         state.lastDiagnostic=null;
         mtSaveTypedState(slotIndex,state);
         mtInitSlots();
