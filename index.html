@@ -2538,7 +2538,7 @@ body { background: var(--bench-v2-bg) !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v75</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v76</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -2970,7 +2970,9 @@ body { background: var(--bench-v2-bg) !important; }
                     </div>
                     <button class="btn-excel" type="button" onclick="mtCloseNormalClipboardModal()">닫기</button>
                 </div>
-                <textarea id="mtNormalClipboardText" style="width:100%;min-height:260px;box-sizing:border-box;margin-top:14px;padding:12px;border:1px solid #cbd5e1;border-radius:8px;font-size:12px;line-height:1.5;resize:vertical;outline:none;" placeholder="1열\t2열\t3열\n오빠!\tOppa!\t[오빠!]\n응?\tYeah?\t[응?]"></textarea>
+                <label for="mtInitialSlotName" style="display:block;margin-top:14px;font-size:12px;font-weight:700;color:#374151;">슬롯 이름</label>
+                <input id="mtInitialSlotName" type="text" maxlength="80" style="width:100%;box-sizing:border-box;margin-top:6px;padding:9px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:12px;outline:none;" placeholder="예: Lesson 1 · 여행 영어">
+                <textarea id="mtNormalClipboardText" style="width:100%;min-height:260px;box-sizing:border-box;margin-top:12px;padding:12px;border:1px solid #cbd5e1;border-radius:8px;font-size:12px;line-height:1.5;resize:vertical;outline:none;" placeholder="1열\t2열\t3열\n오빠!\tOppa!\t[오빠!]\n응?\tYeah?\t[응?]"></textarea>
                 <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:12px;">
                     <button class="btn-excel" type="button" onclick="mtPasteFromSystemClipboard()">클립보드에서 가져오기</button>
                     <button class="btn-primary" type="button" onclick="mtRegisterNormalClipboardText()">등록</button>
@@ -3195,7 +3197,7 @@ body { background: var(--bench-v2-bg) !important; }
 
         <div id="mtEbookViewer" class="mt-ebook-viewer">
             <div class="mt-ebook-head">
-                <div><div class="mt-ebook-title" id="mtEbookViewerTitle">전자책</div><div class="mt-ebook-subtitle" id="mtEbookViewerSubtitle"></div></div>
+                <div><div style="display:flex;align-items:center;gap:6px;"><div class="mt-ebook-title" id="mtEbookViewerTitle">전자책</div><button type="button" class="mt-ebook-title-edit-btn" onclick="mtRenameEbookViewerTitle()" title="슬롯 제목 수정" aria-label="슬롯 제목 수정">✎</button></div><div class="mt-ebook-subtitle" id="mtEbookViewerSubtitle"></div></div>
                 <div style="display:flex;align-items:center;gap:6px;">
                     <button id="mtEbookEnglishToggleBtn" type="button" class="btn-excel" onclick="mtToggleEbookEnglishMode()">영어변환</button>
                     <button class="btn-excel" onclick="mtCloseEbookViewer()">← 슬롯 목록</button>
@@ -5365,7 +5367,7 @@ Rules:
     }
     function mtCloseNormalImportSourceModal(){const modal=document.getElementById('mtNormalImportSourceModal');if(modal)modal.style.display='none';}
     function mtNormalImportFromFile(){if(!Number.isInteger(mtInitialImportSlot))return;const slot=mtInitialImportSlot,type=mtInitialImportType;mtCloseNormalImportSourceModal();mtTriggerUpload(slot,type);}
-    function mtOpenNormalClipboardModal(){const source=document.getElementById('mtNormalImportSourceModal'),modal=document.getElementById('mtNormalClipboardModal'),ta=document.getElementById('mtNormalClipboardText');if(source)source.style.display='none';if(ta){ta.value='';setTimeout(()=>ta.focus(),0);}if(modal)modal.style.display='flex';}
+    function mtOpenNormalClipboardModal(){const source=document.getElementById('mtNormalImportSourceModal'),modal=document.getElementById('mtNormalClipboardModal'),ta=document.getElementById('mtNormalClipboardText'),name=document.getElementById('mtInitialSlotName');if(source)source.style.display='none';if(ta)ta.value='';if(name)name.value='';if(modal)modal.style.display='flex';setTimeout(()=>name?.focus(),0);}
     function mtCloseNormalClipboardModal(){const modal=document.getElementById('mtNormalClipboardModal');if(modal)modal.style.display='none';}
     async function mtPasteFromSystemClipboard(){const ta=document.getElementById('mtNormalClipboardText');if(!ta)return;try{ta.value=await navigator.clipboard.readText();}catch(_){alert('브라우저에서 클립보드 읽기가 차단되었습니다. 텍스트를 직접 붙여넣어 주세요.');}}
     function mtRegisterNormalClipboardText(){
@@ -5373,11 +5375,13 @@ Rules:
         const rows=raw.split(/\r?\n/).filter(x=>x.trim()!=='').map(x=>x.split('\t'));
         if(!rows.length)return alert('등록할 텍스트가 없습니다.');
         if(!Number.isInteger(mtInitialImportSlot))return alert('등록할 슬롯을 찾지 못했습니다. 다시 시도해 주세요.');
-        const slot=mtInitialImportSlot,type=mtInitialImportType; mtCloseNormalClipboardModal();
+        const slot=mtInitialImportSlot,type=mtInitialImportType;
+        const slotName=String(document.getElementById('mtInitialSlotName')?.value||'').trim() || `${type==='ebook'?'전자책':'일반'} 슬롯 ${slot}`;
+        mtCloseNormalClipboardModal();
         if(type==='ebook'){
-            const state=mtGetTypedState(slot);state.type='ebook';state.fileName=state.fileName||`붙여넣기 전자책 ${slot}`;mtSetSlotType(slot,'ebook');mtSaveTypedState(slot,state);
+            const state=mtGetTypedState(slot);state.type='ebook';state.fileName=slotName;mtSetSlotType(slot,'ebook');mtSaveTypedState(slot,state);
             mtEbookTemp={slotIndex:slot,fileName:state.fileName,rows,sourceSheetName:'클립보드',addMode:false};mtOpenEbookColumnModal(rows);
-        }else mtRegisterNormalRows(rows,slot,`붙여넣기 일반 ${slot}`,'clipboard');
+        }else mtRegisterNormalRows(rows,slot,slotName,'clipboard');
     }
     let mtEbookTypingActive = false;
     let mtEbookActiveSlot = null;
@@ -7402,9 +7406,10 @@ ${JSON.stringify(finalPayload)}`;
             }
             if(!words.length) throw new Error(`선택한 열에서 주문장과 영어문장 데이터를 찾지 못했습니다. (주문장=${mainIdx+1}열, 영어문장=${engIdx+1}열)`);
 
-            const displayName=sourceType==='clipboard'
-                ? (normalize(fixedRows[0]?.[0])||`슬롯 ${slot+1}`)
-                : (String(rawName).replace(/\.[^/.]+$/,'').trim()||`슬롯 ${slot+1}`);
+            // 붙여넣기 최초 등록 시 사용자가 입력한 슬롯 이름을 최우선으로 사용합니다.
+            const displayName=String(rawName).replace(/\.[^/.]+$/,'').trim()
+                || (sourceType==='clipboard' ? normalize(fixedRows[0]?.[0]) : '')
+                || `슬롯 ${slot+1}`;
             const stored={name:displayName,words,lastSession:null,type:'normal',completedMaskKeys:[],columnPattern:{mainKorCol:mainIdx+1,subKorCol:subIdx>=0?subIdx+1:null,engCol:engIdx+1}};
             mtSetNormalSlotSync(slot, stored);
             mtSetSlotType(slot,'normal');
@@ -7683,6 +7688,20 @@ ${JSON.stringify(finalPayload)}`;
         st.lastSession=null; mtSaveTypedState(slotIndex,st);
         mtEbookSelectedIndexes.delete(index);
         mtOpenEbookViewer(slotIndex); mtInitSlots();
+    }
+
+    function mtRenameEbookViewerTitle(){
+        const slot=Number(mtEbookActiveSlot);
+        if(!Number.isInteger(slot)) return;
+        const state=mtGetTypedState(slot);
+        const next=prompt('새 슬롯 제목을 입력하세요.',String(state.fileName||''));
+        if(next===null) return;
+        const title=String(next).trim();
+        if(!title) return alert('슬롯 제목을 입력해 주세요.');
+        state.fileName=title;
+        mtSaveTypedState(slot,state);
+        mtOpenEbookViewer(slot,true);
+        mtInitSlots();
     }
 
     function mtOpenEbookViewer(slotIndex, preserveSelection=false){
@@ -10371,6 +10390,12 @@ ${JSON.stringify(finalPayload)}`;
 </script>
 
 <style id="v63-slot-unified-fix">
+.mt-ebook-title-edit-btn {
+  display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px;
+  padding:0; border:1px solid #d1d5db; border-radius:6px; background:#fff; color:#475569;
+  font-size:15px; line-height:1; cursor:pointer;
+}
+.mt-ebook-title-edit-btn:hover { background:#f8fafc; color:#111827; border-color:#94a3b8; }
 .mt-slot { transform:none !important; transition: box-shadow .15s ease, background .15s ease !important; }
 .mt-slot:hover { transform:none !important; }
  .mt-slot.mt-empty-card { background:transparent !important; box-shadow:none !important; border:1px solid transparent !important; min-height:56px !important; padding:8px 10px !important; justify-content:center !important; }
