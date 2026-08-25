@@ -2337,7 +2337,7 @@ body { background: var(--bench-v2-bg) !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템</h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small style="font-size:8px;margin-left:5px;color:#94a3b8;font-weight:400;vertical-align:middle;">v45</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -3806,10 +3806,29 @@ body { background: var(--bench-v2-bg) !important; }
                 }
                 if (parsed.mtBackupData.typed_slots) {
                     for (const [slot, info] of Object.entries(parsed.mtBackupData.typed_slots)) {
+                        const n=Number(slot);
                         if (info?.type) localStorage.setItem(MT_SLOT_TYPE_STORAGE_PREFIX + slot, info.type);
                         else localStorage.removeItem(MT_SLOT_TYPE_STORAGE_PREFIX + slot);
-                        if (info?.state) localStorage.setItem(mtGetTypedStateKey(slot), info.state);
-                        else localStorage.removeItem(mtGetTypedStateKey(slot));
+                        if (info?.state) {
+                            if (n===9 || n===10) {
+                                // 슬롯9/10 대용량 상태는 localStorage에 저장하지 않습니다.
+                                try {
+                                    const st=JSON.parse(info.state);
+                                    mtTypedStateCache[String(n)]=st;
+                                    await mtWithGeneratorStore('readwrite', store => { store.put(st, mtTypedStateDbPrefix + n); });
+                                } catch (e) { throw new Error(`슬롯 ${n} 상태 복원 실패: ${e?.message||e}`); }
+                            } else {
+                                try { localStorage.setItem(mtGetTypedStateKey(slot), info.state); } catch (e) {
+                                    // 다른 typed 슬롯도 quota 초과 시 생성형 IndexedDB로 안전하게 우회
+                                    const st=JSON.parse(info.state);
+                                    mtTypedStateCache[String(n)]=st;
+                                    await mtWithGeneratorStore('readwrite', store => { store.put(st, mtTypedStateDbPrefix + n); });
+                                }
+                            }
+                        } else {
+                            delete mtTypedStateCache[String(n)];
+                            try { localStorage.removeItem(mtGetTypedStateKey(slot)); } catch (_) {}
+                        }
                     }
                 }
 
@@ -9464,6 +9483,10 @@ ${JSON.stringify(finalPayload)}`;
     /* ========================================== */
     const MT_SLOT_TYPE_STORAGE_PREFIX = 'mt_slot_type_';
     const MT_TYPED_STATE_PREFIX = 'mt_typed_state_';
+    // 대용량 자체형/참조형 상태는 localStorage 용량 제한을 넘을 수 있으므로
+    // 메모리 캐시 + 생성형 IndexedDB를 우선 사용합니다.
+    const mtTypedStateCache = {};
+    const mtTypedStateDbPrefix = 'typed_';
     const mtTypedTimers = {};
     let mtPendingTypeSlot = null;
     let mtConfiguredEmptySlot = null;
@@ -9491,14 +9514,43 @@ ${JSON.stringify(finalPayload)}`;
     }
     function mtGetTypedStateKey(slotIndex) { return MT_TYPED_STATE_PREFIX + String(slotIndex); }
     function mtGetTypedState(slotIndex) {
+        const idx=Number(slotIndex);
+        if (Object.prototype.hasOwnProperty.call(mtTypedStateCache, String(idx))) return mtTypedStateCache[String(idx)];
         try {
-            const raw = localStorage.getItem(mtGetTypedStateKey(slotIndex));
-            if (raw) return JSON.parse(raw);
+            const raw = localStorage.getItem(mtGetTypedStateKey(idx));
+            if (raw) {
+                const parsed=JSON.parse(raw);
+                mtTypedStateCache[String(idx)]=parsed;
+                return parsed;
+            }
         } catch (_) {}
-        return { type:mtGetSlotType(slotIndex), fileName:'', sourceRows:[], sourceRowsLock:[], topicRows:[], topics:[], outputRows:[], starredSerials:[], lastSession:null, nextSourceIndex:0, nextRun:null, lastRun:null, lastError:'', pattern:null };
+        return mtTypedStateCache[String(idx)] || { type:mtGetSlotType(idx), fileName:'', sourceRows:[], sourceRowsLock:[], topicRows:[], topics:[], outputRows:[], starredSerials:[], lastSession:null, nextSourceIndex:0, nextRun:null, lastRun:null, lastError:'', pattern:null };
     }
     function mtSaveTypedState(slotIndex, state) {
-        localStorage.setItem(mtGetTypedStateKey(slotIndex), JSON.stringify(state));
+        const idx=Number(slotIndex);
+        mtTypedStateCache[String(idx)]=state;
+        try { localStorage.setItem(mtGetTypedStateKey(idx), JSON.stringify(state)); } catch (e) {
+            // 대용량 상태는 localStorage quota 초과를 정상적으로 무시하고 IndexedDB에 저장합니다.
+            try {
+                mtWithGeneratorStore('readwrite', store => { store.put(state, mtTypedStateDbPrefix + idx); }).catch(()=>{});
+            } catch (_) {}
+        }
+        // 일반 크기의 상태도 IndexedDB에 함께 보존하여 백업 복원 시 localStorage 의존을 없앱니다.
+        if ((Array.isArray(state?.outputRows) && state.outputRows.length > 30) || idx===9 || idx===10) {
+            try { mtWithGeneratorStore('readwrite', store => { store.put(state, mtTypedStateDbPrefix + idx); }).catch(()=>{}); } catch (_) {}
+        }
+    }
+    async function mtLoadTypedStatesFromGeneratorDb(){
+        try {
+            const db=await initDB();
+            const tx=db.transaction(MT_GENERATOR_STORE_NAME,'readonly');
+            const store=tx.objectStore(MT_GENERATOR_STORE_NAME);
+            const reads=[];
+            for(let i=1;i<=11;i++) reads.push(new Promise(resolve=>{const q=store.get(mtTypedStateDbPrefix+i);q.onsuccess=()=>resolve([i,q.result||null]);q.onerror=()=>resolve([i,null]);}));
+            const rows=await Promise.all(reads);
+            rows.forEach(([i,v])=>{if(v && typeof v==='object') mtTypedStateCache[String(i)]=v;});
+            try{db.close();}catch(_){}
+        }catch(_){}
     }
     function mtOpenSlotTypeModal(slotIndex) {
         mtPendingTypeSlot = slotIndex;
@@ -12586,6 +12638,7 @@ ${JSON.stringify(finalPayload)}`;
             mtApplyFontSettings();
             await mtInitNormalSlotCache();
             if (typeof mtInitGeneratorStates === 'function') await mtInitGeneratorStates();
+            await mtLoadTypedStatesFromGeneratorDb();
             if (typeof mtMigrateDedicatedGeneratorStates === 'function') await mtMigrateDedicatedGeneratorStates();
             if (typeof mtInitSlots === 'function') mtInitSlots();
             // 모든 생성형 슬롯은 동일한 self_generate/reference_generate 엔진과 유형별 타이머를 사용합니다.
