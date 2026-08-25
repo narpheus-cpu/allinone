@@ -2411,7 +2411,7 @@ body { background: var(--bench-v2-bg) !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v70</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v71</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -3630,9 +3630,22 @@ body { background: var(--bench-v2-bg) !important; }
             const starSess = localStorage.getItem('word_slot_star_session');
             if (starSess) mtBackupData['star_session'] = starSess;
             mtBackupData['typing_unmask_stats'] = localStorage.getItem(MT_STATS_STORAGE_KEY) || JSON.stringify(mtGetStatsState());
+            // 유형과 무관하게 모든 슬롯의 상태를 백업합니다.
+            // 이전에는 생성형만 담아 전자책 슬롯이 코드 업데이트 후 복원되지 않았습니다.
+            mtBackupData['slot_types'] = {};
+            mtBackupData['typed_slots'] = {};
+            // generator_*는 이전 백업 파일과의 호환을 위해 함께 유지합니다.
             mtBackupData['generator_states'] = {};
             mtBackupData['generator_types'] = {};
-            for(let i=1;i<=11;i++){ const gt=mtGetSlotType(i); if(gt==='self_generate'||gt==='reference_generate'){ mtBackupData['generator_types'][i]=gt; mtBackupData['generator_states'][i]=JSON.stringify(mtGetTypedState(i)); } }
+            for(let i=1;i<=10;i++){
+                const slotType=mtGetSlotType(i);
+                if(slotType) mtBackupData['slot_types'][i]=slotType;
+                if(['ebook','self_generate','reference_generate'].includes(slotType)) mtBackupData['typed_slots'][i]=JSON.stringify(mtGetTypedState(i));
+                if(slotType==='self_generate'||slotType==='reference_generate'){
+                    mtBackupData['generator_types'][i]=slotType;
+                    mtBackupData['generator_states'][i]=mtBackupData['typed_slots'][i];
+                }
+            }
 
             const dataToSave = {
                 slotsData: slotsData,
@@ -3701,7 +3714,19 @@ body { background: var(--bench-v2-bg) !important; }
                 if (Object.prototype.hasOwnProperty.call(parsed.mtBackupData, 'typing_unmask_stats')) {
                     localStorage.setItem(MT_STATS_STORAGE_KEY, parsed.mtBackupData['typing_unmask_stats']);
                 }
-                if(parsed.mtBackupData.generator_types){ for(const [k,v] of Object.entries(parsed.mtBackupData.generator_types)){ const slot=Number(k); if(['self_generate','reference_generate'].includes(v)){ localStorage.setItem(MT_SLOT_TYPE_STORAGE_PREFIX+slot,v); if(parsed.mtBackupData.generator_states?.[k]){ try{ mtSaveTypedState(slot,JSON.parse(parsed.mtBackupData.generator_states[k])); }catch(_){} } } } }
+                // v71 형식: 전자책을 포함한 모든 유형별 상태를 원본 그대로 복원합니다.
+                if(parsed.mtBackupData.slot_types){
+                    for(const [k,v] of Object.entries(parsed.mtBackupData.slot_types)){
+                        const slot=Number(k);
+                        if(slot>=1 && slot<=10 && ['normal','ebook','self_generate','reference_generate'].includes(v)) {
+                            mtSetSlotType(slot,v);
+                            if(parsed.mtBackupData.typed_slots?.[k]){ try { mtSaveTypedState(slot,JSON.parse(parsed.mtBackupData.typed_slots[k])); } catch(_) {} }
+                        }
+                    }
+                } else if(parsed.mtBackupData.generator_types) {
+                    // 구 백업 형식도 계속 복원합니다.
+                    for(const [k,v] of Object.entries(parsed.mtBackupData.generator_types)){ const slot=Number(k); if(['self_generate','reference_generate'].includes(v)){ mtSetSlotType(slot,v); if(parsed.mtBackupData.generator_states?.[k]){ try{ mtSaveTypedState(slot,JSON.parse(parsed.mtBackupData.generator_states[k])); }catch(_){} } } }
+                }
             }
             if (parsed.mtFontSettings) {
                 mtSetFontSettings(parsed.mtFontSettings);
@@ -6285,7 +6310,11 @@ Rules:
                 }
             }
 
-            if (changed) mtCardSuccessCountRecorded = true;
+            if (changed) {
+                mtCardSuccessCountRecorded = true;
+                // 일반·자체형·참조형도 마스킹 완료 즉시 상단 성공 카드 수에 반영합니다.
+                mtRecordDailyStat('cards', 1);
+            }
 
             // 저장이 새 완료를 만들었거나, 이전 버전 데이터 구조를 정규화한 뒤라도 화면을 즉시 갱신합니다.
             mtRefreshSlotProgressUI();
@@ -7996,7 +8025,31 @@ ${JSON.stringify(finalPayload)}`;
         document.getElementById('mtGeneratorPromptModal').dataset.slot=String(slotIndex);document.getElementById('mtGeneratorPromptModal').dataset.type=type;document.getElementById('mtGeneratorPromptModal').style.display='flex';
     }
     function mtCloseGeneratorPromptEditor(){document.getElementById('mtGeneratorPromptModal').style.display='none';}
-    function mtSaveGeneratorPromptDashboard(){const m=document.getElementById('mtGeneratorPromptModal'),type=m.dataset.type;const cfg=mtGetGenCfg(type);cfg.intervalMin=Math.max(1,Number(document.getElementById('mtGenInterval').value)||5);cfg.batchSize=Math.max(1,Number(document.getElementById('mtGenBatch').value)||1);cfg.delaySec=Math.max(0,Number(document.getElementById('mtGenDelay').value)||0);cfg.models=String(document.getElementById('mtGenModels').value||'').split(',').map(x=>x.trim()).filter(Boolean);mtSaveGenCfg(type,cfg);if(type==='self_generate')mtSaveGenPrompt(type,'main',document.getElementById('mtGenPromptMain').value);else{mtSaveGenPrompt(type,'dialogue',document.getElementById('mtGenPromptDialogue').value);mtSaveGenPrompt(type,'literal',document.getElementById('mtGenPromptLiteral').value);}mtRescheduleGeneratorSlots(type);mtCloseGeneratorPromptEditor();mtInitSlots();}
+    function mtSaveGeneratorPromptDashboard(){
+        const m=document.getElementById('mtGeneratorPromptModal'),type=String(m?.dataset.type||'');
+        if(!['self_generate','reference_generate'].includes(type)) return alert('저장할 생성 유형을 찾지 못했습니다. 설정 창을 다시 열어 주세요.');
+        try{
+            const cfg=mtGetGenCfg(type);
+            cfg.intervalMin=Math.max(1,Number(document.getElementById('mtGenInterval')?.value)||5);
+            cfg.batchSize=Math.max(1,Number(document.getElementById('mtGenBatch')?.value)||1);
+            cfg.delaySec=Math.max(0,Number(document.getElementById('mtGenDelay')?.value)||0);
+            cfg.models=String(document.getElementById('mtGenModels')?.value||'').split(',').map(x=>x.trim()).filter(Boolean);
+            mtSaveGenCfg(type,cfg);
+            if(type==='self_generate') mtSaveGenPrompt(type,'main',document.getElementById('mtGenPromptMain')?.value||'');
+            else {
+                // 참조형은 두 프롬프트를 각각 저장해야 다음 생성부터 모두 반영됩니다.
+                mtSaveGenPrompt(type,'dialogue',document.getElementById('mtGenPromptDialogue')?.value||'');
+                mtSaveGenPrompt(type,'literal',document.getElementById('mtGenPromptLiteral')?.value||'');
+            }
+            mtRescheduleGeneratorSlots(type);
+            mtCloseGeneratorPromptEditor();
+            mtInitSlots();
+            alert('생성 설정을 저장했습니다. 다음 생성부터 적용됩니다.');
+        }catch(error){
+            console.error('생성 설정 저장 실패:',error);
+            alert(`생성 설정을 저장하지 못했습니다: ${error?.message||error}`);
+        }
+    }
     function mtResetGeneratorPromptDashboard(){const m=document.getElementById('mtGeneratorPromptModal'),type=m.dataset.type;localStorage.removeItem(MT_GEN_CFG_KEY+'_'+type);['main','dialogue','literal'].forEach(k=>localStorage.removeItem('mt_generator_prompt_v59_'+type+'_'+k));mtOpenGeneratorPromptEditor(Number(m.dataset.slot),type);}
     let mtGeneratorListSlot=null,mtGeneratorListPage=1,mtGeneratorListSelected=new Set(); const MT_GEN_LIST_PAGE=30;
     function mtOpenGeneratorList(slotIndex){mtGeneratorListSlot=Number(slotIndex);mtGeneratorListPage=1;mtGeneratorListSelected=new Set();mtRenderGeneratorList();document.getElementById('mtGeneratorListModal').style.display='flex';}
@@ -10007,6 +10060,13 @@ ${JSON.stringify(finalPayload)}`;
 .mt-slot.mt-type-reference_generate .mt-slot-meta-badge {
   background:#16a34a !important; color:#fff !important; border-color:#16a34a !important;
 }
+</style>
+<style id="v71-slot-natural-height">
+/* 슬롯별 내용 높이를 그대로 사용해, 버튼 아래의 인위적인 공란을 없앱니다. */
+#mtSlotsGrid.mt-slots-grid { align-items:start !important; }
+#mtSlotsGrid .mt-slot { min-height:0 !important; height:auto !important; }
+#mtSlotsGrid .mt-slot-actions-row { margin-top:0 !important; }
+#mtSlotsGrid .mt-slot-desc:empty { display:none !important; }
 </style>
 </body>
 </html>
