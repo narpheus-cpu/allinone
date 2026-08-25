@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v86</title>
+    <title>올인원 영작-단어장 시스템 · v87</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -2538,7 +2538,7 @@ body { background: var(--bench-v2-bg) !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v86</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v87</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -10431,7 +10431,7 @@ ${JSON.stringify(finalPayload)}`;
   (function syncAppVersionFromFileName(){
     // 파일을 다른 이름으로 저장하거나 브라우저가 경로를 변환해도, 기본 표시가
     // 사라지지 않게 한다. 정상 파일명에서는 아래 값이 자동으로 새 번호로 대체된다.
-    const fallbackVersion='v86';
+    const fallbackVersion='v87';
     let fileName='';
     try{fileName=decodeURIComponent(String(location.pathname||'').split('/').pop()||'');}
     catch(_){fileName=String(location.pathname||'').split('/').pop()||'';}
@@ -10576,4 +10576,26 @@ ${JSON.stringify(finalPayload)}`;
         .mt-slot.mt-empty-card { background:transparent !important; border-color:#e5e7eb !important; box-shadow:none !important; }
         .mt-slot.mt-empty-card:hover { background:transparent !important; }
         .mt-gen-actions.mt-slot-unified-actions { display:flex; align-items:center; gap:5px; flex-wrap:wrap; }
+</style>
+<style id="v87-normal-ebook-badge-alignment">
+/* 일반·전자책은 유형 뱃지의 감싸는 행에만 상·하 여백이 남아 별표 뱃지보다
+   위로 보였습니다. 생성형의 도구 행과 똑같이 24px 중앙 정렬로 고정합니다. */
+.mt-slot.mt-type-normal .mt-slot-stat-row > .mt-slot-type-line,
+.mt-slot.mt-type-ebook .mt-slot-stat-row > .mt-slot-type-line {
+  display:flex !important;
+  align-items:center !important;
+  align-self:center !important;
+  height:24px !important;
+  min-height:24px !important;
+  margin:0 !important;
+}
+.mt-slot.mt-type-normal .mt-slot-stat-row > .mt-slot-type-line .mt-slot-meta-badge,
+.mt-slot.mt-type-ebook .mt-slot-stat-row > .mt-slot-type-line .mt-slot-meta-badge,
+.mt-slot.mt-type-normal .mt-slot-stat-row > .mt-slot-star-count,
+.mt-slot.mt-type-ebook .mt-slot-stat-row > .mt-slot-star-count {
+  height:24px !important;
+  min-height:24px !important;
+  box-sizing:border-box !important;
+  align-self:center !important;
+}
 </style>
