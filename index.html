@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올 인원 영작-단어장 시스템 · v53</title>
+    <title>올인원 영작-단어장 시스템 · v54</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -4225,25 +4225,26 @@ body { background: var(--bench-v2-bg) !important; }
         return [];
     }
     function mtGeneratorPromptDefault(slotKey,type,promptId){
-        if(type==='self_generate')return `당신은 전문 영어 학습 콘텐츠 생성기입니다.
+        if(type==='self_generate')return `아래 지시사항에 맞게 [한국어 원문]을 아래의 형식(1열, 2열, 3열)에 맞춰서 생성해줘(파이프(|)로 구분 이외에 별도의 구분기호 사용 금지):
+-1열: 한국어 원문(변형 금지)
+-2열: 한국어 원문 뉘앙스를 스마트하게 살린 A2 수준 일상영어
+-3열: 2열의 영어어순에 1:1 대응하는 직독직해식 청크 한국어 (하나의 대괄호 안에 슬래시로 구분)
 
-제공되는 각각의 원본 한국어 문장에 대해 정확히 하나의 A2 수준 영어 문장과, 영어 어순에 맞춘 한국어 직독직해(대괄호 청크)를 생성하세요.
+[출력 규칙]
+-1행 헤더 없음 / 뷸릿 없음 / 문장 앞 -는 \"로 대체 / \"는 반드시 한국어와 붙여쓸 것 / 맥락에 맞춰 대사 분리 / 직접인용문 뒤의 인용어구는 직접인용문에 붙여도 무방 / 결정적인 오타 수정 / 번역시 없는 내용 임의 추가 금지
+-각 열의 구분은 반드시 파이프 기호(|)를 사용할 것. 1열부터 3열까지 한 줄에 작성하며, 열 구분을 위해 절대 줄바꿈을 사용하지 말 것.
 
-엄격한 규칙:
-1. 1열은 입력된 원본 한국어 문장을 한 글자도 바꾸지 말고 그대로 출력하세요.
-2. 2열은 원본 한국어의 의미와 뉘앙스를 정확히 보존한 자연스러운 A2 수준 일상영어를 출력하세요.
-3. 3열은 2열 영어의 어순에 1:1 대응하는 한국어 직독직해식 청크를 출력하세요. 각 청크는 대괄호로 감싸세요.
-4. 각 행의 열은 TAB 문자 1개로만 구분하세요. 다른 구분기호를 사용하지 마세요.
-5. 헤더를 출력하지 마세요. 설명, 번호, 마크다운, 코드펜스도 출력하지 마세요.
-6. 입력 문장 순서와 출력 행 순서를 반드시 일치시키세요.
-7. 입력 문장 수와 출력 행 수를 정확히 일치시키세요.
-8. 각 출력 행은 정확히 3개 열이어야 합니다.
-9. 안전하지 않거나 민감한 콘텐츠의 경우 관련 없는 내용을 추가하지 말고 플랫폼 안전 요구사항을 따르세요.
+[3열(청크) 절대 규칙]
+1. 누락 방지: 2열 문장의 끝(마침표, 물음표, 따옴표 등)에 도달할 때까지 단어 하나도 누락하지 말고 100% 끝까지 청크로 분리할 것. 중간에 번역을 멈추거나 생략하는 것을 엄격히 금지함.
+2. 기호 형태: 3열 전체를 단 하나의 대괄호 [...] 로 감싸고, 내부의 청크 구분은 슬래시(/)만 사용할 것.
 
-출력 예시:
-그가 여행을 떠난 지 벌써 보름이 넘었다.\tIt has already been over two weeks since he left on a trip.\t[이미 지나갔다] [2주 이상이] [그가 떠난 지] [여행을]
+[가장 중요한 절대 규칙]
+한행이 '25자'가 넘어가는 문장인 경우에 만약 쉼표 기호(,)가 있다면 이 기호를 기준으로 두 개의 문장으로 분리할 것
 
-원본 한국어 문장 목록 (총 {{COUNT}}개):
+[예시]
+그가 여행을 떠난 지 벌써 보름이 넘었다. | It has already been over two weeks since he left on a trip. | [이미 지났다 / 2주 이상이 / 그가 떠난 지 / 여행을]
+
+[한국어 원문]
 {{BATCH}}`;
         if(type==='reference_generate'&&promptId==='dialogue')return `You are an expert English dialogue writer and English-Korean translator.
 Create a continuous, natural everyday conversation between 2 people based on this topic: "{{TOPIC}}"
@@ -4280,7 +4281,7 @@ Rules:
     }
     const MT_GENERATOR_SETTINGS_KEY = 'mt_generator_settings_v1';
     const MT_GENERATOR_SETTING_DEFAULTS = Object.freeze({
-        self_generate: Object.freeze({intervalMin:5,batchSize:6,preferredModel:'gemini-3.6-flash',maxModelAttempts:5,requestTimeoutSec:90,maxOutputTokens:4096,emptyResponseRetries:1,emptyResponseRetryDelayMs:500,networkRetryAttempts:2,networkRetryDelay1Sec:1.5,networkRetryDelay2Sec:4,temporaryQuotaMinSec:30,dailyCooldownHours:24}),
+        self_generate: Object.freeze({intervalMin:5,batchSize:3,batchDelaySec:2,preferredModel:'gemini-3.6-flash',maxModelAttempts:5,requestTimeoutSec:90,maxOutputTokens:4096,emptyResponseRetries:1,emptyResponseRetryDelayMs:500,networkRetryAttempts:2,networkRetryDelay1Sec:1.5,networkRetryDelay2Sec:4,temporaryQuotaMinSec:30,dailyCooldownHours:24}),
         reference_generate: Object.freeze({intervalMin:5,batchSize:6,preferredModel:'gemini-3.6-flash',maxModelAttempts:5,requestTimeoutSec:90,maxOutputTokens:4096,emptyResponseRetries:1,emptyResponseRetryDelayMs:500,networkRetryAttempts:2,networkRetryDelay1Sec:1.5,networkRetryDelay2Sec:4,temporaryQuotaMinSec:30,dailyCooldownHours:24})
     });
     function mtGetGeneratorSettings(type){
@@ -4288,6 +4289,7 @@ Rules:
         try{const raw=JSON.parse(localStorage.getItem(`${MT_GENERATOR_SETTINGS_KEY}_${t}`)||'null'); if(raw&&typeof raw==='object') Object.assign(base,raw);}catch(_){ }
         base.intervalMin=Math.min(1440,Math.max(1,Number(base.intervalMin)||5));
         base.batchSize=Math.min(24,Math.max(1,Math.floor(Number(base.batchSize)||6)));
+        base.batchDelaySec=Math.min(60,Math.max(0,Number(base.batchDelaySec??2)||0));
         base.maxModelAttempts=Math.min(10,Math.max(1,Math.floor(Number(base.maxModelAttempts)||5)));
         base.requestTimeoutSec=Math.min(300,Math.max(5,Number(base.requestTimeoutSec)||90));
         base.maxOutputTokens=Math.min(32768,Math.max(256,Math.floor(Number(base.maxOutputTokens)||4096)));
@@ -4315,6 +4317,7 @@ Rules:
         const fields=[
           ['intervalMin','자동 생성 간격',1,1440,'분','number'],
           ['batchSize','1회 배치 문장 수',1,24,'개','number'],
+          ...(normalized==='self_generate'?[['batchDelaySec','배치 간 대기',0,60,'초','number']]:[]),
           ['preferredModel','우선 모델','','','','select'],
           ['maxModelAttempts','모델 최대 시도 횟수',1,10,'회','number'],
           ['requestTimeoutSec','API 요청 제한시간',5,300,'초','number'],
@@ -8341,53 +8344,92 @@ ${JSON.stringify(finalPayload)}`;
         const work=[...retryTake,...freshRows];
         if(!work.length)return;
 
-        const batch=work.map(x=>x.korean);
-        const prompt=mtApplyGeneratorPrompt(
-            mtGetGeneratorPrompt('self_generate','main',mtGeneratorPromptDefault('self_generate','self_generate','main'),'self_generate'),
-            {COUNT:batch.length,BATCH:batch.join('\n')}
-        ).trim();
+        const config=mtGetGeneratorTypeAiConfig('self_generate');
+        const apiKey=String(config.apiKey||localStorage.getItem('gemini_api_key')||'').trim();
+        if(!apiKey) throw new Error(config.missingKeyMessage||'Gemini API Key가 없습니다.');
 
-        // 자체형은 API-level JSON Schema를 사용하지 않습니다. 자유 텍스트 TAB 3열을 요청합니다.
-        const raw=await fetchGemini(
-            prompt,
-            null,
-            mtGetGeneratorAiConfig(mtGetGeneratorTypeAiConfig('self_generate'),`typed_${slotIndex}`,'자체형')
+        // 업로드된 자체형 시험 파일의 핵심 생성 로직을 이식합니다.
+        const MODELS=[config.models?.[0]||settings.preferredModel,'gemini-3.1-flash-lite','gemini-3.5-flash-lite']
+            .filter(Boolean).filter((m,i,a)=>a.indexOf(m)===i);
+        const SYSTEM_PROMPT=mtGetGeneratorPrompt(
+            'self_generate','main',
+            mtGeneratorPromptDefault('self_generate','self_generate','main'),
+            'self_generate'
         );
-        if(raw==null||String(raw).trim()==='') throw new Error('AI 응답이 비어 있습니다.');
+        const makePrompt=(text)=>mtApplyGeneratorPrompt(SYSTEM_PROMPT,{
+            COUNT:1,
+            BATCH:String(text??'')
+        }).replace(/\{\{BATCH\}\}/g,String(text??'')).trim();
 
-        const cleanText=String(raw)
-            .replace(/^\s*```(?:text|tsv|plaintext)?\s*/i,'')
-            .replace(/\s*```\s*$/i,'')
-            .trim();
+        const sleep=ms=>new Promise(resolve=>setTimeout(resolve,Math.max(0,ms)));
+        const maxTotalAttempts=Math.max(1,Number(settings.maxModelAttempts||5))*MODELS.length;
+        const requestTimeoutMs=Math.max(5000,Number(settings.requestTimeoutSec||90)*1000);
+        const maxOutputTokens=Math.max(256,Number(settings.maxOutputTokens||4096));
 
-        let parsed=[];
-        // 1차: 권장 TSV/탭 3열 파싱
-        const tsvLines=cleanText.split(/\r?\n/).map(v=>v.trim()).filter(Boolean);
-        parsed=tsvLines.map(line=>{
-            const cols=line.split('\t');
-            return {
-                source_korean:String(cols[0]??'').trim(),
-                english:String(cols[1]??'').trim(),
-                literal_korean:String(cols.slice(2).join('\t')??'').trim()
-            };
-        });
-
-        // 2차 호환 파싱: 기존에 저장돼 있던 JSON형 자체생성 프롬프트/응답이 남아 있어도 생성 자체가 막히지 않도록 합니다.
-        // API 스키마를 다시 강제하는 것이 아니라, 텍스트 응답이 JSON으로 돌아온 경우에만 수용합니다.
-        const looksLikeJson=cleanText.startsWith('[')||cleanText.startsWith('{');
-        if(looksLikeJson){
-            try{
-                const maybe=mtExtractJsonValue(cleanText);
-                if(Array.isArray(maybe)){
-                    parsed=maybe.map((x,i)=>({
-                        source_korean:String(x?.source_korean??x?.korean_source??'').trim(),
-                        english:String(x?.english??'').trim(),
-                        literal_korean:String(x?.literal_korean??'').trim(),
-                        __idx:Number.isFinite(Number(x?.index))?Number(x.index):i
-                    })).sort((a,b)=>a.__idx-b.__idx);
+        async function fetchSelfWithFallback(text, sourceIndex){
+            let lastError=null;
+            let totalAttempts=0;
+            while(totalAttempts<maxTotalAttempts){
+                for(let i=0;i<MODELS.length && totalAttempts<maxTotalAttempts;i++){
+                    const model=MODELS[i];
+                    const url=`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+                    const payload={
+                        contents:[{parts:[{text:makePrompt(text)}]}],
+                        generationConfig:{temperature:0.1,maxOutputTokens}
+                    };
+                    try{
+                        const controller=new AbortController();
+                        const timer=setTimeout(()=>controller.abort(),requestTimeoutMs);
+                        let response;
+                        try{
+                            response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:controller.signal});
+                        }finally{clearTimeout(timer);}
+                        const data=await response.json().catch(()=>null);
+                        if(response.ok){
+                            const output=String(data?.candidates?.[0]?.content?.parts?.map(p=>p?.text||'').join('')||'').trim();
+                            if(!output){
+                                lastError=new Error('AI 응답 본문이 비어 있습니다.');
+                                mtRecordGeneratorErrorLog(`typed_${slotIndex}`,{slotLabel:'자체형',model,httpStatus:response.status,finishReason:data?.candidates?.[0]?.finishReason||'',promptFeedback:data?.promptFeedback??null,contentParts:data?.candidates?.[0]?.content?.parts??null,responseObject:data,errorMessage:lastError.message,source:'self-generate-empty'});
+                            }else{
+                                return output;
+                            }
+                        }else{
+                            const errMsg=data?.error?.message||`API Error (${response.status})`;
+                            lastError=new Error(errMsg);
+                            mtRecordGeneratorErrorLog(`typed_${slotIndex}`,{slotLabel:'자체형',model,httpStatus:response.status,finishReason:'',promptFeedback:data?.error?.details??null,contentParts:null,responseObject:data,errorMessage:errMsg,source:'self-generate-api'});
+                            if(response.status===429){
+                                const match=errMsg.match(/retry in\s+(\d+(?:\.\d+)?)s/i);
+                                if(match?.[1]){
+                                    await sleep((Math.ceil(Number(match[1]))+2)*1000);
+                                    i--; totalAttempts++; continue;
+                                }
+                                await sleep(3000);
+                            }
+                        }
+                    }catch(error){
+                        lastError=error?.name==='AbortError'?new Error(`API 요청이 ${settings.requestTimeoutSec||90}초 후 시간 초과되었습니다.`):(error instanceof Error?error:new Error(String(error)));
+                        mtRecordGeneratorErrorLog(`typed_${slotIndex}`,{slotLabel:'자체형',model,httpStatus:null,finishReason:'',promptFeedback:null,contentParts:null,responseObject:null,errorMessage:lastError.message,source:'self-generate-network'});
+                    }
+                    totalAttempts++;
                 }
-            }catch(_){ }
+                if(totalAttempts<maxTotalAttempts) await sleep(10000);
+            }
+            throw lastError||new Error(`${sourceIndex+1}행 생성에 실패했습니다.`);
         }
+
+        // 시험 파일처럼 배치의 각 원문을 독립 요청하되, Promise.all로 병렬 처리합니다.
+        const results=await Promise.all(work.map(async item=>{
+            if(!item.korean)return {item,error:new Error('원문이 비어 있습니다.')};
+            try{
+                const raw=await fetchSelfWithFallback(item.korean,item.sourceIndex);
+                const clean=String(raw).replace(/^\s*```(?:text|tsv|plaintext)?\s*/i,'').replace(/\s*```\s*$/i,'').trim();
+                const line=clean.split(/\r?\n/).map(x=>x.trim()).filter(Boolean)[0]||'';
+                const cols=line.split('|').map(x=>x.trim());
+                return {item,result:{source_korean:cols[0]||item.korean,english:cols[1]||'',literal_korean:cols.slice(2).join('|').trim()}};
+            }catch(error){
+                return {item,error};
+            }
+        }));
 
         const normalize=v=>String(v??'').normalize('NFC').replace(/\s+/g,' ').trim();
         const koreanChunkList=v=>{
@@ -8396,52 +8438,59 @@ ${JSON.stringify(finalPayload)}`;
             if(!text||chunks.length<1||chunks.length>12)return false;
             const outside=text.replace(/\[[^\[\]]+\]/g,'').replace(/[\s.,!?;:·]+/g,'');
             if(outside!=='')return false;
-            return chunks.every(c=>{
-                const inside=c.slice(1,-1).trim();
-                return inside&&/[가-힣]/.test(inside);
-            });
+            return chunks.every(c=>/[가-힣]/.test(c.slice(1,-1).trim()));
         };
 
         const accepted=[];
         const failed=[];
-        for(let i=0;i<work.length;i++){
-            const item=parsed[i];
-            const original=work[i].korean;
-            if(!item){ failed.push({sourceIndex:work[i].sourceIndex,korean:original,reason:'빈 행'}); continue; }
-            if(normalize(item.source_korean)!==normalize(original)){
-                failed.push({sourceIndex:work[i].sourceIndex,korean:original,reason:'원문 불일치'}); continue;
+        for(const r of results){
+            const original=r.item.korean;
+            if(r.error){
+                failed.push({sourceIndex:r.item.sourceIndex,korean:original,reason:r.error.message});
+                continue;
             }
-            if(item.english.length<2){
-                failed.push({sourceIndex:work[i].sourceIndex,korean:original,reason:'영어 문장 비어 있음'}); continue;
+            const x=r.result||{};
+            if(normalize(x.source_korean)!==normalize(original)){
+                failed.push({sourceIndex:r.item.sourceIndex,korean:original,reason:'1열 원문 불일치'}); continue;
             }
-            if(!koreanChunkList(item.literal_korean)){
-                failed.push({sourceIndex:work[i].sourceIndex,korean:original,reason:'직독직해 형식 오류'}); continue;
+            if(String(x.english||'').trim().length<2){
+                failed.push({sourceIndex:r.item.sourceIndex,korean:original,reason:'2열 영어 문장 비어 있음'}); continue;
             }
-            accepted.push({...item,sourceIndex:work[i].sourceIndex});
+            if(!koreanChunkList(x.literal_korean)){
+                failed.push({sourceIndex:r.item.sourceIndex,korean:original,reason:'3열 직독직해 형식 오류'}); continue;
+            }
+            accepted.push({...x,sourceIndex:r.item.sourceIndex});
         }
 
         const p={sourceKorCol:1,engCol:2,mainKorCol:1,subKorCol:3,serialCol:4};
         state.pattern={...(state.pattern||{}),...p};
-        let current=mtTypedSerialNext(state);
+        const current=mtTypedSerialNext(state);
         accepted.forEach((x,i)=>{
             const row=Array(4).fill('');
             row[0]=x.source_korean;
-            row[1]=x.english;
-            row[2]=x.literal_korean;
+            row[1]=String(x.english||'').trim();
+            row[2]=String(x.literal_korean||'').trim();
             row[3]=String(current+i);
             state.outputRows.push(row);
         });
 
-        const retryKeys=new Set(failed.map(x=>`${x.sourceIndex}::${x.korean}`));
-        const remainingRetry=retryItems.slice(retryTake.length).filter(x=>!retryKeys.has(`${x.sourceIndex}::${x.korean}`));
-        state.retryRows=[...remainingRetry,...failed];
-        state.nextSourceIndex=Math.min(sourceRows.length,freshStart+freshRows.length);
+        const retryTakeKeys=new Set(retryTake.map(x=>`${x.sourceIndex}::${x.korean}`));
+        const failedKeys=new Set(failed.map(x=>`${x.sourceIndex}::${x.korean}`));
+        const remainingRetry=retryItems.slice(retryTake.length).filter(x=>!failedKeys.has(`${x.sourceIndex}::${x.korean}`));
+        // 현재 시도한 재시도 항목이 성공하면 제거되고, 실패하면 다시 retryRows에 들어갑니다.
+        const retryFromCurrent=failed.filter(x=>retryTakeKeys.has(`${x.sourceIndex}::${x.korean}`));
+        state.retryRows=[...remainingRetry,...retryFromCurrent,...failed.filter(x=>!retryTakeKeys.has(`${x.sourceIndex}::${x.korean}`))];
+        state.nextSourceIndex=Math.min(sourceRows.length,freshStart+freshCapacity);
         state.lastRun=Date.now();
         state.nextRun=Date.now()+mtGetGeneratorTypeIntervalMs(state.type);
         state.lastError=failed.length?`${accepted.length}개 저장, ${failed.length}개는 다음 자동 실행에서 재시도합니다.`:'';
-        state.lastDiagnostic=null;
+        state.lastDiagnostic=failed.length?{errorMessage:failed[0].reason,source:'self-generate-validation'}:null;
         mtSaveTypedState(slotIndex,state);
         mtInitSlots();
+
+        if(settings.batchDelaySec>0 && state.nextSourceIndex<sourceRows.length){
+            await sleep(settings.batchDelaySec*1000);
+        }
     }
 
     async function mtTypedReferenceGenerate(slotIndex) {
