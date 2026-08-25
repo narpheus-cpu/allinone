@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v70</title>
+    <title>올인원 영작-단어장 시스템</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -2538,7 +2538,7 @@ body { background: var(--bench-v2-bg) !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v68</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small></small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -8135,13 +8135,27 @@ ${JSON.stringify(finalPayload)}`;
         const v=String(value||'').trim();
         try{ if(v) localStorage.setItem(key,v); else localStorage.removeItem(key); }catch(_){ }
     }
+    // 쿨다운은 모델·슬롯·유형·API 키 조합별로만 적용한다.
+    function mtGetGeneratorModelCooldownKey(type,slotIndex,model,apiKey){
+        return `${String(type)}|${Number(slotIndex)}|${String(model)}|${String(apiKey)}`;
+    }
     async function mtGenFetchText(type,prompt,slotIndex,temperature=0.1,responseSchema=null,phase='생성'){
         const key=String(mtGetGeneratorSlotApiKey(slotIndex,type) || localStorage.getItem('gemini_api_key') || '').trim();
         if(!key){const e=new Error('Gemini API Key를 먼저 입력해 주세요.');mtGeneratorRecordError(type,slotIndex,e,{phase,kind:'configuration'});throw e;}
         const cfg=mtGetGenCfg(type); let last=null; let attempt=0;
         while(attempt<15){
+            let madeRequest=false;
+            let earliestCooldownUntil=Infinity;
             for(const model of cfg.models){
                 if(attempt>=15) break;
+                const cooldownKey=mtGetGeneratorModelCooldownKey(type,slotIndex,model,key);
+                const cooldownUntil=Number(GEMINI_MODEL_COOLDOWN_UNTIL.get(cooldownKey)||0);
+                if(cooldownUntil>Date.now()){
+                    earliestCooldownUntil=Math.min(earliestCooldownUntil,cooldownUntil);
+                    continue;
+                }
+                if(cooldownUntil) GEMINI_MODEL_COOLDOWN_UNTIL.delete(cooldownKey);
+                madeRequest=true;
                 attempt++;
                 const controller=typeof AbortController!=='undefined'?new AbortController():null;
                 const timeoutId=setTimeout(()=>controller?.abort(),90000);
@@ -8155,14 +8169,23 @@ ${JSON.stringify(finalPayload)}`;
                     mtGeneratorRecordError(type,slotIndex,last,{model,httpStatus:res.status,phase,response:data,kind:res.status===429?'quota':'http-error'});
                     if(res.status===429){
                         const m=msg.match(/retry in\s+([\d.]+)s/i); const sec=m?Math.ceil(parseFloat(m[1]))+2:3;
-                        mtGeneratorRecordError(type,slotIndex,new Error(`API 쿼터/속도 제한으로 ${sec}초 쿨다운 대기 후 재시도합니다.`),{model,httpStatus:429,phase,response:data,kind:'cooldown',retryAfterSec:sec});
-                        await new Promise(r=>setTimeout(r,sec*1000)); if(m) break;
+                        // 429는 특정 모델의 쿼터일 수 있으므로, 해당 모델만 잠시 제외한다.
+                        GEMINI_MODEL_COOLDOWN_UNTIL.set(cooldownKey,Date.now()+(sec*1000));
+                        earliestCooldownUntil=Math.min(earliestCooldownUntil,Date.now()+(sec*1000));
+                        mtGeneratorRecordError(type,slotIndex,new Error(`API 쿼터/속도 제한: [${model}]을 ${sec}초 동안 제외하고 다음 모델을 시도합니다.`),{model,httpStatus:429,phase,response:data,kind:'cooldown',retryAfterSec:sec});
+                        continue;
                     }
                 }catch(e){
                     last=e;
                     const timedOut=controller?.signal?.aborted || e?.name==='AbortError';
                     mtGeneratorRecordError(type,slotIndex,e,{model,phase,kind:timedOut?'timeout':'network-error'});
                 }finally{clearTimeout(timeoutId);}
+            }
+            // 모든 모델이 쿨다운인 경우에만 가장 먼저 끝나는 쿨다운까지 대기한다.
+            // 이 대기는 재시도 횟수에 포함하지 않는다.
+            if(!madeRequest && Number.isFinite(earliestCooldownUntil)){
+                await new Promise(r=>setTimeout(r,Math.max(1000,earliestCooldownUntil-Date.now()+100)));
+                continue;
             }
             if(attempt<15) await new Promise(r=>setTimeout(r,2000));
         }
@@ -10399,6 +10422,20 @@ ${JSON.stringify(finalPayload)}`;
 /* 전자책 문장 목록은 카드·행 모두 순백색으로 고정합니다. */
 #mtEbookList, #mtEbookList .mt-ebook-item { background:#fff !important; }
 </style>
+<script>
+  // 저장한 HTML 파일명 끝의 _v번호를 읽어, 브라우저 탭과 메인 제목의 버전을 항상 맞춘다.
+  // 이후 파일을 v85, v86처럼 복사해도 이 코드는 수정할 필요가 없다.
+  (function syncAppVersionFromFileName(){
+    const fileName=decodeURIComponent(String(location.pathname||'').split('/').pop()||'');
+    const match=fileName.match(/_v(\d+)\.html$/i);
+    if(!match) return;
+    const version='v'+match[1];
+    document.title='올인원 영작-단어장 시스템 · '+version;
+    const homeTitle=document.getElementById('appHomeTitle');
+    const badge=homeTitle&&homeTitle.querySelector('small');
+    if(badge) badge.textContent=version;
+  })();
+</script>
 </body>
 </html>
 
