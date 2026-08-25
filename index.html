@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v87</title>
+    <title>올인원 영작-단어장 시스템 · v88</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -2538,7 +2538,7 @@ body { background: var(--bench-v2-bg) !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v87</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v88</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -8301,14 +8301,20 @@ ${JSON.stringify(finalPayload)}`;
         const sourceText=batch.map((text,i)=>`[입력 ${i+1}]\n${String(text).trim()}`).join('\n\n');
         const prompt=mtGetGenPrompt('self_generate','main')+
             `\n\n[한국어 원문 목록]\n${sourceText}`+
-            `\n\n[추가 출력 규칙]\n- 위 입력 ${batch.length}개에 대응하는 결과를 반드시 정확히 ${batch.length}행 출력하세요.\n- 각 결과 행은 입력 순서를 그대로 지키고, \"한국어 원문 | 영어문장 | 직독직해\"만 작성하세요.\n- 번호, [입력 n], 헤더, 설명, 빈 줄을 절대 출력하지 마세요.`;
+            `\n\n[추가 출력 규칙]\n- 각 결과 행은 한국어 원문 | 영어문장 | 직독직해 형식으로만 작성하세요.\n- 한 원문을 자연스럽게 나누어야 한다면 여러 결과 행으로 작성해도 됩니다. 불필요하게 행 수를 맞추지 마세요.\n- 모든 원문의 뜻이 빠짐없이 결과에 반영되어야 하며, 각 행의 한국어 원문 칸도 비워 두지 마세요.\n- 번호, [입력 n], 헤더, 설명, 빈 줄을 절대 출력하지 마세요.`;
         const res=await mtGenFetchText('self_generate',prompt,slotIndex,0.1,null,'자체형 일괄생성');
         const lines=String(res.text||'').trim().split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
-        if(lines.length!==batch.length) throw new Error(`자체형 일괄 응답 행 수가 맞지 않습니다. 요청 ${batch.length}행 / 응답 ${lines.length}행`);
+        if(!lines.length) throw new Error('자체형 일괄 응답에 저장할 행이 없습니다.');
+        // 입력 행 수와 결과 행 수는 일부러 같게 강제하지 않는다. 한 원문이 둘 이상의
+        // 자연스러운 카드로 나뉘어도 모두 보존한다.
+        const serialStart=(st.outputRows||[]).reduce((max,row)=>{
+            const n=Number(String(row?.[(st.pattern?.serialCol||4)-1]??'').trim());
+            return Number.isFinite(n)?Math.max(max,Math.floor(n)):max;
+        },0)+1;
         const results=lines.map((line,i)=>{
             const cols=line.split('|').map(x=>x.trim());
-            if(cols.length<3 || !cols[1] || !cols[2]) throw new Error(`자체형 일괄 응답 ${i+1}행 형식이 올바르지 않습니다.`);
-            return [cols[0]||String(batch[i]).trim(),cols[1],cols.slice(2).join(' | '),String(start+i+1)];
+            if(cols.length<3 || !cols[0] || !cols[1] || !cols[2]) throw new Error(`자체형 일괄 응답 ${i+1}행 형식이 올바르지 않습니다.`);
+            return [cols[0],cols[1],cols.slice(2).join(' | '),String(serialStart+i)];
         });
         st.outputRows.push(...results); st.nextSourceIndex=end; st.lastRun=Date.now(); mtSaveTypedState(slotIndex,st); mtInitSlots(); return true;
     }
@@ -10431,7 +10437,7 @@ ${JSON.stringify(finalPayload)}`;
   (function syncAppVersionFromFileName(){
     // 파일을 다른 이름으로 저장하거나 브라우저가 경로를 변환해도, 기본 표시가
     // 사라지지 않게 한다. 정상 파일명에서는 아래 값이 자동으로 새 번호로 대체된다.
-    const fallbackVersion='v87';
+    const fallbackVersion='v88';
     let fileName='';
     try{fileName=decodeURIComponent(String(location.pathname||'').split('/').pop()||'');}
     catch(_){fileName=String(location.pathname||'').split('/').pop()||'';}
