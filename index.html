@@ -2538,7 +2538,7 @@ body { background: var(--bench-v2-bg) !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v82</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v68</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -8274,8 +8274,20 @@ ${JSON.stringify(finalPayload)}`;
     async function mtGeneratorSelfBatch(slotIndex){
         const st=mtGetTypedState(slotIndex),cfg=mtGetGenCfg('self_generate'); const start=Number(st.nextSourceIndex||0); const end=Math.min(start+cfg.batchSize,st.sourceRows.length); const batch=st.sourceRows.slice(start,end);
         if(!batch.length)return false;
-        const promises=batch.map(async(text,i)=>{const prompt=mtGetGenPrompt('self_generate','main')+'\n\n[한국어 원문]\n'+text; const res=await mtGenFetchText('self_generate',prompt,slotIndex,0.1,null,'자체형'); const line=res.text.trim().split(/\r?\n/).map(x=>x.trim()).filter(Boolean)[0]||''; const cols=line.split('|').map(x=>x.trim()); return [cols[0]||text,cols[1]||'',cols[2]||'',String(start+i+1)];});
-        const results=await Promise.all(promises); st.outputRows.push(...results); st.nextSourceIndex=end; st.lastRun=Date.now(); mtSaveTypedState(slotIndex,st); mtInitSlots(); return true;
+        // 배치의 원문들을 한 번의 요청으로 처리합니다. 기본 3개라면 API 호출도 3회가 아니라 1회입니다.
+        const sourceText=batch.map((text,i)=>`[입력 ${i+1}]\n${String(text).trim()}`).join('\n\n');
+        const prompt=mtGetGenPrompt('self_generate','main')+
+            `\n\n[한국어 원문 목록]\n${sourceText}`+
+            `\n\n[추가 출력 규칙]\n- 위 입력 ${batch.length}개에 대응하는 결과를 반드시 정확히 ${batch.length}행 출력하세요.\n- 각 결과 행은 입력 순서를 그대로 지키고, \"한국어 원문 | 영어문장 | 직독직해\"만 작성하세요.\n- 번호, [입력 n], 헤더, 설명, 빈 줄을 절대 출력하지 마세요.`;
+        const res=await mtGenFetchText('self_generate',prompt,slotIndex,0.1,null,'자체형 일괄생성');
+        const lines=String(res.text||'').trim().split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+        if(lines.length!==batch.length) throw new Error(`자체형 일괄 응답 행 수가 맞지 않습니다. 요청 ${batch.length}행 / 응답 ${lines.length}행`);
+        const results=lines.map((line,i)=>{
+            const cols=line.split('|').map(x=>x.trim());
+            if(cols.length<3 || !cols[1] || !cols[2]) throw new Error(`자체형 일괄 응답 ${i+1}행 형식이 올바르지 않습니다.`);
+            return [cols[0]||String(batch[i]).trim(),cols[1],cols.slice(2).join(' | '),String(start+i+1)];
+        });
+        st.outputRows.push(...results); st.nextSourceIndex=end; st.lastRun=Date.now(); mtSaveTypedState(slotIndex,st); mtInitSlots(); return true;
     }
     function mtRefParseJson(text){const s=String(text||'').trim();try{return JSON.parse(s);}catch(_){}const a=s.indexOf('['),b=s.lastIndexOf(']');if(a>=0&&b>a)return JSON.parse(s.slice(a,b+1));throw new Error('JSON 파싱 실패');}
     async function mtGeneratorReferenceForTopic(slotIndex,topic){
