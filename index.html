@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템</title>
+    <title>올인원 영작-단어장 시스템 · v86</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -2538,7 +2538,7 @@ body { background: var(--bench-v2-bg) !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small></small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v86</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -8345,7 +8345,10 @@ ${JSON.stringify(finalPayload)}`;
     }
     function mtRescheduleGeneratorSlots(type){for(let i=1;i<=11;i++){if(mtGetSlotType(i)===type){const st=mtGetTypedState(i);st.nextRun=Date.now()+mtGetGenCfg(type).intervalMin*60*1000;mtSaveTypedState(i,st);if(mtGeneratorTimers[i])clearTimeout(mtGeneratorTimers[i]);mtGeneratorTimers[i]=setTimeout(()=>mtGeneratorRun(i,false),Math.max(1000,st.nextRun-Date.now()));}}}
     function mtOpenGeneratorPromptEditor(slotIndex,type){
-        const st=mtGetTypedState(slotIndex),cfg=mtGetGenCfg(type); document.getElementById('mtGeneratorPromptTitle').innerText=`${mtGeneratorFileLabel(type)} 생성 설정`;document.getElementById('mtGeneratorPromptSubtitle').innerText=`슬롯 ${slotIndex}`;
+        const st=mtGetTypedState(slotIndex),cfg=mtGetGenCfg(type); document.getElementById('mtGeneratorPromptTitle').innerText=`${mtGeneratorFileLabel(type)} 생성 설정`;document.getElementById('mtGeneratorPromptSubtitle').innerText=type==='self_generate'?`슬롯 ${slotIndex} · 현재 설정: API 1회 호출당 원문 ${cfg.batchSize}문장을 함께 생성`:`슬롯 ${slotIndex}`;
+        const batchLabel=document.getElementById('mtGenBatchLabel'),batchHelp=document.getElementById('mtGenBatchHelp');
+        if(batchLabel) batchLabel.textContent=type==='self_generate'?'API 1회 호출당 함께 생성할 문장 수':'API 1회 호출당 처리할 주제 수';
+        if(batchHelp) batchHelp.textContent=type==='self_generate'?'기본값 3은 문장 3개를 API 호출 1회로 함께 처리한다는 뜻입니다.':'설정한 주제 수만큼의 생성 작업을 한 묶음으로 처리합니다.';
         const box=document.getElementById('mtGeneratorPromptFields');box.innerHTML='';
         if(type==='self_generate') box.innerHTML=`<div class="mt-generator-grid"><label>생성 프롬프트</label><textarea id="mtGenPromptMain">${mtEscapeHTML(mtGetGenPrompt(type,'main'))}</textarea></div>`;
         else box.innerHTML=`<div class="mt-generator-grid"><label>1차 대화 프롬프트</label><textarea id="mtGenPromptDialogue">${mtEscapeHTML(mtGetGenPrompt(type,'dialogue'))}</textarea></div><div class="mt-generator-grid"><label>2차 직독직해 프롬프트</label><textarea id="mtGenPromptLiteral">${mtEscapeHTML(mtGetGenPrompt(type,'literal'))}</textarea></div>`;
@@ -10335,7 +10338,7 @@ ${JSON.stringify(finalPayload)}`;
     <div class="mt-generator-modal-body" style="margin-top:10px;">
       <div id="mtGeneratorPromptFields"></div>
       <div class="mt-generator-grid"><label>자동 생성 간격(분)</label><input id="mtGenInterval" type="number" min="1" max="1440"></div>
-      <div class="mt-generator-grid"><label>1회 처리량</label><input id="mtGenBatch" type="number" min="1" max="24"></div>
+      <div class="mt-generator-grid"><label id="mtGenBatchLabel">API 1회 호출당 처리할 항목 수</label><input id="mtGenBatch" type="number" min="1" max="24"><div id="mtGenBatchHelp" style="font-size:10px;color:#64748b;margin-top:4px;"></div></div>
       <div class="mt-generator-grid"><label>배치 간 대기(초)</label><input id="mtGenDelay" type="number" min="0" max="600"></div>
       <div class="mt-generator-grid"><label>모델 순서</label><input id="mtGenModels" type="text"></div>
       <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:4px;"><button class="btn-excel" onclick="mtResetGeneratorPromptDashboard()">기본값</button><button class="btn-primary" onclick="mtSaveGeneratorPromptDashboard()">저장</button></div>
@@ -10426,10 +10429,15 @@ ${JSON.stringify(finalPayload)}`;
   // 저장한 HTML 파일명 끝의 _v번호를 읽어, 브라우저 탭과 메인 제목의 버전을 항상 맞춘다.
   // 이후 파일을 v85, v86처럼 복사해도 이 코드는 수정할 필요가 없다.
   (function syncAppVersionFromFileName(){
-    const fileName=decodeURIComponent(String(location.pathname||'').split('/').pop()||'');
-    const match=fileName.match(/_v(\d+)\.html$/i);
-    if(!match) return;
-    const version='v'+match[1];
+    // 파일을 다른 이름으로 저장하거나 브라우저가 경로를 변환해도, 기본 표시가
+    // 사라지지 않게 한다. 정상 파일명에서는 아래 값이 자동으로 새 번호로 대체된다.
+    const fallbackVersion='v86';
+    let fileName='';
+    try{fileName=decodeURIComponent(String(location.pathname||'').split('/').pop()||'');}
+    catch(_){fileName=String(location.pathname||'').split('/').pop()||'';}
+    const match=fileName.match(/(?:^|[_-])v(\d+)\.html$/i)
+      || String(location.href||'').match(/(?:^|[_-])v(\d+)\.html(?:[?#]|$)/i);
+    const version=match ? 'v'+match[1] : fallbackVersion;
     document.title='올인원 영작-단어장 시스템 · '+version;
     const homeTitle=document.getElementById('appHomeTitle');
     const badge=homeTitle&&homeTitle.querySelector('small');
