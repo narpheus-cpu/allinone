@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v88</title>
+    <title>올인원 영작-단어장 시스템 · v89</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -2538,7 +2538,7 @@ body { background: var(--bench-v2-bg) !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v88</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v89</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -8400,7 +8400,19 @@ ${JSON.stringify(finalPayload)}`;
         const st=mtGetTypedState(slotIndex); mtActiveSlotIndex=slotIndex; mtOriginalSlotData={name:st.fileName||`슬롯 ${slotIndex}`,words,lastSession:null}; mtCurrentStudyWords=words; mtCurrentIndex=Math.max(0,Math.min(rowIndex,words.length-1)); mtEbookTypingActive=false; document.getElementById('mtGeneratorListModal').style.display='none'; document.getElementById('mt-main-menu').style.display='none'; document.getElementById('mt-flashcard').style.display='block'; mtLoadWord(mtCurrentIndex);
     }
     let mtGeneratorEditSlot=null,mtGeneratorEditIndex=null;
-    function mtOpenGeneratorEditModal(slotIndex,rowIndex){const st=mtGetTypedState(slotIndex),r=st.outputRows?.[rowIndex]||[];mtGeneratorEditSlot=slotIndex;mtGeneratorEditIndex=rowIndex;const type=st.type;document.getElementById('mtGenEditCol1').value=type==='reference_generate'?String(r[0]||''):String(r[0]||'');document.getElementById('mtGenEditCol2').value=type==='reference_generate'?String(r[2]||''):String(r[1]||'');document.getElementById('mtGenEditCol3').value=type==='reference_generate'?String(r[4]||''):String(r[2]||'');document.getElementById('mtGeneratorEditModal').style.display='flex';}
+    function mtOpenGeneratorEditModal(slotIndex,rowIndex){
+        const st=mtGetTypedState(slotIndex),r=st.outputRows?.[rowIndex]||[];
+        mtGeneratorEditSlot=slotIndex;mtGeneratorEditIndex=rowIndex;
+        const type=st.type;
+        document.getElementById('mtGenEditCol1').value=type==='reference_generate'?String(r[3]||''):String(r[0]||'');
+        document.getElementById('mtGenEditCol2').value=type==='reference_generate'?String(r[2]||''):String(r[1]||'');
+        document.getElementById('mtGenEditCol3').value=type==='reference_generate'?String(r[4]||''):String(r[2]||'');
+        const labels=type==='reference_generate'?['주문장','영어문장','직독직해']:['한국어 원문','영어문장','직독직해'];
+        ['mtGenEditLabel1','mtGenEditLabel2','mtGenEditLabel3'].forEach((id,i)=>{const el=document.getElementById(id);if(el)el.textContent=labels[i];});
+        const sub=document.getElementById('mtGeneratorEditSubtitle'); if(sub)sub.textContent=(type==='reference_generate'?'참조형':'자체형')+' · 문장 '+(rowIndex+1);
+        const modal=document.getElementById('mtGeneratorEditModal'); if(modal)modal.style.display='flex';
+        setTimeout(()=>document.getElementById('mtGenEditCol1')?.focus(),0);
+    }
     function mtCloseGeneratorEditModal(){document.getElementById('mtGeneratorEditModal').style.display='none';mtGeneratorEditSlot=null;mtGeneratorEditIndex=null;}
     function mtSaveGeneratorEditRow(){if(mtGeneratorEditSlot==null)return;const st=mtGetTypedState(mtGeneratorEditSlot),r=st.outputRows?.[mtGeneratorEditIndex]||[],a=document.getElementById('mtGenEditCol1').value,b=document.getElementById('mtGenEditCol2').value,c=document.getElementById('mtGenEditCol3').value;if(st.type==='reference_generate'){r[3]=a;r[2]=b;r[4]=c;}else{r[0]=a;r[1]=b;r[2]=c;}mtSaveTypedState(mtGeneratorEditSlot,st);mtCloseGeneratorEditModal();mtRenderGeneratorList();mtInitSlots();}
     function mtExportGeneratorSlot(event,slotIndex){if(event)event.stopPropagation();const st=mtGetTypedState(slotIndex),rows=Array.isArray(st.outputRows)?st.outputRows:[];if(!rows.length)return alert('내보낼 데이터가 없습니다.');const p=st.pattern||{},serialIdx=(p.serialCol|| (st.type==='reference_generate'?2:4))-1,starSet=new Set((st.starredSerials||[]).map(String));let out=[];if(st.type==='self_generate'){out=[['한국어 원문','영어문장','직독직해','일련번호','중요'],...rows.map(r=>[r[0]||'',r[1]||'',r[2]||'',r[serialIdx]||'',starSet.has(String(r[serialIdx]||''))?'★':''])];}else{out=[['주제','일련번호','영어문장','한국어','직독직해','중요'],...rows.map(r=>[r[0]||'',r[1]||'',r[2]||'',r[3]||'',r[4]||'',starSet.has(String(r[1]||''))?'★':''])];}const ws=XLSX.utils.aoa_to_sheet(out);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,st.type==='self_generate'?'자체형':'참조형');XLSX.writeFile(wb,`${st.fileName||mtGeneratorFileLabel(st.type)}_${new Date().toISOString().slice(0,10)}.xlsx`);}
@@ -10359,8 +10371,19 @@ ${JSON.stringify(finalPayload)}`;
     <div id="mtGeneratorListPagination" style="display:flex;justify-content:center;align-items:center;gap:8px;padding-top:10px;"></div>
   </div>
 </div>
-<div id="mtGeneratorEditModal" class="modal-overlay" style="display:none;z-index:6600;">
-  <div class="modal-card" style="width:min(760px,96vw);text-align:left;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div style="font-size:15px;font-weight:800;">문장 편집</div><button class="btn-excel" onclick="mtCloseGeneratorEditModal()">닫기</button></div><div class="mt-generator-modal-body"><div class="mt-generator-grid"><label>1열</label><textarea id="mtGenEditCol1"></textarea></div><div class="mt-generator-grid"><label>2열</label><textarea id="mtGenEditCol2"></textarea></div><div class="mt-generator-grid"><label>3열</label><textarea id="mtGenEditCol3"></textarea></div><div style="display:flex;justify-content:flex-end;"><button class="btn-primary" onclick="mtSaveGeneratorEditRow()">저장</button></div></div></div>
+<div id="mtGeneratorEditModal" class="mt-ebook-edit-overlay" style="display:none;z-index:6600;" onclick="if(event.target===this)mtCloseGeneratorEditModal()">
+  <div class="mt-ebook-edit-modal" onclick="event.stopPropagation()">
+    <div class="mt-ebook-edit-head">
+      <div><div class="mt-ebook-edit-title">문장 수정</div><div id="mtGeneratorEditSubtitle" style="font-size:10px;color:#94a3b8;margin-top:3px;"></div></div>
+      <button type="button" class="btn-excel" onclick="mtCloseGeneratorEditModal()">닫기</button>
+    </div>
+    <div class="mt-ebook-edit-grid">
+      <div class="mt-ebook-edit-field"><label id="mtGenEditLabel1">주문장</label><textarea id="mtGenEditCol1"></textarea></div>
+      <div class="mt-ebook-edit-field"><label id="mtGenEditLabel2">영어문장</label><textarea id="mtGenEditCol2"></textarea></div>
+      <div class="mt-ebook-edit-field"><label id="mtGenEditLabel3">보조문장</label><textarea id="mtGenEditCol3"></textarea></div>
+    </div>
+    <div class="mt-ebook-edit-actions"><button type="button" class="btn-excel" onclick="mtCloseGeneratorEditModal()">닫기</button><button type="button" class="btn-primary" onclick="mtSaveGeneratorEditRow()">수정 후 저장</button></div>
+  </div>
 </div>
 <div id="mtGeneratorErrorModal" class="modal-overlay" style="display:none;z-index:6700;">
   <div class="modal-card" style="width:min(1000px,96vw);max-height:92vh;overflow:hidden;text-align:left;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div><div id="mtGeneratorErrorTitle" style="font-size:16px;font-weight:800;">오류로그</div><div id="mtGeneratorErrorSummary" style="font-size:11px;color:#64748b;margin-top:3px;"></div></div><button class="btn-excel" onclick="mtCloseGeneratorErrorLog()">닫기</button></div><textarea id="mtGeneratorErrorText" class="mt-generator-error-text" readonly style="margin-top:10px;"></textarea></div>
@@ -10437,7 +10460,7 @@ ${JSON.stringify(finalPayload)}`;
   (function syncAppVersionFromFileName(){
     // 파일을 다른 이름으로 저장하거나 브라우저가 경로를 변환해도, 기본 표시가
     // 사라지지 않게 한다. 정상 파일명에서는 아래 값이 자동으로 새 번호로 대체된다.
-    const fallbackVersion='v88';
+    const fallbackVersion='v89';
     let fileName='';
     try{fileName=decodeURIComponent(String(location.pathname||'').split('/').pop()||'');}
     catch(_){fileName=String(location.pathname||'').split('/').pop()||'';}
