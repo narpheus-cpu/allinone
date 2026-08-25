@@ -3848,8 +3848,10 @@ body { background: var(--bench-v2-bg) !important; }
                     mtWordWebStateCache.nextRun = Date.now() + MT_WORDWEB_INTERVAL_MS;
                 }
                 try { await mtPersistGeneratorStates(); } catch (e) { console.warn('[백업 복원] 생성형 IndexedDB 저장 실패:', e); }
+                // 구버전 슬롯10 백업도 새 참조형 슬롯10으로 즉시 복원합니다.
+                try { await mtRecoverReferenceTypeFromLegacy(); } catch (_) {}
                 try { localStorage.removeItem(MT_SLOT9_LEGACY_STORAGE_KEY); } catch (_) {}
-                try { localStorage.removeItem(MT_WORDWEB_STORAGE_KEY); } catch (_) {}
+                // legacy wordweb 저장소는 복구 안전을 위해 삭제하지 않습니다.
                 if (Object.prototype.hasOwnProperty.call(parsed.mtBackupData, 'slot9_api_key')) {
                     if (parsed.mtBackupData['slot9_api_key']) localStorage.setItem(MT_SLOT9_API_KEY_STORAGE_KEY, parsed.mtBackupData['slot9_api_key']);
                     else localStorage.removeItem(MT_SLOT9_API_KEY_STORAGE_KEY);
@@ -3873,6 +3875,8 @@ body { background: var(--bench-v2-bg) !important; }
             switchSlot(activeSlotIndex, false);
 
             if (typeof mtMigrateDedicatedGeneratorStates === 'function') await mtMigrateDedicatedGeneratorStates();
+            // 마이그레이션 후에도 슬롯10 참조형이 실제로 살아 있는지 마지막 검증을 수행합니다.
+            if (!(await mtVerifyTypedMigrationSlot(10,'reference_generate'))) { await mtRecoverReferenceTypeFromLegacy(); }
             if (typeof mtInitSlots === 'function') mtInitSlots();
             for (let i=1;i<=11;i++){ const t=mtGetSlotType(i); if(t==='self_generate'||t==='reference_generate') mtStartTypedTimer(i,false); }
             mtRenderDailyStats();
@@ -7850,7 +7854,7 @@ Rules:
             if(migratedSlot9 || migratedWordWeb){
                 await mtPersistGeneratorStates();
                 if(migratedSlot9) try{ localStorage.removeItem(MT_SLOT9_LEGACY_STORAGE_KEY); }catch(_){}
-                if(migratedWordWeb) try{ localStorage.removeItem(MT_WORDWEB_STORAGE_KEY); }catch(_){}
+                // migratedWordWeb 상태도 원본 legacy 키를 보존합니다.
             }
 
             if(!mtSlot9StateCache) mtSlot9StateCache=mtSlot9DefaultState();
@@ -12505,19 +12509,56 @@ ${JSON.stringify(finalPayload)}`;
                 }catch(_){}
             }
 
-            // 새 엔진이 성공적으로 사용할 수 있게 되었으므로 구버전 전용 자동 실행은 중단하고,
-            // 구버전 전용 캐시/legacy localStorage만 제거합니다. PC 백업의 구버전 항목은 복원 시 다시 위 과정으로 승격됩니다.
+            // [안전 패치] 구버전 저장소는 새 typed 상태가 실제로 존재하고 내용까지 확인되기 전에는 절대 삭제하지 않습니다.
+            // 복구 가능성을 보존하기 위해 legacy IndexedDB/localStorage/API key를 그대로 유지합니다.
+            // 구버전 자동 트리거만 중단하고, 데이터 저장소 자체는 보존합니다.
             try{ if(mtSlot9TimerId) clearTimeout(mtSlot9TimerId); mtSlot9TimerId=null; }catch(_){}
             try{ if(mtWordWebTimerId) clearTimeout(mtWordWebTimerId); mtWordWebTimerId=null; }catch(_){}
-            try{ localStorage.removeItem(MT_SLOT9_LEGACY_STORAGE_KEY); }catch(_){}
-            try{ localStorage.removeItem(MT_WORDWEB_STORAGE_KEY); }catch(_){}
-            try{ localStorage.removeItem(MT_SLOT9_API_KEY_STORAGE_KEY); }catch(_){}
-            try{ localStorage.removeItem(MT_WORDWEB_API_KEY_STORAGE_KEY); }catch(_){}
-            try{
-                if(mtGeneratorStoreLoaded){ await mtWithGeneratorStore('readwrite', store=>{ store.delete('slot9'); store.delete('wordweb'); }); }
-            }catch(_){}
-            mtSlot9StateCache=null; mtWordWebStateCache=null;
+            // legacy 저장소는 의도적으로 삭제하지 않습니다.
+            // mtSlot9StateCache / mtWordWebStateCache도 즉시 null 처리하지 않아 복구 경로가 유지됩니다.
         }catch(e){ console.warn('[생성형 통합 마이그레이션]',e); }
+    }
+
+    async function mtVerifyTypedMigrationSlot(slot, type){
+        try{
+            const st=mtGetTypedState(slot);
+            const meaningful=!!st && (String(st.fileName||'').trim() || (st.outputRows||[]).length || (st.sourceRows||[]).length || (st.topics||[]).length || (st.topicRows||[]).length);
+            if(meaningful && mtGetSlotType(slot)===type) return true;
+        }catch(_){ }
+        return false;
+    }
+
+    async function mtRecoverReferenceTypeFromLegacy(){
+        // 슬롯10 참조형(구 wordweb) 데이터를 새 typed slot 10으로 안전하게 복구합니다.
+        try{
+            let legacy=null;
+            if(mtWordWebStateCache && typeof mtWordWebStateCache==='object') legacy=mtWordWebStateCache;
+            if(!legacy){
+                try{
+                    const raw=localStorage.getItem(MT_WORDWEB_STORAGE_KEY);
+                    if(raw) legacy=JSON.parse(raw);
+                }catch(_){ }
+            }
+            if(!legacy){
+                try{
+                    const db=await initDB();
+                    const tx=db.transaction(MT_GENERATOR_STORE_NAME,'readonly');
+                    const store=tx.objectStore(MT_GENERATOR_STORE_NAME);
+                    legacy=await new Promise(resolve=>{const q=store.get('wordweb');q.onsuccess=()=>resolve(q.result||null);q.onerror=()=>resolve(null);});
+                    try{db.close();}catch(_){}
+                }catch(_){ }
+            }
+            if(!legacy || typeof legacy!=='object') return false;
+            const cur=mtGetTypedState(10);
+            const meaningful=String(legacy.fileName||'').trim() || (legacy.outputRows||[]).length || (legacy.topics||[]).length || (legacy.topicRows||[]).length;
+            const curMeaningful=String(cur.fileName||'').trim() || (cur.outputRows||[]).length || (cur.topics||[]).length || (cur.topicRows||[]).length;
+            if(!meaningful) return false;
+            if(curMeaningful && mtGetSlotType(10)==='reference_generate') return true;
+            const migrated={...legacy,type:'reference_generate',fileName:legacy.fileName||'',sourceRows:Array.isArray(legacy.sourceRows)?legacy.sourceRows.slice():[],sourceRowsLock:Array.isArray(legacy.sourceRowsLock)?legacy.sourceRowsLock.slice():[],topicRows:Array.isArray(legacy.topicRows)?legacy.topicRows.map(r=>Array.isArray(r)?r.slice():[]):[],topics:Array.isArray(legacy.topics)?legacy.topics.slice():[],outputRows:Array.isArray(legacy.outputRows)?legacy.outputRows.map(r=>Array.isArray(r)?r.slice():[]):[],starredSerials:Array.isArray(legacy.starredSerials)?legacy.starredSerials.map(String):[],lastSession:legacy.lastSession||null,nextSourceIndex:Number(legacy.nextSourceIndex||0),nextRun:Number(legacy.nextRun)||Date.now()+mtGetGeneratorTypeIntervalMs('reference_generate'),lastRun:legacy.lastRun||null,lastError:legacy.lastError||'',lastDiagnostic:legacy.lastDiagnostic||null,pattern:legacy.pattern||{engCol:1,mainKorCol:2,subKorCol:3,serialCol:4,topicOutputCol:5}};
+            mtSetSlotType(10,'reference_generate');
+            mtSaveTypedState(10,migrated);
+            return await mtVerifyTypedMigrationSlot(10,'reference_generate');
+        }catch(_){ return false; }
     }
 
     (async function initApp() {
