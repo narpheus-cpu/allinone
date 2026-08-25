@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v55</title>
+    <title>올인원 영작-단어장 시스템 · v56</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -2349,7 +2349,7 @@ body { background: var(--bench-v2-bg) !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v55</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v56</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -7982,6 +7982,16 @@ ${JSON.stringify(finalPayload)}`;
         if (modal) modal.style.display = 'none';
         mtPendingTypeSlot = null;
     }
+    function mtTriggerUpload(slotIndex){
+        const slot=Number(slotIndex);
+        if(!Number.isInteger(slot)||slot<0||slot>10)return;
+        mtActiveSlotIndex=slot;
+        const input=document.getElementById('mtFileUpload');
+        if(!input)return;
+        input.value='';
+        input.click();
+    }
+
     function mtOpenConfiguredEmptySlotModal(slotIndex) {
         mtConfiguredEmptySlot = Number(slotIndex);
         const type = mtGetSlotType(slotIndex);
@@ -9291,6 +9301,30 @@ ${JSON.stringify(finalPayload)}`;
         else mtInitSlots();
     }
 
+    // 생성형/전자책 공통 내보내기 보조 함수
+    function mtBuildExportRowsWithStarred(rows, pattern, starredSerials, headerLabel='중요') {
+        const list=Array.isArray(rows)?rows:[];
+        const p=pattern||{serialCol:4};
+        const serialIdx=Math.max(0,Number(p.serialCol||1)-1);
+        const starSet=new Set((Array.isArray(starredSerials)?starredSerials:[]).map(String));
+        if(!list.length)return [];
+        const width=Math.max(serialIdx+1,...list.map(r=>Array.isArray(r)?r.length:0));
+        return list.map(r=>{
+            const row=Array.isArray(r)?r.slice():[];
+            while(row.length<width)row.push('');
+            const serial=String(row[serialIdx]??'').trim();
+            row.push(starSet.has(serial)?'★':'');
+            return row;
+        });
+    }
+    function mtAddExportHeader(rows, headerLabel='중요'){
+        const data=Array.isArray(rows)?rows.map(r=>Array.isArray(r)?r.slice():[]):[];
+        const width=Math.max(1,...data.map(r=>r.length));
+        const header=Array(width).fill('');
+        header[width-1]=headerLabel;
+        return [header,...data];
+    }
+
     function mtTypedExport(e,slotIndex){
         if(e)e.stopPropagation();
         const type=mtGetSlotType(slotIndex), state=mtGetTypedState(slotIndex), wb=XLSX.utils.book_new();
@@ -9306,10 +9340,12 @@ ${JSON.stringify(finalPayload)}`;
             XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(out),'시트1');
             XLSX.writeFile(wb,`${state.fileName||'슬롯'}_참조형.xlsx`);
         } else if(type==='ebook'){
-            XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet((state.ebook?.sourceRows||[])),'전자책원본');
+            XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet((state.ebook?.sourceRows||state.sourceRows||[])),'전자책원본');
             const out=mtAddExportHeader(mtBuildExportRowsWithStarred(state.outputRows||[],pattern,state.starredSerials,'중요'),'중요');
             XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(out),'전자책');
             XLSX.writeFile(wb,`${state.fileName||'슬롯'}_전자책.xlsx`);
+        } else {
+            throw new Error(`지원하지 않는 슬롯 유형입니다: ${type||'빈 슬롯'}`);
         }
     }
 
