@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v70</title>
+    <title>올인원 영작-단어장 시스템 · v74</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -2411,7 +2411,7 @@ body { background: var(--bench-v2-bg) !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v73</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v74</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -6409,7 +6409,8 @@ Rules:
                     const slotApiKey = mtGetGeneratorSlotApiKey(i,type);
                     const apiKeyInput = `<div class="mt-slot-api-row" style="display:flex;align-items:center;gap:5px;margin:5px 0 6px;"><span style="font-size:9px;color:#64748b;font-weight:700;white-space:nowrap;">전용 API</span><input type="text" autocomplete="off" value="${mtEscapeAttr(slotApiKey)}" placeholder="비워두면 메인 API 키 사용" style="flex:1;min-width:0;height:24px;padding:3px 6px;border:1px solid #e2e8f0;border-radius:5px;font-size:9px;box-sizing:border-box;" oninput="mtSetGeneratorSlotApiKey(${i},'${type}',this.value)" onclick="event.stopPropagation()"></div>`;
                     div.innerHTML=`<div class="mt-slot-title">${mtEscapeHTML(title)}</div><div class="mt-slot-stat-row"><div><div class="mt-slot-count">${rows.length}</div><div class="mt-slot-count-label"></div></div><div class="mt-slot-type-tools"><span class="mt-slot-meta-badge mt-gen-type-badge-inline" style="display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;width:max-content;min-width:54px;height:24px;padding:3px 8px;margin:0;border-radius:6px;background:${badgeColor} !important;color:#fff !important;border:1px solid ${badgeColor} !important;font-size:9px !important;line-height:1 !important;font-weight:800 !important;white-space:nowrap;">${label}</span><button type="button" class="mt-slot-error-btn" onclick="event.stopPropagation();mtOpenGeneratorErrorLog(${i},'${type}')">오류로그</button><div class="mt-slot-star-count">★ ${star}</div></div></div>${apiKeyInput}<div class="mt-slot-actions-row mt-generator-main-actions"><button class="btn-excel" onclick="event.stopPropagation();mtOpenGeneratorPromptEditor(${i},'${type}')">프롬프트</button><button class="btn-excel" onclick="event.stopPropagation();mtOpenGeneratorList(${i})">목록</button><button class="btn-excel" onclick="event.stopPropagation();mtOpenTypeChangeModal(${i})">변경</button><button class="btn-excel" onclick="event.stopPropagation();mtExportGeneratorSlot(event,${i})">내보내기</button><button type="button" class="btn-excel mt-slot-delete-btn" onclick="event.stopPropagation();mtDeleteSlot(event,${i})">삭제</button></div>`;
-                    div.onclick=()=>{ const w=mtGetGeneratorWords(i); if(w.length){ mtStartSlotDirect(i,{name:title,words:w,lastSession:st.lastSession}); } else { mtTriggerUpload(i,type); } };
+                    // 생성형도 카드 클릭 시 전자책과 같은 문장 목록 화면을 먼저 엽니다.
+                    div.onclick=()=>{ const w=mtGetGeneratorWords(i); if(w.length){ mtOpenEbookViewer(i); } else { mtTriggerUpload(i,type); } };
                 }
             } else if(normal){
                 const data=Array.isArray(normal)?{name:`슬롯 ${i}`,words:normal}:normal, words=Array.isArray(data.words)?data.words:[], star=words.filter(w=>w&&w.starred).length;
@@ -6430,7 +6431,7 @@ Rules:
 
         // ★ 카드 모아보기는 항상 11번째 슬롯 위치에 고정.
         const starDiv=document.createElement('div'); starDiv.className='mt-slot mt-premium-slot has-data mt-star-fixed-slot11';
-        starDiv.innerHTML=`<div class="mt-slot-title">★ 모아보기</div><div class="mt-slot-slotno">[슬롯 11]</div><div class="mt-slot-card-count-line"><span class="mt-slot-card-count-badge">${allStarredWords.length}</span><span class="mt-slot-card-count-label"></span></div><div class="mt-slot-desc"></div><div class="mt-slot-actions-row"><button class="btn-download" onclick="event.stopPropagation();mtExportStarred(event)">엑셀로 모아서 내보내기</button></div>`;
+        starDiv.innerHTML=`<div class="mt-slot-title">★ 모아보기</div><div class="mt-slot-card-count-line"><span class="mt-slot-card-count-badge">${allStarredWords.length}</span><span class="mt-slot-card-count-label"></span></div><div class="mt-slot-desc"></div><div class="mt-slot-actions-row"><button class="btn-download" onclick="event.stopPropagation();mtExportStarred(event)">엑셀로 모아서 내보내기</button></div>`;
         starDiv.onclick=()=>allStarredWords.length?mtPromptAction('star',{name:'★ 카드 모아보기',words:allStarredWords,isStarSlot:true}):alert('★ 표시된 카드가 없습니다.');
         grid.appendChild(starDiv);
     }
@@ -7487,6 +7488,7 @@ ${JSON.stringify(finalPayload)}`;
 
     function mtEbookDeleteSelected(slotIndex){
         const slot=Number(slotIndex);
+        const type=mtGetSlotType(slot);
         const indexes=Array.from(mtEbookSelectedIndexes).map(Number).filter(Number.isInteger).sort((a,b)=>b-a);
         if(!indexes.length) return;
         const st=mtGetTypedState(slot);
@@ -7496,10 +7498,10 @@ ${JSON.stringify(finalPayload)}`;
 
         valid.forEach(displayIndex=>{
             st.outputRows.splice(displayIndex,1);
-            if(st.ebook && Array.isArray(st.ebook.sourceRows) && displayIndex < st.ebook.sourceRows.length) st.ebook.sourceRows.splice(displayIndex,1);
+            if(type==='ebook' && st.ebook && Array.isArray(st.ebook.sourceRows) && displayIndex < st.ebook.sourceRows.length) st.ebook.sourceRows.splice(displayIndex,1);
         });
 
-        if(Array.isArray(st.ebookReadIndexes)) {
+        if(type==='ebook' && Array.isArray(st.ebookReadIndexes)) {
             const deletedAsc=valid.slice().sort((a,b)=>a-b);
             st.ebookReadIndexes=st.ebookReadIndexes.map(Number).filter(Number.isInteger).filter(i=>!deletedAsc.includes(i)).map(i=>i-deletedAsc.filter(d=>d<i).length);
         }
@@ -7507,7 +7509,7 @@ ${JSON.stringify(finalPayload)}`;
         mtSaveTypedState(slot,st);
         mtEbookSelectedIndexes.clear();
 
-        const remaining=mtGetEbookWords(slot).length;
+        const remaining=(type==='ebook'?mtGetEbookWords(slot):mtGetGeneratorWords(slot)).length;
         const totalPages=Math.max(1,Math.ceil(remaining/MT_EBOOK_PAGE_SIZE));
         const key=String(slot);
         mtSaveEbookPage(key,Math.min(Math.max(mtGetEbookPage(key),1),totalPages));
@@ -7515,8 +7517,26 @@ ${JSON.stringify(finalPayload)}`;
         mtInitSlots();
     }
 
+    function mtDeleteTypedListItem(slotIndex,index,event){
+        const type=mtGetSlotType(slotIndex);
+        if(type==='ebook') return mtDeleteEbookItem(slotIndex,index,event);
+        if(event){event.preventDefault();event.stopPropagation();}
+        const st=mtGetTypedState(slotIndex);
+        if(!Array.isArray(st.outputRows) || index<0 || index>=st.outputRows.length)return;
+        if(!confirm(`${index+1}번 문장을 삭제하시겠습니까?`))return;
+        st.outputRows.splice(index,1);
+        const serialCol=(st.pattern?.serialCol || (type==='reference_generate'?2:4))-1;
+        const remainingSerials=new Set(st.outputRows.map(r=>String(r?.[serialCol]??'')));
+        st.starredSerials=(st.starredSerials||[]).filter(x=>remainingSerials.has(String(x)));
+        st.lastSession=null; mtSaveTypedState(slotIndex,st);
+        mtEbookSelectedIndexes.delete(index);
+        mtOpenEbookViewer(slotIndex); mtInitSlots();
+    }
+
     function mtOpenEbookViewer(slotIndex, preserveSelection=false){
-        const st=mtGetTypedState(slotIndex), words=mtGetEbookWords(slotIndex);
+        const type=mtGetSlotType(slotIndex);
+        const isEbook=type==='ebook';
+        const st=mtGetTypedState(slotIndex), words=isEbook?mtGetEbookWords(slotIndex):mtGetGeneratorWords(slotIndex);
         if(!st.fileName || !words.length){
             mtEbookSelectedIndexes.clear();
             const toolbar=document.getElementById('mtEbookListToolbar'); if(toolbar) toolbar.style.display='none';
@@ -7525,7 +7545,7 @@ ${JSON.stringify(finalPayload)}`;
             const main=document.getElementById('mt-main-menu');
             if(main) main.style.display='none';
             if(viewer) viewer.style.display='block';
-            if(list) list.innerHTML='<div class="mt-ebook-empty">전자책에서 표시할 주문장 데이터를 찾지 못했습니다.</div>';
+            if(list) list.innerHTML=`<div class="mt-ebook-empty">${isEbook?'전자책':'생성형'}에서 표시할 문장 데이터를 찾지 못했습니다.</div>`;
             const pg=document.getElementById('mtEbookPagination'); if(pg) pg.innerHTML='';
             return;
         }
@@ -7555,9 +7575,10 @@ ${JSON.stringify(finalPayload)}`;
         pageWords.forEach((w,localIndex)=>{
             const absoluteIndex=start+localIndex;
             const item=document.createElement('div');
-            item.className='mt-ebook-item'+(w.ebookRead?' read':'');
+            const isRead=isEbook ? w.ebookRead : mtGetCardSuccessCount(Number(slotIndex),w,absoluteIndex)>0;
+            item.className='mt-ebook-item'+(isRead?' read':'');
             item.dataset.index=absoluteIndex;
-            const displayText = (mtEbookDisplayMode === 'eng' && w.ebookRead) ? w.eng : w.kor;
+            const displayText = (mtEbookDisplayMode === 'eng' && isRead) ? w.eng : w.kor;
             item.innerHTML=`<div class="mt-ebook-item-inner"><input type="checkbox" class="mt-ebook-item-select" aria-label="문장 ${absoluteIndex+1}번 선택" ${mtEbookSelectedIndexes.has(absoluteIndex)?'checked':''}><div class="mt-ebook-item-main-wrap"><button type="button" class="mt-ebook-item-delete-btn" title="항목 삭제" aria-label="항목 삭제">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v5"></path><path d="M14 11v5"></path>
@@ -7570,9 +7591,9 @@ ${JSON.stringify(finalPayload)}`;
             const check=item.querySelector('.mt-ebook-item-select');
             // 체크박스 클릭은 선택 상태만 변경하고 카드 열기 이벤트가 부모 행으로 전파되지 않도록 합니다.
             check.addEventListener('click',(e)=>{ e.stopPropagation(); }); check.addEventListener('change',(e)=>{ e.stopPropagation(); if(check.checked) mtEbookSelectedIndexes.add(absoluteIndex); else mtEbookSelectedIndexes.delete(absoluteIndex); mtEbookUpdateSelectionUi(Number(slotIndex), pageWords, start); });
-            item.querySelector('.mt-ebook-item-delete-btn').onclick=(e)=>mtDeleteEbookItem(Number(slotIndex),absoluteIndex,e);
-            item.querySelector('.mt-ebook-item-edit-btn').onclick=(e)=>{ e.preventDefault(); e.stopPropagation(); mtOpenEbookEditModal(Number(slotIndex),absoluteIndex); };
-            item.onclick=()=>mtOpenEbookTyping(Number(slotIndex),absoluteIndex);
+            item.querySelector('.mt-ebook-item-delete-btn').onclick=(e)=>mtDeleteTypedListItem(Number(slotIndex),absoluteIndex,e);
+            item.querySelector('.mt-ebook-item-edit-btn').onclick=(e)=>{ e.preventDefault(); e.stopPropagation(); if(isEbook)mtOpenEbookEditModal(Number(slotIndex),absoluteIndex);else mtOpenGeneratorEditModal(Number(slotIndex),absoluteIndex); };
+            item.onclick=()=>{if(isEbook)mtOpenEbookTyping(Number(slotIndex),absoluteIndex);else mtOpenGeneratorCardAt(Number(slotIndex),absoluteIndex);};
             list.appendChild(item);
         });
         mtEbookUpdateSelectionUi(Number(slotIndex), pageWords, start);
