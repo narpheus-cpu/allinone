@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v92</title>
+    <title>올인원 영작-단어장 시스템 · v93</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -2538,7 +2538,7 @@ body { background: var(--bench-v2-bg) !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v92</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v93</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -7137,7 +7137,11 @@ ${JSON.stringify(finalPayload)}`;
         mtSlotStateCache[key]=state; return state;
     }
     function mtSaveTypedState(slotIndex,state){
-        const idx=Number(slotIndex), key=String(idx); mtSlotStateCache[key]=state;
+        const idx=Number(slotIndex), key=String(idx);
+        // localStorage와 IndexedDB 중 어떤 저장본이 최신인지 복원 시 판별할 수 있도록
+        // 모든 유형 슬롯 저장에 단조 증가에 가까운 시각을 남깁니다.
+        state._mtSavedAt=Date.now();
+        mtSlotStateCache[key]=state;
         try{localStorage.setItem('mt_slot_state_'+key,JSON.stringify(state));}catch(e){console.warn('[유형 슬롯] localStorage 저장 실패. IndexedDB 영구 저장을 계속 시도합니다.',e);}
         mtQueueTypedSlotStatePersistence();
     }
@@ -7190,8 +7194,12 @@ ${JSON.stringify(finalPayload)}`;
                     try{const raw=localStorage.getItem('mt_slot_state_'+key);if(raw)localState=JSON.parse(raw);}catch(_){}
                     const savedHasData=!!(String(state.fileName||'').trim() || state.outputRows?.length || state.sourceRows?.length || state.topics?.length);
                     const localHasData=!!(String(localState?.fileName||'').trim() || localState?.outputRows?.length || localState?.sourceRows?.length || localState?.topics?.length);
-                    // 비어 있거나 불완전한 localStorage 값보다 영구 저장본을 우선하여 자체형 원문을 복구합니다.
-                    if(!localState || (savedHasData && !localHasData)){
+                    const savedAt=Number(state._mtSavedAt||0);
+                    const localSavedAt=Number(localState?._mtSavedAt||0);
+                    // 대용량 전자책에서는 localStorage가 이전 전체 상태를 그대로 남길 수 있다.
+                    // 이때 최신 IndexedDB 저장본을 오래된 localStorage가 덮어쓰지 않게 한다.
+                    const indexedDbIsNewer=!!savedAt && (!localSavedAt || savedAt>localSavedAt);
+                    if(!localState || indexedDbIsNewer || (savedHasData && !localHasData)){
                         mtSlotStateCache[String(key)]=state;try{localStorage.setItem('mt_slot_state_'+key,JSON.stringify(state));}catch(_){}
                     } else mtSlotStateCache[String(key)]=localState;
                 }
@@ -7515,7 +7523,7 @@ ${JSON.stringify(finalPayload)}`;
         state.starredSerials=importedStarredSerials;
         state.ebookReadIndexes=[];
         // 새 전자책으로 교체할 때는 이전 전자책의 독립 완료 기록도 함께 초기화합니다.
-        try{localStorage.removeItem(MT_EBOOK_COMPLETION_RECORD_PREFIX+Number(slot));}catch(_){}
+        try{localStorage.removeItem(MT_EBOOK_COMPLETION_RECORD_PREFIX+Number(slot));sessionStorage.removeItem(MT_EBOOK_COMPLETION_RECORD_PREFIX+Number(slot));}catch(_){}
         state.lastSession=null;
         state.lastError='';
         mtSetSlotType(slot,'ebook');
@@ -9119,14 +9127,18 @@ ${JSON.stringify(finalPayload)}`;
         return serial+'|'+eng+'|'+kor;
     }
     function mtGetEbookCompletionRecord(slotIndex){
-        try{
-            const raw=localStorage.getItem(MT_EBOOK_COMPLETION_RECORD_PREFIX+Number(slotIndex));
-            const parsed=raw?JSON.parse(raw):null;
-            return parsed&&typeof parsed==='object'?parsed:{keys:[],lastIndex:null};
-        }catch(_){return {keys:[],lastIndex:null};}
+        const storageKey=MT_EBOOK_COMPLETION_RECORD_PREFIX+Number(slotIndex);
+        const records=[];
+        [localStorage,sessionStorage].forEach(store=>{try{const parsed=JSON.parse(store.getItem(storageKey)||'null');if(parsed&&typeof parsed==='object')records.push(parsed);}catch(_){}});
+        const keys=new Set(); let lastIndex=null,completedAt=0;
+        records.forEach(record=>{(record.keys||[]).forEach(key=>keys.add(String(key)));if(Number(record.completedAt||0)>=completedAt){completedAt=Number(record.completedAt||0);lastIndex=record.lastIndex;}});
+        return {keys:Array.from(keys),lastIndex,completedAt};
     }
     function mtSaveEbookCompletionRecord(slotIndex,record){
-        try{localStorage.setItem(MT_EBOOK_COMPLETION_RECORD_PREFIX+Number(slotIndex),JSON.stringify(record));}catch(e){console.warn('전자책 완료 기록 저장 실패:',e);}
+        const storageKey=MT_EBOOK_COMPLETION_RECORD_PREFIX+Number(slotIndex),encoded=JSON.stringify(record);
+        // sessionStorage는 즉시 새로고침 복구용, localStorage는 탭을 닫은 뒤의 보조 복구용입니다.
+        try{sessionStorage.setItem(storageKey,encoded);}catch(e){console.warn('전자책 완료 임시 기록 저장 실패:',e);}
+        try{localStorage.setItem(storageKey,encoded);}catch(e){console.warn('전자책 완료 기록 저장 실패:',e);}
     }
     function mtRestoreEbookCompletionRecord(slotIndex,state){
         const st=state||mtGetTypedState(Number(slotIndex));
@@ -10531,7 +10543,7 @@ ${JSON.stringify(finalPayload)}`;
   (function syncAppVersionFromFileName(){
     // 파일을 다른 이름으로 저장하거나 브라우저가 경로를 변환해도, 기본 표시가
     // 사라지지 않게 한다. 정상 파일명에서는 아래 값이 자동으로 새 번호로 대체된다.
-    const fallbackVersion='v92';
+    const fallbackVersion='v93';
     let fileName='';
     try{fileName=decodeURIComponent(String(location.pathname||'').split('/').pop()||'');}
     catch(_){fileName=String(location.pathname||'').split('/').pop()||'';}
