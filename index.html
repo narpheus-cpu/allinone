@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v65</title>
+    <title>올인원 영작-단어장 시스템 · v67</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -2366,7 +2366,7 @@ body { background: var(--bench-v2-bg) !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v66</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v67</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -9926,6 +9926,39 @@ ${JSON.stringify(finalPayload)}`;
 </style>
 <style id="v64NoSlotCountLabel">
 .mt-slot-count-label,.mt-slot-card-count-label{display:none!important;}
+</style>
+
+<style id="v67-final-type-badge-colors">
+/* v67: 유형 색상은 슬롯 전체가 아니라 유형 뱃지에만 적용. 모든 유형 뱃지 크기 통일. */
+.mt-slot-unified .mt-slot-meta-badge.mt-gen-type-badge-inline,
+.mt-slot-unified .mt-slot-type-line .mt-slot-meta-badge {
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  box-sizing:border-box !important;
+  min-height:24px !important;
+  height:24px !important;
+  padding:3px 8px !important;
+  margin:0 !important;
+  border-radius:6px !important;
+  font-size:9px !important;
+  line-height:1 !important;
+  font-weight:800 !important;
+  white-space:nowrap !important;
+  border:1px solid transparent !important;
+}
+.mt-slot.mt-type-normal .mt-slot-meta-badge {
+  background:#8b5cf6 !important; color:#fff !important; border-color:#8b5cf6 !important;
+}
+.mt-slot.mt-type-ebook .mt-slot-meta-badge {
+  background:#f9735b !important; color:#fff !important; border-color:#f9735b !important;
+}
+.mt-slot.mt-type-self_generate .mt-slot-meta-badge {
+  background:#eab308 !important; color:#fff !important; border-color:#eab308 !important;
+}
+.mt-slot.mt-type-reference_generate .mt-slot-meta-badge {
+  background:#16a34a !important; color:#fff !important; border-color:#16a34a !important;
+}
 </style>
 </body>
 </html>
