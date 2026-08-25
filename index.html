@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v74</title>
+    <title>올인원 영작-단어장 시스템 · v70</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -1433,6 +1433,133 @@
             .mt-slot { min-height:118px; padding:10px; }
         }
 </style>
+
+<!-- v75: 전자책 목록 영역과 최초 등록 방식 보완 -->
+<style id="v75-ebook-list-surface">
+/* 자체형·참조형을 포함한 전자책 목록은 제목 버튼 바로 아래부터 페이지 구분선까지 흰 바탕을 유지합니다. */
+#mtEbookViewer { background:#fff !important; }
+#mtEbookViewer .mt-ebook-list-toolbar,
+#mtEbookViewer #mtEbookList,
+#mtEbookViewer #mtEbookList .mt-ebook-item { background:#fff !important; }
+#mtEbookViewer #mtEbookList { max-width:none !important; min-height:calc(100vh - 320px); }
+#mtEbookViewer .mt-ebook-pagination { background:#fff !important; }
+</style>
+<script id="v75-ebook-persistence-and-paste">
+(function () {
+  'use strict';
+
+  function rowsFromText(text) {
+    return String(text || '').replace(/^\uFEFF/, '').normalize('NFC')
+      .split(/\r?\n/).filter(line => line.trim() !== '').map(line => line.split('\t'));
+  }
+  function ebookKey(row, index, pattern) {
+    const p = pattern || {};
+    const eng = String(row?.[(p.engCol || 1) - 1] ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+    const kor = String(row?.[(p.mainKorCol || 2) - 1] ?? '').trim().replace(/\s+/g, ' ');
+    const serial = String(row?.[(p.serialCol || 4) - 1] ?? (index + 1)).trim();
+    return serial + '|' + eng + '|' + kor;
+  }
+  function normalizeEbookReadState(state) {
+    if (!state || state.type !== 'ebook' || !Array.isArray(state.outputRows)) return state;
+    const rows = state.outputRows, p = state.pattern || {};
+    const keySet = new Set(Array.isArray(state.ebookReadKeys) ? state.ebookReadKeys.map(String) : []);
+    (state.ebookReadIndexes || []).map(Number).filter(Number.isInteger).forEach(i => {
+      if (rows[i]) keySet.add(ebookKey(rows[i], i, p));
+    });
+    state.ebookReadKeys = Array.from(keySet);
+    const indexes = rows.map((row, i) => keySet.has(ebookKey(row, i, p)) ? i : -1).filter(i => i >= 0);
+    state.ebookReadIndexes = Array.from(new Set(indexes)).sort((a, b) => a - b);
+    return state;
+  }
+
+  // 완료 문장은 문장 내용 기반 키도 함께 저장합니다. 행 순서나 저장소 복원 순서가 달라져도 회색 상태가 사라지지 않습니다.
+  const originalSave = window.mtSaveTypedState;
+  if (typeof originalSave === 'function') {
+    window.mtSaveTypedState = function (slot, state) {
+      return originalSave.call(this, slot, normalizeEbookReadState(state));
+    };
+  }
+  const originalGetWords = window.mtGetEbookWords;
+  if (typeof originalGetWords === 'function') {
+    window.mtGetEbookWords = function (slot) {
+      const state = window.mtGetTypedState(slot);
+      normalizeEbookReadState(state);
+      return originalGetWords.call(this, slot);
+    };
+  }
+
+  let initialImportSlot = null;
+  let initialImportType = 'normal';
+  window.mtOpenNormalImportSourceModal = function (slot, type) {
+    initialImportSlot = Number(slot);
+    initialImportType = type === 'ebook' ? 'ebook' : 'normal';
+    const modal = document.getElementById('mtNormalImportSourceModal');
+    const subtitle = document.getElementById('mtNormalImportSourceSubtitle');
+    if (subtitle) subtitle.textContent = initialImportType === 'ebook'
+      ? '파일 또는 클립보드에서 전자책 문장을 가져오세요.'
+      : '파일 또는 클립보드에서 문장을 가져오세요.';
+    if (modal) modal.style.display = 'flex';
+  };
+  window.mtCloseNormalImportSourceModal = function () {
+    const modal = document.getElementById('mtNormalImportSourceModal');
+    if (modal) modal.style.display = 'none';
+  };
+  window.mtNormalImportFromFile = function () {
+    if (!Number.isInteger(initialImportSlot)) return;
+    const slot = initialImportSlot, type = initialImportType;
+    window.mtCloseNormalImportSourceModal();
+    window.mtTriggerUpload(slot, type);
+  };
+  window.mtOpenNormalClipboardModal = function () {
+    const source = document.getElementById('mtNormalImportSourceModal');
+    const modal = document.getElementById('mtNormalClipboardModal');
+    const text = document.getElementById('mtNormalClipboardText');
+    if (source) source.style.display = 'none';
+    if (text) { text.value = ''; setTimeout(() => text.focus(), 0); }
+    if (modal) modal.style.display = 'flex';
+  };
+  window.mtCloseNormalClipboardModal = function () {
+    const modal = document.getElementById('mtNormalClipboardModal');
+    if (modal) modal.style.display = 'none';
+  };
+  window.mtPasteFromSystemClipboard = async function () {
+    const text = document.getElementById('mtNormalClipboardText');
+    if (!text) return;
+    try { text.value = await navigator.clipboard.readText(); }
+    catch (_) { alert('브라우저에서 클립보드 읽기가 차단되었습니다. 텍스트를 직접 붙여넣어 주세요.'); }
+  };
+  window.mtRegisterNormalClipboardText = function () {
+    const text = document.getElementById('mtNormalClipboardText');
+    const rows = rowsFromText(text?.value);
+    if (!rows.length) return alert('등록할 텍스트가 없습니다.');
+    if (!Number.isInteger(initialImportSlot)) return alert('등록할 슬롯을 찾지 못했습니다. 다시 시도해 주세요.');
+    const slot = initialImportSlot, type = initialImportType;
+    window.mtCloseNormalClipboardModal();
+    if (type === 'ebook') {
+      const state = window.mtGetTypedState(slot);
+      state.type = 'ebook';
+      state.fileName = state.fileName || `붙여넣기 전자책 ${slot}`;
+      window.mtSetSlotType(slot, 'ebook');
+      window.mtSaveTypedState(slot, state);
+      window.mtEbookTemp = { slotIndex: slot, fileName: state.fileName, rows, sourceSheetName: '클립보드', addMode: false };
+      window.mtOpenEbookColumnModal(rows);
+    } else {
+      window.mtRegisterNormalRows(rows, slot, `붙여넣기 일반 ${slot}`, 'clipboard');
+    }
+  };
+
+  // 빈 전자책 슬롯도 일반형과 똑같이 파일 또는 붙여넣기 중 선택할 수 있습니다.
+  window.mtRegisterConfiguredEmptySlotFile = function () {
+    if (window.mtConfiguredEmptySlot == null) return;
+    const slot = Number(window.mtConfiguredEmptySlot);
+    const type = window.mtPendingSlotType;
+    window.mtCloseConfiguredEmptySlotModal();
+    if (type === 'normal' || type === 'ebook') return window.mtOpenNormalImportSourceModal(slot, type);
+    if (type) return window.mtTriggerUpload(slot, type);
+    window.mtOpenSlotTypeModal(slot);
+  };
+})();
+</script>
 <style id="benchmarkDesignOverride">
 /* =========================================================
    BENCHMARK DESIGN OVERRIDE
@@ -2411,7 +2538,7 @@ body { background: var(--bench-v2-bg) !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v74</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v75</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -5227,6 +5354,31 @@ Rules:
     let mtCardHadDirectTyping = false;
     let mtTempParsedData = null;
     let mtEbookTemp = null;
+    // 일반형과 전자책의 최초 등록에서 공통으로 쓰는 입력 출처 상태입니다.
+    let mtInitialImportSlot = null;
+    let mtInitialImportType = 'normal';
+    function mtOpenNormalImportSourceModal(slot, type='normal'){
+        mtInitialImportSlot=Number(slot); mtInitialImportType=type==='ebook'?'ebook':'normal';
+        const sub=document.getElementById('mtNormalImportSourceSubtitle');
+        if(sub) sub.textContent=mtInitialImportType==='ebook'?'파일 또는 클립보드에서 전자책 문장을 가져오세요.':'파일 또는 클립보드에서 문장을 가져오세요.';
+        const modal=document.getElementById('mtNormalImportSourceModal'); if(modal) modal.style.display='flex';
+    }
+    function mtCloseNormalImportSourceModal(){const modal=document.getElementById('mtNormalImportSourceModal');if(modal)modal.style.display='none';}
+    function mtNormalImportFromFile(){if(!Number.isInteger(mtInitialImportSlot))return;const slot=mtInitialImportSlot,type=mtInitialImportType;mtCloseNormalImportSourceModal();mtTriggerUpload(slot,type);}
+    function mtOpenNormalClipboardModal(){const source=document.getElementById('mtNormalImportSourceModal'),modal=document.getElementById('mtNormalClipboardModal'),ta=document.getElementById('mtNormalClipboardText');if(source)source.style.display='none';if(ta){ta.value='';setTimeout(()=>ta.focus(),0);}if(modal)modal.style.display='flex';}
+    function mtCloseNormalClipboardModal(){const modal=document.getElementById('mtNormalClipboardModal');if(modal)modal.style.display='none';}
+    async function mtPasteFromSystemClipboard(){const ta=document.getElementById('mtNormalClipboardText');if(!ta)return;try{ta.value=await navigator.clipboard.readText();}catch(_){alert('브라우저에서 클립보드 읽기가 차단되었습니다. 텍스트를 직접 붙여넣어 주세요.');}}
+    function mtRegisterNormalClipboardText(){
+        const raw=String(document.getElementById('mtNormalClipboardText')?.value||'').replace(/^\uFEFF/,'').normalize('NFC').trim();
+        const rows=raw.split(/\r?\n/).filter(x=>x.trim()!=='').map(x=>x.split('\t'));
+        if(!rows.length)return alert('등록할 텍스트가 없습니다.');
+        if(!Number.isInteger(mtInitialImportSlot))return alert('등록할 슬롯을 찾지 못했습니다. 다시 시도해 주세요.');
+        const slot=mtInitialImportSlot,type=mtInitialImportType; mtCloseNormalClipboardModal();
+        if(type==='ebook'){
+            const state=mtGetTypedState(slot);state.type='ebook';state.fileName=state.fileName||`붙여넣기 전자책 ${slot}`;mtSetSlotType(slot,'ebook');mtSaveTypedState(slot,state);
+            mtEbookTemp={slotIndex:slot,fileName:state.fileName,rows,sourceSheetName:'클립보드',addMode:false};mtOpenEbookColumnModal(rows);
+        }else mtRegisterNormalRows(rows,slot,`붙여넣기 일반 ${slot}`,'clipboard');
+    }
     let mtEbookTypingActive = false;
     let mtEbookActiveSlot = null;
     let mtEbookDisplayMode = 'kor'; // 'kor': 주문장, 'eng': 언마스킹 완료 문장만 영어로 표시
@@ -7039,7 +7191,7 @@ ${JSON.stringify(finalPayload)}`;
     }
     function mtCloseConfiguredEmptySlotModal(){const modal=document.getElementById('mtConfiguredEmptySlotModal');if(modal)modal.style.display='none';mtConfiguredEmptySlot=null;mtPendingSlotType=null;}
     function mtRechooseConfiguredEmptySlotType(){if(mtConfiguredEmptySlot==null)return;const slot=mtConfiguredEmptySlot;mtCloseConfiguredEmptySlotModal();mtOpenSlotTypeModal(slot);}
-    function mtRegisterConfiguredEmptySlotFile(){if(mtConfiguredEmptySlot==null)return;const slot=mtConfiguredEmptySlot,type=mtPendingSlotType;mtCloseConfiguredEmptySlotModal();if(type==='normal'){mtOpenNormalImportSourceModal(slot);return;}if(type){mtTriggerUpload(slot,type);return;}mtOpenSlotTypeModal(slot);}
+    function mtRegisterConfiguredEmptySlotFile(){if(mtConfiguredEmptySlot==null)return;const slot=mtConfiguredEmptySlot,type=mtPendingSlotType;mtCloseConfiguredEmptySlotModal();if(type==='normal'||type==='ebook'){mtOpenNormalImportSourceModal(slot,type);return;}if(type){mtTriggerUpload(slot,type);return;}mtOpenSlotTypeModal(slot);}
     function mtChooseSlotType(type){
         if(!['normal','ebook','self_generate','reference_generate'].includes(type))return;
         const slot=Number(mtPendingTypeSlot);if(!Number.isInteger(slot))return;
@@ -10180,8 +10332,41 @@ ${JSON.stringify(finalPayload)}`;
   }
   const origMain = window.mtGoMainMenu;
   if(typeof origMain==='function'){
-    window.mtGoMainMenu=function(){ const ev=document.getElementById('mtEbookViewer'), fc=document.getElementById('mt-flashcard'); if(ev) ev.classList.remove('is-open'); if(fc) fc.classList.remove('is-open'); return origMain.apply(this,arguments); };
+  window.mtGoMainMenu=function(){ const ev=document.getElementById('mtEbookViewer'), fc=document.getElementById('mt-flashcard'); if(ev) ev.classList.remove('is-open'); if(fc) fc.classList.remove('is-open'); return origMain.apply(this,arguments); };
   }
+})();
+</script>
+<script id="v75-runtime-install">
+(function () {
+  'use strict';
+  const key = (row, index, p={}) => String(row?.[(p.serialCol||4)-1] ?? index+1).trim()+'|'+String(row?.[(p.engCol||1)-1]??'').trim().replace(/\s+/g,' ').toLowerCase()+'|'+String(row?.[(p.mainKorCol||2)-1]??'').trim().replace(/\s+/g,' ');
+  const normalise = state => {
+    if(!state || state.type!=='ebook' || !Array.isArray(state.outputRows)) return state;
+    const keys=new Set((state.ebookReadKeys||[]).map(String));
+    (state.ebookReadIndexes||[]).map(Number).filter(Number.isInteger).forEach(i=>{if(state.outputRows[i])keys.add(key(state.outputRows[i],i,state.pattern));});
+    state.ebookReadKeys=Array.from(keys);
+    state.ebookReadIndexes=state.outputRows.map((r,i)=>keys.has(key(r,i,state.pattern))?i:-1).filter(i=>i>=0);
+    return state;
+  };
+  const save=window.mtSaveTypedState;
+  if(typeof save==='function') window.mtSaveTypedState=function(slot,state){return save.call(this,slot,normalise(state));};
+  const getWords=window.mtGetEbookWords;
+  if(typeof getWords==='function') window.mtGetEbookWords=function(slot){normalise(window.mtGetTypedState(slot));return getWords.call(this,slot);};
+
+  // 붙여넣기 UI 함수는 본문 스크립트의 let 상태(mtEbookTemp 등)에 접근해야 하므로,
+  // 위쪽 본문 스크립트에서 정의합니다.
+  return;
+
+  let slot=null, type='normal';
+  const parse=text=>String(text||'').replace(/^\uFEFF/,'').normalize('NFC').split(/\r?\n/).filter(x=>x.trim()!=='').map(x=>x.split('\t'));
+  window.mtOpenNormalImportSourceModal=function(s,t){slot=Number(s);type=t==='ebook'?'ebook':'normal';const sub=document.getElementById('mtNormalImportSourceSubtitle'),m=document.getElementById('mtNormalImportSourceModal');if(sub)sub.textContent=type==='ebook'?'파일 또는 클립보드에서 전자책 문장을 가져오세요.':'파일 또는 클립보드에서 문장을 가져오세요.';if(m)m.style.display='flex';};
+  window.mtCloseNormalImportSourceModal=function(){const m=document.getElementById('mtNormalImportSourceModal');if(m)m.style.display='none';};
+  window.mtNormalImportFromFile=function(){if(!Number.isInteger(slot))return;window.mtCloseNormalImportSourceModal();window.mtTriggerUpload(slot,type);};
+  window.mtOpenNormalClipboardModal=function(){const source=document.getElementById('mtNormalImportSourceModal'),m=document.getElementById('mtNormalClipboardModal'),ta=document.getElementById('mtNormalClipboardText');if(source)source.style.display='none';if(ta){ta.value='';setTimeout(()=>ta.focus(),0);}if(m)m.style.display='flex';};
+  window.mtCloseNormalClipboardModal=function(){const m=document.getElementById('mtNormalClipboardModal');if(m)m.style.display='none';};
+  window.mtPasteFromSystemClipboard=async function(){const ta=document.getElementById('mtNormalClipboardText');if(!ta)return;try{ta.value=await navigator.clipboard.readText();}catch(_){alert('브라우저에서 클립보드 읽기가 차단되었습니다. 텍스트를 직접 붙여넣어 주세요.');}};
+  window.mtRegisterNormalClipboardText=function(){const rows=parse(document.getElementById('mtNormalClipboardText')?.value);if(!rows.length)return alert('등록할 텍스트가 없습니다.');if(!Number.isInteger(slot))return alert('등록할 슬롯을 찾지 못했습니다. 다시 시도해 주세요.');window.mtCloseNormalClipboardModal();if(type==='ebook'){const st=window.mtGetTypedState(slot);st.type='ebook';st.fileName=st.fileName||`붙여넣기 전자책 ${slot}`;window.mtSetSlotType(slot,'ebook');window.mtSaveTypedState(slot,st);window.mtEbookTemp={slotIndex:slot,fileName:st.fileName,rows,sourceSheetName:'클립보드',addMode:false};window.mtOpenEbookColumnModal(rows);}else window.mtRegisterNormalRows(rows,slot,`붙여넣기 일반 ${slot}`,'clipboard');};
+  window.mtRegisterConfiguredEmptySlotFile=function(){if(window.mtConfiguredEmptySlot==null)return;const s=Number(window.mtConfiguredEmptySlot),t=window.mtPendingSlotType;window.mtCloseConfiguredEmptySlotModal();if(t==='normal'||t==='ebook')return window.mtOpenNormalImportSourceModal(s,t);if(t)return window.mtTriggerUpload(s,t);window.mtOpenSlotTypeModal(s);};
 })();
 </script>
 
