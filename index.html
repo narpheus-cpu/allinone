@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v63</title>
+    <title>올인원 영작-단어장 시스템 · v64</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -2343,7 +2343,7 @@ body { background: var(--bench-v2-bg) !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v63</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v64</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -6278,7 +6278,7 @@ Rules:
         mtCurrentIndex = 0;
         mtEbookTypingActive = false;
         mtEbookActiveSlot = null;
-        const modal = document.getElementById('mtPromptActionModal'); if (modal) modal.style.display = 'none';
+        const modal = document.getElementById('mtActionModal'); if (modal) modal.style.display = 'none';
         const main = document.getElementById('mt-main-menu'); if (main) main.style.display = 'none';
         const viewer = document.getElementById('mtEbookViewer'); if (viewer) { viewer.style.display = 'none'; viewer.classList.remove('is-open'); }
         const flash = document.getElementById('mt-flashcard'); if (flash) { flash.classList.add('is-open'); flash.style.display = 'block'; }
@@ -6304,23 +6304,23 @@ Rules:
             const normal=mtGetNormalSlotSync(i);
             if(type==='ebook' && mtHasMeaningfulTypedData(i,'ebook')){
                 const st=mtGetTypedState(i), words=mtGetEbookWords(i), title=mtGetDisplayFileTitle(st.fileName||`슬롯 ${i}`), count=words.length;
-                div.className='mt-slot has-data mt-slot-unified';
-                div.innerHTML=`<div class="mt-slot-title">${mtEscapeHTML(title)}</div><div class="mt-slot-stat-row"><div><div class="mt-slot-count">${count}</div><div class="mt-slot-count-label">문장</div></div><div class="mt-slot-type-line" style="margin-left:auto;"><span class="mt-slot-meta-badge">전자책</span></div></div><div class="mt-slot-actions-row"><button class="btn-excel" onclick="event.stopPropagation();mtOpenAddDataSourceModal(${i},'ebook')">추가</button><button class="btn-excel" onclick="event.stopPropagation();mtOpenTypeChangeModal(${i})">변경</button><button class="btn-download" onclick="event.stopPropagation();mtExportSlot(event,${i})">내보내기</button><button class="mt-btn-delete" onclick="event.stopPropagation();mtDeleteSlot(event,${i})">삭제</button></div>`;
+                div.className='mt-slot has-data mt-slot-unified mt-type-ebook';
+                div.innerHTML=`<div class="mt-slot-title">${mtEscapeHTML(title)}</div><div class="mt-slot-stat-row"><div><div class="mt-slot-count">${count}</div><div class="mt-slot-count-label"></div></div><div class="mt-slot-type-line" style="margin-left:auto;"><span class="mt-slot-meta-badge">전자책</span></div></div><div class="mt-slot-actions-row"><button class="btn-excel" onclick="event.stopPropagation();mtOpenAddDataSourceModal(${i},'ebook')">추가</button><button class="btn-excel" onclick="event.stopPropagation();mtOpenTypeChangeModal(${i})">변경</button><button class="btn-download" onclick="event.stopPropagation();mtExportSlot(event,${i})">내보내기</button><button class="mt-btn-delete" onclick="event.stopPropagation();mtDeleteSlot(event,${i})">삭제</button></div>`;
                 div.onclick=()=>mtOpenEbookViewer(i);
             } else if(type==='self_generate' || type==='reference_generate'){
                 const st=mtGetTypedState(i), rows=Array.isArray(st.outputRows)?st.outputRows:[], words=mtGetGeneratorWords(i), star=(st.starredSerials||[]).length, title=mtGetDisplayFileTitle(st.fileName||`슬롯 ${i}`), label=type==='self_generate'?'자체형':'참조형';
                 if(!st.fileName && !words.length){ mtClearGhostEmptyType(i); div.className='mt-slot mt-empty-card'; div.innerHTML=`<div class="mt-slot-title">[슬롯 ${i}]</div>`; div.onclick=()=>mtOpenSlotTypeModal(i); }
                 else {
-                    div.className='mt-slot has-data mt-slot-unified';
+                    div.className=`mt-slot has-data mt-slot-unified mt-type-${type}`;
                     const slotApiKey = mtGetGeneratorSlotApiKey(i,type);
                     const apiKeyInput = `<div class="mt-slot-api-row" style="display:flex;align-items:center;gap:5px;margin:5px 0 6px;"><span style="font-size:9px;color:#64748b;font-weight:700;white-space:nowrap;">전용 API</span><input type="text" autocomplete="off" value="${mtEscapeAttr(slotApiKey)}" placeholder="비워두면 메인 API 키 사용" style="flex:1;min-width:0;height:24px;padding:3px 6px;border:1px solid #e2e8f0;border-radius:5px;font-size:9px;box-sizing:border-box;" oninput="mtSetGeneratorSlotApiKey(${i},'${type}',this.value)" onclick="event.stopPropagation()"></div>`;
-                    div.innerHTML=`<div class="mt-slot-title">${mtEscapeHTML(title)}</div><div class="mt-slot-stat-row"><div><div class="mt-slot-count">${rows.length}</div><div class="mt-slot-count-label">문장</div></div><div class="mt-slot-type-line" style="margin-left:auto;"><span class="mt-slot-meta-badge mt-gen-type-badge-inline">${label}</span></div><div class="mt-slot-star-count">★ ${star}</div></div>${apiKeyInput}<div class="mt-gen-actions mt-slot-unified-actions"><button class="btn-excel" onclick="event.stopPropagation();mtOpenGeneratorPromptEditor(${i},'${type}')">프롬프트</button><button class="btn-excel" onclick="event.stopPropagation();mtOpenGeneratorErrorLog(${i},'${type}')">오류로그</button><button class="btn-excel" onclick="event.stopPropagation();mtOpenGeneratorList(${i})">목록</button><button class="btn-excel" onclick="event.stopPropagation();mtOpenTypeChangeModal(${i})">변경</button><button class="btn-download" onclick="event.stopPropagation();mtExportGeneratorSlot(event,${i})">내보내기</button><button class="mt-btn-delete" onclick="event.stopPropagation();mtDeleteSlot(event,${i})">삭제</button></div>`;
+                    div.innerHTML=`<div class="mt-slot-title">${mtEscapeHTML(title)}</div><div class="mt-slot-stat-row"><div><div class="mt-slot-count">${rows.length}</div><div class="mt-slot-count-label"></div></div><div class="mt-slot-type-line" style="margin-left:auto;"><span class="mt-slot-meta-badge mt-gen-type-badge-inline">${label}</span></div><div class="mt-slot-star-count">★ ${star}</div></div>${apiKeyInput}<div class="mt-slot-actions-row"><button class="btn-excel" onclick="event.stopPropagation();mtOpenGeneratorPromptEditor(${i},'${type}')">프롬프트</button><button class="btn-excel" onclick="event.stopPropagation();mtOpenGeneratorErrorLog(${i},'${type}')">오류로그</button><button class="btn-excel" onclick="event.stopPropagation();mtOpenGeneratorList(${i})">목록</button><button class="btn-excel" onclick="event.stopPropagation();mtOpenTypeChangeModal(${i})">변경</button><button class="btn-excel" onclick="event.stopPropagation();mtExportGeneratorSlot(event,${i})">내보내기</button><button class="btn-excel" onclick="event.stopPropagation();mtDeleteSlot(event,${i})">삭제</button></div>`;
                     div.onclick=()=>{ const w=mtGetGeneratorWords(i); if(w.length){ mtStartSlotDirect(i,{name:title,words:w,lastSession:st.lastSession}); } else { mtTriggerUpload(i,type); } };
                 }
             } else if(normal){
                 const data=Array.isArray(normal)?{name:`슬롯 ${i}`,words:normal}:normal, words=Array.isArray(data.words)?data.words:[], star=words.filter(w=>w&&w.starred).length;
-                div.className='mt-slot has-data mt-slot-unified';
-                div.innerHTML=`<div class="mt-slot-title">${mtEscapeHTML(mtGetDisplayFileTitle(data.name||`슬롯 ${i}`))}</div><div class="mt-slot-stat-row"><div><div class="mt-slot-count">${words.length}</div><div class="mt-slot-count-label">문장</div></div><div class="mt-slot-type-line" style="margin-left:auto;"><span class="mt-slot-meta-badge">일반</span></div><div class="mt-slot-star-count">★ ${star}</div></div>${mtSlotProgressRow(mtGetSlotLearningProgress(i,data,'normal'))}<div class="mt-slot-actions-row"><button class="btn-excel" onclick="event.stopPropagation();mtOpenAddDataSourceModal(${i},'normal')">추가</button><button class="btn-excel" onclick="event.stopPropagation();mtOpenTypeChangeModal(${i})">변경</button><button class="btn-download" onclick="event.stopPropagation();mtExportSlot(event,${i})">내보내기</button><button class="mt-btn-delete" onclick="event.stopPropagation();mtDeleteSlot(event,${i})">삭제</button></div>`;
+                div.className='mt-slot has-data mt-slot-unified mt-type-normal';
+                div.innerHTML=`<div class="mt-slot-title">${mtEscapeHTML(mtGetDisplayFileTitle(data.name||`슬롯 ${i}`))}</div><div class="mt-slot-stat-row"><div><div class="mt-slot-count">${words.length}</div><div class="mt-slot-count-label"></div></div><div class="mt-slot-type-line" style="margin-left:auto;"><span class="mt-slot-meta-badge">일반</span></div><div class="mt-slot-star-count">★ ${star}</div></div>${mtSlotProgressRow(mtGetSlotLearningProgress(i,data,'normal'))}<div class="mt-slot-actions-row"><button class="btn-excel" onclick="event.stopPropagation();mtOpenAddDataSourceModal(${i},'normal')">추가</button><button class="btn-excel" onclick="event.stopPropagation();mtOpenTypeChangeModal(${i})">변경</button><button class="btn-download" onclick="event.stopPropagation();mtExportSlot(event,${i})">내보내기</button><button class="mt-btn-delete" onclick="event.stopPropagation();mtDeleteSlot(event,${i})">삭제</button></div>`;
                 div.onclick=()=>mtPromptAction(i,data);
             } else {
                 div.className='mt-slot mt-empty-card';
@@ -6336,7 +6336,7 @@ Rules:
 
         // ★ 카드 모아보기는 항상 11번째 슬롯 위치에 고정.
         const starDiv=document.createElement('div'); starDiv.className='mt-slot mt-premium-slot has-data mt-star-fixed-slot11';
-        starDiv.innerHTML=`<div class="mt-slot-title">★ 카드 모아보기</div><div class="mt-slot-slotno">[슬롯 11]</div><div class="mt-slot-card-count-line"><span class="mt-slot-card-count-badge">${allStarredWords.length}</span><span class="mt-slot-card-count-label">개의 별표 카드</span></div><div class="mt-slot-desc">모든 슬롯에서 별표(★) 체크한 문장들이 자동으로 모이는 특별한 슬롯입니다.</div><div class="mt-slot-actions-row"><button class="btn-download" onclick="event.stopPropagation();mtExportStarred(event)">엑셀로 모아서 내보내기</button></div>`;
+        starDiv.innerHTML=`<div class="mt-slot-title">★ 모아보기</div><div class="mt-slot-slotno">[슬롯 11]</div><div class="mt-slot-card-count-line"><span class="mt-slot-card-count-badge">${allStarredWords.length}</span><span class="mt-slot-card-count-label"></span></div><div class="mt-slot-desc"></div><div class="mt-slot-actions-row"><button class="btn-download" onclick="event.stopPropagation();mtExportStarred(event)">엑셀로 모아서 내보내기</button></div>`;
         starDiv.onclick=()=>allStarredWords.length?mtPromptAction('star',{name:'★ 카드 모아보기',words:allStarredWords,isStarSlot:true}):alert('★ 표시된 카드가 없습니다.');
         grid.appendChild(starDiv);
     }
@@ -6360,8 +6360,8 @@ Rules:
     }
 
     function mtPromptAction(slotIndex, slotData) {
-        mtActiveSlotIndex=slotIndex; mtOriginalSlotData=slotData;
-        document.getElementById('mtActionSlotTitle').innerText=slotData.name||`슬롯 ${slotIndex}`;
+        mtActiveSlotIndex=slotIndex; mtOriginalSlotData=slotData || {name:`슬롯 ${slotIndex}`,words:[]};
+        const titleEl=document.getElementById('mtActionSlotTitle'); if(titleEl) titleEl.innerText=mtOriginalSlotData.name||`슬롯 ${slotIndex}`;
         if(slotIndex==='star'){
             const raw=localStorage.getItem('word_slot_star_session'); if(raw){try{slotData.lastSession=JSON.parse(raw);}catch(_){}}
         }
@@ -6371,7 +6371,7 @@ Rules:
             mtOriginalSlotData=slotData;
         }
         const resumeText=document.getElementById('mtResumeInfo'); if(resumeText)resumeText.textContent='';
-        const modal=document.getElementById('mtPromptActionModal'); if(modal)modal.style.display='flex';
+        const modal=document.getElementById('mtActionModal'); if(modal)modal.style.display='flex';
     }
 
     function mtOpenNaverListEditor() {
@@ -8808,22 +8808,42 @@ ${JSON.stringify(finalPayload)}`;
                     const maskStart = maskTarget.indexOf(barText, maskCursor);
                     const effectiveMaskStart = maskStart >= 0 ? maskStart : maskCursor;
                     const effectiveMaskEnd = effectiveMaskStart + barText.length;
-                    const isComplete = typedStr.length >= barEnd;
                     const allHinted = Array.from({length: barText.length}, (_, n) => mtRevealedSet.has(barStart + n)).every(Boolean);
+                    const typedLen = Math.max(0, Math.min(barText.length, typedStr.length - barStart));
 
-                    if (isComplete || allHinted) {
-                        const span = document.createElement('span');
-                        span.className = 'mt-revealed-text' + (allHinted && !isComplete ? ' hint' : '');
-                        span.textContent = barText;
-                        row.appendChild(span);
+                    if (typedLen > 0 || allHinted) {
+                        if (typedLen > 0) {
+                            const typedSpan = document.createElement('span');
+                            typedSpan.className = 'mt-revealed-text';
+                            typedSpan.textContent = barText.slice(0, typedLen);
+                            row.appendChild(typedSpan);
+                        }
+                        if (typedLen < barText.length && !allHinted) {
+                            const rest = document.createElement('span');
+                            rest.className = 'mt-chunk-mask-box';
+                            const restText = barText.slice(typedLen);
+                            rest.style.width = `${Math.max(20, restText.length * Math.max(7, mtEngBoxSize * 0.48))}px`;
+                            rest.title = '클릭하면 이 부분을 힌트로 표시합니다.';
+                            rest.onclick = function() {
+                                mtRecordRevealedWordAtPosition(targetStr, barStart + typedLen);
+                                for (let i = barStart; i < barEnd; i++) mtRevealedSet.add(i);
+                                mtRenderMask(document.getElementById('mtEngInput').value);
+                                mtRecordPersistentCardCompletion();
+                                document.getElementById('mtEngInput').focus();
+                            };
+                            row.appendChild(rest);
+                        } else if (allHinted && typedLen < barText.length) {
+                            const hint = document.createElement('span');
+                            hint.className = 'mt-revealed-text hint';
+                            hint.textContent = barText.slice(typedLen);
+                            row.appendChild(hint);
+                        }
                     } else {
                         const bar = document.createElement('span');
                         bar.className = 'mt-chunk-mask-box';
-                        const width = Math.max(20, barText.length * Math.max(7, mtEngBoxSize * 0.48));
-                        bar.style.width = `${width}px`;
+                        bar.style.width = `${Math.max(20, barText.length * Math.max(7, mtEngBoxSize * 0.48))}px`;
                         bar.title = '클릭하면 이 부분을 힌트로 표시합니다.';
                         bar.onclick = function() {
-                            // 사용자가 마스킹 청크를 직접 눌러 공개한 것도 '성공 단어'로 집계합니다.
                             mtRecordRevealedWordAtPosition(targetStr, barStart);
                             for (let i = barStart; i < barEnd; i++) mtRevealedSet.add(i);
                             mtRenderMask(document.getElementById('mtEngInput').value);
@@ -9858,6 +9878,30 @@ ${JSON.stringify(finalPayload)}`;
 <div id="mtGeneratorErrorModal" class="modal-overlay" style="display:none;z-index:6700;">
   <div class="modal-card" style="width:min(1000px,96vw);max-height:92vh;overflow:hidden;text-align:left;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div><div id="mtGeneratorErrorTitle" style="font-size:16px;font-weight:800;">오류로그</div><div id="mtGeneratorErrorSummary" style="font-size:11px;color:#64748b;margin-top:3px;"></div></div><button class="btn-excel" onclick="mtCloseGeneratorErrorLog()">닫기</button></div><textarea id="mtGeneratorErrorText" class="mt-generator-error-text" readonly style="margin-top:10px;"></textarea></div>
 </div>
+
+<style id="v64SlotTypeUnifiedStyles">
+/* v64: 유형별 색상, 일반형과 동일한 하단 버튼 스타일 */
+.mt-slot.mt-type-normal{background:#f5f3ff!important;border-color:#c4b5fd!important;}
+.mt-slot.mt-type-ebook{background:#fff1ec!important;border-color:#f7a58f!important;}
+.mt-slot.mt-type-self_generate{background:#fff8cc!important;border-color:#e5cf57!important;}
+.mt-slot.mt-type-reference_generate{background:#ecfdf5!important;border-color:#86efac!important;}
+.mt-slot.mt-type-normal .mt-slot-meta-badge{background:#8b5cf6!important;color:#fff!important;border-color:#8b5cf6!important;}
+.mt-slot.mt-type-ebook .mt-slot-meta-badge{background:#f9735b!important;color:#fff!important;border-color:#f9735b!important;}
+.mt-slot.mt-type-self_generate .mt-slot-meta-badge{background:#d6b800!important;color:#fff!important;border-color:#d6b800!important;}
+.mt-slot.mt-type-reference_generate .mt-slot-meta-badge{background:#16a34a!important;color:#fff!important;border-color:#16a34a!important;}
+.mt-slot .mt-slot-type-line{justify-content:flex-end!important;}
+.mt-slot .mt-slot-stat-row{align-items:center!important;}
+.mt-slot-actions-row{margin-top:auto!important;padding-top:10px!important;border-top:none!important;justify-content:flex-start!important;align-items:center!important;}
+.mt-slot-actions-row > button{background:transparent!important;color:#374151!important;border:none!important;box-shadow:none!important;font-size:10px!important;font-weight:700!important;padding:4px 6px!important;min-height:24px!important;height:24px!important;}
+.mt-slot-actions-row > button:hover{background:#f3f4f6!important;color:#111827!important;}
+.mt-slot-actions-row .mt-btn-delete{background:transparent!important;color:#374151!important;border:none!important;}
+.mt-slot-actions-row .mt-btn-delete:hover{background:#f3f4f6!important;color:#111827!important;}
+.mt-gen-actions.mt-slot-unified-actions{display:flex!important;}
+.mt-slot-api-row{margin:4px 0 8px!important;}
+</style>
+<style id="v64NoSlotCountLabel">
+.mt-slot-count-label,.mt-slot-card-count-label{display:none!important;}
+</style>
 </body>
 </html>
 
