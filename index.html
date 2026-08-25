@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v49</title>
+    <title>올인원 영작-단어장 시스템 · v50</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -2337,7 +2337,7 @@ body { background: var(--bench-v2-bg) !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템</h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v50</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -4281,7 +4281,7 @@ body { background: var(--bench-v2-bg) !important; }
         } catch (_) { return null; }
     }
     async function mtGetGeneratorErrorLogsAsync(slotKey){
-        const key=String(slotKey);
+        const key=mtNormalizeGeneratorTypeKey(slotKey,'');
         const localLogs=mtGetGeneratorErrorLogs(key);
         const dbLogs=await mtReadErrorLogsFromDedicatedDb(key);
         const merged=mtMergeGeneratorErrorLogs(key,localLogs,dbLogs);
@@ -4321,16 +4321,18 @@ body { background: var(--bench-v2-bg) !important; }
     }
     async function mtDownloadGeneratorErrorLog(event,slotKey,slotLabel){
         if(event)event.stopPropagation();
-        let logs=await mtGetGeneratorErrorLogsAsync(slotKey);
+        const requestedKey=String(slotKey||'');
+        const key=mtNormalizeGeneratorTypeKey(requestedKey,'');
+        let logs=await mtGetGeneratorErrorLogsAsync(key);
         if(!logs.length){
             try{
                 let fallback=null;
-                if(slotKey==='generator:self_generate'){ fallback=mtGetTypedState(9)?.lastDiagnostic||null; }
-                else if(slotKey==='generator:reference_generate'){ fallback=mtGetTypedState(10)?.lastDiagnostic||null; }
-                else if(/^typed_\d+$/.test(String(slotKey)))fallback=mtGetTypedState(Number(String(slotKey).slice(6)))?.lastDiagnostic||null;
+                if(key==='self_generate'){ fallback=mtGetTypedState(9)?.lastDiagnostic||null; }
+                else if(key==='reference_generate'){ fallback=mtGetTypedState(10)?.lastDiagnostic||null; }
+                else if(/^typed_\d+$/.test(String(requestedKey)))fallback=mtGetTypedState(Number(String(requestedKey).slice(6)))?.lastDiagnostic||null;
                 if(fallback){
-                    mtRecordGeneratorErrorLog(slotKey,{...fallback,slotLabel:slotLabel||fallback.slotLabel||slotKey,source:'lastDiagnostic-fallback'});
-                    logs=mtGetGeneratorErrorLogs(slotKey);
+                    mtRecordGeneratorErrorLog(key,{...fallback,slotLabel:slotLabel||fallback.slotLabel||key,source:'lastDiagnostic-fallback'});
+                    logs=mtGetGeneratorErrorLogs(key);
                 }
             }catch(_){}
         }
@@ -4338,21 +4340,26 @@ body { background: var(--bench-v2-bg) !important; }
             try {
                 const rawGlobal = localStorage.getItem(MT_GENERATOR_ERROR_LOG_GLOBAL_KEY);
                 const globalLogs = mtNormalizeGeneratorErrorLogs(rawGlobal ? JSON.parse(rawGlobal) : []);
-                const slotOnly = globalLogs.filter(x => String(x.slotKey||'') === String(slotKey));
+                const slotOnly = globalLogs.filter(x => mtNormalizeGeneratorTypeKey(x.slotKey||'', '') === key || String(x.slotKey||'') === key);
                 if (slotOnly.length) logs = slotOnly.slice(-MT_GENERATOR_ERROR_LOG_MAX);
             } catch (_) {}
         }
-        if(!logs.length){alert(`저장된 ${slotLabel||slotKey} 오류 로그가 없습니다.`);return;}
         logs=logs.slice().sort((a,b)=>Number(b.timestampMs||0)-Number(a.timestampMs||0));
-        const text=[
-            `[마스킹타이핑] ${slotLabel||slotKey} 오류 로그`,
+        const text=logs.length ? [
+            `[마스킹타이핑] ${slotLabel||key} 오류 로그`,
             `화면 표시시각(KST): ${mtGetSeoulTimestamp()}`,
             `가장 최근 실제 오류 기록시각(KST): ${logs[0]?.timestampKST||'없음'}`,
             `총 오류 수: ${logs.length}`,
             '', '[최신 오류 → 과거 오류 순]', '',
             ...logs.map(mtFormatGeneratorErrorEntry)
+        ].join('\n') : [
+            `[마스킹타이핑] ${slotLabel||key} 오류 로그`,
+            `화면 표시시각(KST): ${mtGetSeoulTimestamp()}`,
+            `총 오류 수: 0`,
+            '',
+            '현재 저장된 오류 로그가 없습니다.'
         ].join('\n');
-        mtOpenGeneratorErrorLogModal(slotLabel||slotKey,logs,text);
+        mtOpenGeneratorErrorLogModal(slotLabel||key,logs,text);
     }
 
     // ============================================================
@@ -10090,7 +10097,7 @@ ${JSON.stringify(finalPayload)}`;
                 const sub=subIdx>=0?normalize(r[subIdx]):'';
                 const eng=normalize(r[engIdx]);
                 if(!kor||!eng) continue;
-                const serial=normalize(r[0])||String(words.length+1);
+                const serial=String(words.length+1);
                 const starCell=normalize(r[1]);
                 words.push({id:baseId+words.length,number:serial,createdAt:Date.now(),eng,kor,subKor:sub,score:0,lastQueriedAt:0,selected:false,isEditing:false,starred:/★/.test(starCell)});
             }
