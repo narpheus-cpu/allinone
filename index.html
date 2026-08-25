@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v91</title>
+    <title>올인원 영작-단어장 시스템 · v92</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -2538,7 +2538,7 @@ body { background: var(--bench-v2-bg) !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v91</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v92</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -7750,7 +7750,7 @@ ${JSON.stringify(finalPayload)}`;
         const totalPages=Math.max(1,Math.ceil(words.length/MT_EBOOK_PAGE_SIZE));
         const resumeIndex=isEbook ? Number(st.lastEbookStudyIndex) : NaN;
         // 마지막으로 완료한 카드가 있는 페이지를 우선 표시합니다.
-        if(Number.isInteger(resumeIndex) && resumeIndex>=0 && resumeIndex<words.length){
+        if(!preserveSelection && Number.isInteger(resumeIndex) && resumeIndex>=0 && resumeIndex<words.length){
             page=Math.floor(resumeIndex/MT_EBOOK_PAGE_SIZE)+1;
         }
         page=Math.min(Math.max(page,1),totalPages);
@@ -7797,7 +7797,7 @@ ${JSON.stringify(finalPayload)}`;
             list.appendChild(item);
         });
         // 목록을 다시 열면 마지막으로 언마스킹한 항목이 화면 가운데 가까이에 오도록 합니다.
-        if(isEbook && Number.isInteger(resumeIndex) && resumeIndex>=start && resumeIndex<start+pageWords.length){
+        if(!preserveSelection && isEbook && Number.isInteger(resumeIndex) && resumeIndex>=start && resumeIndex<start+pageWords.length){
             requestAnimationFrame(()=>list.querySelector(`.mt-ebook-item[data-index="${resumeIndex}"]`)?.scrollIntoView({block:'center',inline:'nearest'}));
         }
         mtEbookUpdateSelectionUi(Number(slotIndex), pageWords, start);
@@ -7809,13 +7809,13 @@ ${JSON.stringify(finalPayload)}`;
         if(pg){
             pg.innerHTML='';
             const prev=document.createElement('button'); prev.className='mt-ebook-page-btn'; prev.textContent='이전'; prev.disabled=page<=1;
-            prev.onclick=()=>{ if(page>1){ mtSaveEbookPage(key, page-1); mtOpenEbookViewer(slotIndex); } };
+            prev.onclick=()=>{ if(page>1){ mtSaveEbookPage(key, page-1); mtOpenEbookViewer(slotIndex,true); } };
             const input=document.createElement('input'); input.className='mt-ebook-page-input'; input.type='number'; input.min='1'; input.max=String(totalPages); input.value=String(page);
-            const go=()=>{ let v=parseInt(input.value,10); if(!Number.isFinite(v)) v=page; v=Math.min(Math.max(v,1),totalPages); mtSaveEbookPage(key, v); mtOpenEbookViewer(slotIndex); };
+            const go=()=>{ let v=parseInt(input.value,10); if(!Number.isFinite(v)) v=page; v=Math.min(Math.max(v,1),totalPages); mtSaveEbookPage(key, v); mtOpenEbookViewer(slotIndex,true); };
             input.onkeydown=(e)=>{ if(e.key==='Enter'){ e.preventDefault(); go(); } }; input.onchange=go;
             const info=document.createElement('span'); info.className='mt-ebook-page-info'; info.textContent=`/ ${totalPages} 페이지`;
             const next=document.createElement('button'); next.className='mt-ebook-page-btn'; next.textContent='다음'; next.disabled=page>=totalPages;
-            next.onclick=()=>{ if(page<totalPages){ mtSaveEbookPage(key, page+1); mtOpenEbookViewer(slotIndex); } };
+            next.onclick=()=>{ if(page<totalPages){ mtSaveEbookPage(key, page+1); mtOpenEbookViewer(slotIndex,true); } };
             pg.append(prev,input,info,next);
         }
     }
@@ -10531,7 +10531,7 @@ ${JSON.stringify(finalPayload)}`;
   (function syncAppVersionFromFileName(){
     // 파일을 다른 이름으로 저장하거나 브라우저가 경로를 변환해도, 기본 표시가
     // 사라지지 않게 한다. 정상 파일명에서는 아래 값이 자동으로 새 번호로 대체된다.
-    const fallbackVersion='v91';
+    const fallbackVersion='v92';
     let fileName='';
     try{fileName=decodeURIComponent(String(location.pathname||'').split('/').pop()||'');}
     catch(_){fileName=String(location.pathname||'').split('/').pop()||'';}
