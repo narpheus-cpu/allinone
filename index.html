@@ -2411,7 +2411,7 @@ body { background: var(--bench-v2-bg) !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v72</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v73</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -6348,18 +6348,9 @@ Rules:
     }
 
     function mtClearGhostEmptyType(slotIndex){
-        const i=Number(slotIndex); if(!Number.isInteger(i))return;
-        const type=mtGetSlotType(i);
-        if(!type)return;
-        const normal=mtGetNormalSlotSync(i);
-        const normalHas=!!(normal && ((Array.isArray(normal)?normal:(normal.words||[])).length));
-        const typedHas=mtHasMeaningfulTypedData(i,type);
-        if((type==='normal' && normalHas) || (type!=='normal' && typedHas)) return;
-        // 유형만 남아 있고 실제 데이터가 없으면 완전히 빈 슬롯으로 되돌립니다.
-        try{localStorage.removeItem(MT_SLOT_TYPE_STORAGE_PREFIX+String(i));}catch(_){ }
-        try{localStorage.removeItem('mt_slot_state_'+String(i));}catch(_){ }
-        try{delete mtSlotStateCache[String(i)];}catch(_){ }
-        try{if(mtGeneratorTimers[i]){clearTimeout(mtGeneratorTimers[i]);delete mtGeneratorTimers[i];}}catch(_){ }
+        // 초기 복원 중 저장소가 잠시 비어 보일 수 있으므로 자동 삭제하지 않습니다.
+        // 슬롯 데이터 삭제는 사용자가 삭제 버튼을 눌렀을 때만 수행합니다.
+        return;
     }
 
     function mtStartSlotDirect(slotIndex, slotData) {
@@ -6457,6 +6448,7 @@ Rules:
         try{localStorage.removeItem(MT_SLOT_TYPE_STORAGE_PREFIX+String(slot));}catch(_){ }
         try{localStorage.removeItem('mt_slot_state_'+String(slot));}catch(_){ }
         try{delete mtSlotStateCache[String(slot)];}catch(_){ }
+        try{mtQueueTypedSlotStatePersistence();}catch(_){ }
         try{localStorage.removeItem('mt_slot_self_generate_api_key_'+slot);localStorage.removeItem('mt_slot_reference_generate_api_key_'+slot);localStorage.removeItem(`${MT_GENERATOR_SLOT_API_KEY_PREFIX}self_generate_${slot}`);localStorage.removeItem(`${MT_GENERATOR_SLOT_API_KEY_PREFIX}reference_generate_${slot}`);}catch(_){ }
         if(Number(mtActiveSlotIndex)===slot) mtActiveSlotIndex=null;
         mtInitSlots();
@@ -6952,6 +6944,7 @@ ${JSON.stringify(finalPayload)}`;
     const MT_SLOT_TYPE_STORAGE_PREFIX = 'mt_slot_type_';
     let mtPendingTypeSlot = null;
     let mtConfiguredEmptySlot = null;
+    const mtSlotTypeMemory = Object.create(null);
 
 
     function mtEscapeAttr(value){ return String(value??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
@@ -6962,12 +6955,15 @@ ${JSON.stringify(finalPayload)}`;
     function mtGetSlotType(slotIndex) {
         const key = MT_SLOT_TYPE_STORAGE_PREFIX + String(slotIndex);
         const raw = localStorage.getItem(key) || '';
-        return ['normal','ebook','self_generate','reference_generate'].includes(raw) ? raw : '';
+        const type = ['normal','ebook','self_generate','reference_generate'].includes(raw) ? raw : (mtSlotTypeMemory[String(slotIndex)] || '');
+        return ['normal','ebook','self_generate','reference_generate'].includes(type) ? type : '';
     }
     function mtSetSlotType(slotIndex, type) {
         const key = MT_SLOT_TYPE_STORAGE_PREFIX + String(slotIndex);
         const safe = ['normal','ebook','self_generate','reference_generate'].includes(type) ? type : '';
-        if (!safe) localStorage.removeItem(key); else localStorage.setItem(key, safe);
+        if (!safe) { delete mtSlotTypeMemory[String(slotIndex)]; localStorage.removeItem(key); }
+        else { mtSlotTypeMemory[String(slotIndex)] = safe; localStorage.setItem(key, safe); }
+        mtQueueTypedSlotStatePersistence();
     }
     function mtGetSlotTypeLabel(type) {
         return type === 'ebook' ? '전자책' : type === 'normal' ? '일반' : type === 'self_generate' ? '자체형' : type === 'reference_generate' ? '참조형' : '빈 슬롯';
@@ -6984,6 +6980,45 @@ ${JSON.stringify(finalPayload)}`;
     function mtSaveTypedState(slotIndex,state){
         const idx=Number(slotIndex), key=String(idx); mtSlotStateCache[key]=state;
         try{localStorage.setItem('mt_slot_state_'+key,JSON.stringify(state));}catch(_){}
+        mtQueueTypedSlotStatePersistence();
+    }
+    let mtTypedSlotStateSaveTimer = null;
+    let mtTypedSlotStateHydrated = false;
+    function mtQueueTypedSlotStatePersistence(){
+        clearTimeout(mtTypedSlotStateSaveTimer);
+        mtTypedSlotStateSaveTimer=setTimeout(()=>{ mtPersistTypedSlotStates().catch(e=>console.warn('[유형 슬롯] 영구 저장 실패:',e)); },0);
+    }
+    async function mtPersistTypedSlotStates(){
+        let db=null;
+        try{
+            db=await initDB();
+            const types={}; for(let i=1;i<=10;i++){const type=mtGetSlotType(i);if(type)types[i]=type;}
+            const snapshot={types,states:mtSlotStateCache,savedAt:Date.now()};
+            const tx=db.transaction(MT_TYPED_SLOT_STORE_NAME,'readwrite');
+            tx.objectStore(MT_TYPED_SLOT_STORE_NAME).put(snapshot,MT_TYPED_SLOT_DATA_KEY);
+            await waitForTransaction(tx);
+        } finally { if(db)db.close(); }
+    }
+    async function mtInitTypedSlotStateCache(){
+        if(mtTypedSlotStateHydrated)return;
+        let db=null;
+        try{
+            db=await initDB();
+            const tx=db.transaction(MT_TYPED_SLOT_STORE_NAME,'readonly');
+            const request=tx.objectStore(MT_TYPED_SLOT_STORE_NAME).get(MT_TYPED_SLOT_DATA_KEY);
+            const saved=await new Promise((resolve,reject)=>{request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
+            if(saved && typeof saved==='object'){
+                for(const [key,type] of Object.entries(saved.types||{})) if(['normal','ebook','self_generate','reference_generate'].includes(type)){
+                    mtSlotTypeMemory[String(key)]=type; try{localStorage.setItem(MT_SLOT_TYPE_STORAGE_PREFIX+String(key),type);}catch(_){}
+                }
+                for(const [key,state] of Object.entries(saved.states||{})){
+                    if(!state || typeof state!=='object')continue;
+                    let hasLocal=false; try{hasLocal=!!localStorage.getItem('mt_slot_state_'+key);}catch(_){}
+                    if(!hasLocal){mtSlotStateCache[String(key)]=state;try{localStorage.setItem('mt_slot_state_'+key,JSON.stringify(state));}catch(_){} }
+                }
+            }
+        } catch(e){ console.warn('[유형 슬롯] 영구 복원 실패:',e); }
+        finally { if(db)db.close(); mtTypedSlotStateHydrated=true; }
     }
     
     
@@ -9213,10 +9248,12 @@ ${JSON.stringify(finalPayload)}`;
     // v2: 게시판 외에 대용량 소설 슬롯/단어장도 IndexedDB로 분리 저장
     // v7: 오류 로그 전용 IndexedDB store가 기존 설치에서도 실제 생성되도록 스키마 버전을 올립니다.
     // 이전 v6에서는 onupgradeneeded에 store 생성 코드만 추가되고 DB_VERSION이 올라가지 않아,
-    const DB_VERSION = 7;
+    const DB_VERSION = 8;
     const STORE_NAME = "boardsStore";
     const SLOT_STORE_NAME = "slotsStore";
     const VOCA_STORE_NAME = "vocaStore";
+    const MT_TYPED_SLOT_STORE_NAME = 'maskingTypingTypedSlotsStore';
+    const MT_TYPED_SLOT_DATA_KEY = 'typedSlotsV1';
     const SLOT_DATA_KEY = "novelPracticeSlotsData";
     const VOCA_DATA_KEY = "scoreVocaWords";
     const SLOT_SAVE_DEBOUNCE_MS = 700;
@@ -9240,6 +9277,7 @@ ${JSON.stringify(finalPayload)}`;
                 if(!db.objectStoreNames.contains(SLOT_STORE_NAME)) db.createObjectStore(SLOT_STORE_NAME);
                 if(!db.objectStoreNames.contains(VOCA_STORE_NAME)) db.createObjectStore(VOCA_STORE_NAME);
                 if(!db.objectStoreNames.contains(MT_NORMAL_SLOT_STORE_NAME)) db.createObjectStore(MT_NORMAL_SLOT_STORE_NAME);
+                if(!db.objectStoreNames.contains(MT_TYPED_SLOT_STORE_NAME)) db.createObjectStore(MT_TYPED_SLOT_STORE_NAME);
             };
             request.onsuccess=()=>{const db=request.result;db.onversionchange=()=>db.close();resolve(db);};
             request.onerror=()=>reject(request.error||new Error('IndexedDB 열기 실패'));
@@ -9932,7 +9970,10 @@ ${JSON.stringify(finalPayload)}`;
             // 타이핑 to 언마스크 초기화 (슬롯 불러오기 연동)
             mtApplyFontSettings();
             await mtInitNormalSlotCache();
+            await mtInitTypedSlotStateCache();
             if (typeof mtInitSlots === 'function') mtInitSlots();
+            // 기존 localStorage 슬롯도 첫 실행 즉시 영구 사본을 만들어 다음 새로고침부터 보호합니다.
+            mtQueueTypedSlotStatePersistence();
         } catch (error) {
             // 초기화 중 한 모듈이 실패해도 다른 기능까지 중단하지 않습니다.
             console.error('앱 초기화 중 일부 기능 오류:', error);
