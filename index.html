@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v54</title>
+    <title>올인원 영작-단어장 시스템 · v55</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -2349,7 +2349,7 @@ body { background: var(--bench-v2-bg) !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v52</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v55</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -8320,6 +8320,7 @@ ${JSON.stringify(finalPayload)}`;
         if(n===1 && rows.length) n=rows.length+1;
         return n;
     }
+    // v55 self_generate immediate-first-batch: upload triggers the first batch immediately; subsequent runs use nextRun.
     async function mtTypedSelfGenerate(slotIndex) {
         const state=mtGetTypedState(slotIndex);
         if(state.type!=='self_generate'||!state.fileName)return;
@@ -8594,7 +8595,10 @@ ${JSON.stringify(finalPayload)}`;
             const outSheet=wb.SheetNames.includes('생성결과')?'생성결과':null;
             state.outputRows=outSheet?XLSX.utils.sheet_to_json(wb.Sheets[outSheet],{header:1,defval:''}).map(r=>Array.isArray(r)?r.map(v=>v??''):[]).filter(r=>r.some(v=>String(v??'').trim())):[];
             state.sourceRowsLock=state.sourceRows.slice(); state.nextSourceIndex=Math.min(state.outputRows.length,state.sourceRows.length); state.pattern=state.pattern||{sourceKorCol:1,engCol:2,mainKorCol:3,subKorCol:4,serialCol:5}; state.nextRun=Date.now()+mtGetGeneratorTypeIntervalMs(type);
-            mtSaveTypedState(slotIndex,state); mtInitSlots(); mtStartTypedTimer(slotIndex,false); alert(`[슬롯 ${Number(slotIndex)+1}] 자체형 파일이 등록되었습니다. 생성 카드 ${mtTypedCardWords(slotIndex).length}개`); return;
+            mtSaveTypedState(slotIndex,state); mtInitSlots();
+            // 자체형은 시험 파일처럼 등록 직후 첫 배치를 즉시 병렬 생성합니다.
+            mtStartTypedTimer(slotIndex,true);
+            alert(`[슬롯 ${Number(slotIndex)+1}] 자체형 파일이 등록되었습니다. 첫 배치를 즉시 생성합니다. 생성 카드 ${mtTypedCardWords(slotIndex).length}개`); return;
         }
         if(type==='reference_generate'){
             const topicSheet='차례', outputSheet='시트1';
