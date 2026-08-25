@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v68</title>
+    <title>올인원 영작-단어장 시스템 · v69</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -2359,6 +2359,13 @@ body { background: var(--bench-v2-bg) !important; }
 .mt-slot-delete-row { display:contents !important; }
 .mt-action-modal-card { text-align:left !important; }
 .mt-action-close-btn { width:auto !important; min-width:54px !important; max-width:70px !important; height:30px !important; padding:5px 10px !important; margin:0 !important; font-size:11px !important; display:inline-flex !important; align-items:center !important; justify-content:center !important; }
+</style>
+
+<style id="v69SlotCompactOverride">
+/* v69: 데이터 슬롯은 콘텐츠 높이만 사용. 빈 슬롯은 기존 높이 유지. */
+.mt-slot.has-data { min-height: 0 !important; }
+.mt-slot.has-data .mt-slot-progress-row { margin-bottom: 5px !important; }
+.mt-slot.has-data .mt-slot-api-row { margin-top: 3px !important; margin-bottom: 4px !important; }
 </style>
 </head>
 <body>
@@ -6330,7 +6337,10 @@ Rules:
             if(type==='ebook' && mtHasMeaningfulTypedData(i,'ebook')){
                 const st=mtGetTypedState(i), words=mtGetEbookWords(i), title=mtGetDisplayFileTitle(st.fileName||`슬롯 ${i}`), count=words.length;
                 div.className='mt-slot has-data mt-slot-unified mt-type-ebook';
-                div.innerHTML=`<div class="mt-slot-title">${mtEscapeHTML(title)}</div><div class="mt-slot-stat-row"><div><div class="mt-slot-count">${count}</div><div class="mt-slot-count-label"></div></div><div class="mt-slot-type-line" style="margin-left:auto;"><span class="mt-slot-meta-badge" style="display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;width:max-content;min-width:54px;height:24px;padding:3px 8px;margin:0;border-radius:6px;background:#f9735b !important;color:#fff !important;border:1px solid #f9735b !important;font-size:9px !important;line-height:1 !important;font-weight:800 !important;white-space:nowrap;">전자책</span></div></div><div class="mt-slot-actions-row"><button class="btn-excel" onclick="event.stopPropagation();mtOpenAddDataSourceModal(${i},'ebook')">추가</button><button class="btn-excel" onclick="event.stopPropagation();mtOpenTypeChangeModal(${i})">변경</button><button class="btn-download" onclick="event.stopPropagation();mtExportSlot(event,${i})">내보내기</button><button class="mt-btn-delete" onclick="event.stopPropagation();mtDeleteSlot(event,${i})">삭제</button></div>`;
+                const ebookRead = new Set((st.ebookReadIndexes||[]).map(Number));
+                const ebookDone = Array.from({length:count},(_,idx)=>idx).filter(idx=>ebookRead.has(idx)).length;
+                const ebookPct = count ? Math.round((ebookDone/count)*100) : 0;
+                div.innerHTML=`<div class="mt-slot-title">${mtEscapeHTML(title)}</div><div class="mt-slot-stat-row"><div><div class="mt-slot-count">${count}</div><div class="mt-slot-count-label"></div></div><div class="mt-slot-type-line" style="margin-left:auto;"><span class="mt-slot-meta-badge" style="display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;width:max-content;min-width:54px;height:24px;padding:3px 8px;margin:0;border-radius:6px;background:#f9735b !important;color:#fff !important;border:1px solid #f9735b !important;font-size:9px !important;line-height:1 !important;font-weight:800 !important;white-space:nowrap;">전자책</span></div></div>${mtSlotProgressRow(`진행률 ${ebookPct}% (${ebookDone}/${count})`)}<div class="mt-slot-actions-row"><button class="btn-excel" onclick="event.stopPropagation();mtOpenAddDataSourceModal(${i},'ebook')">추가</button><button class="btn-excel" onclick="event.stopPropagation();mtOpenTypeChangeModal(${i})">변경</button><button class="btn-download" onclick="event.stopPropagation();mtExportSlot(event,${i})">내보내기</button><button class="mt-btn-delete" onclick="event.stopPropagation();mtDeleteSlot(event,${i})">삭제</button></div>`;
                 div.onclick=()=>mtOpenEbookViewer(i);
             } else if(type==='self_generate' || type==='reference_generate'){
                 const st=mtGetTypedState(i), rows=Array.isArray(st.outputRows)?st.outputRows:[], words=mtGetGeneratorWords(i), star=(st.starredSerials||[]).length, title=mtGetDisplayFileTitle(st.fileName||`슬롯 ${i}`), label=type==='self_generate'?'자체형':'참조형', badgeColor=type==='self_generate'?'#eab308':'#16a34a';
