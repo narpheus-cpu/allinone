@@ -2337,7 +2337,7 @@ body { background: var(--bench-v2-bg) !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small style="font-size:9px;font-weight:400;color:#64748b;margin-left:6px;">v48</small> <small style="font-size:8px;margin-left:5px;color:#94a3b8;font-weight:400;vertical-align:middle;">v45</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템</h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -4412,7 +4412,32 @@ source_korean, english, korean, literal_korean
 
 ORIGINAL KOREAN SENTENCES:
 {{BATCH}}`;
-        if(type==='self_generate')return `You are an expert English teacher. For each Korean sentence, create ONE faithful, natural everyday English sentence at CEFR A2 level. Preserve meaning exactly. Return ONLY a JSON array with exactly {{COUNT}} objects: [{"index":0,"english":"..."}]. Do not add greetings, names, time expressions, or unrelated content. DATA={{BATCH}}`;
+        if(type==='self_generate')return `당신은 전문 영어 학습 콘텐츠 생성기입니다.
+
+제공되는 각각의 원본 한국어 문장에 대해 정확히 하나의 A2 수준 영어 문장과, 영어 어순에 맞춘 한국어 직독직해(대괄호 청크)를 생성하세요.
+
+엄격한 규칙:
+1. 원본 한국어는 변경하지 말고 'source_korean'에 그대로 복사하세요.
+2. 인사말, 이름, 날짜, 시간 표현, 작별 인사 등 관련 없는 내용을 추가하지 마세요.
+3. 영어 문장은 원본 한국어의 의미를 정확히 보존해야 합니다(A2 레벨).
+4. 'literal_korean'은 영어의 구/단어 순서와 정확히 일치하도록 한국어 대괄호 청크로 나누어 작성하세요.
+5. 오직 유효한 JSON 배열만 반환하세요. 마크다운 포맷(예: \`\`\`json)을 포함하지 마세요.
+6. 안전하지 않거나 민감한 콘텐츠의 경우 관련 없는 내용을 추가하는 대신 플랫폼 안전 요구사항을 따르세요.
+
+필수 JSON 키:
+"source_korean", "english", "literal_korean"
+
+예시:
+[
+  {
+    "source_korean": "그가 여행을 떠난 지 벌써 보름이 넘었다.",
+    "english": "It has already been over two weeks since he left on a trip.",
+    "literal_korean": "[이미 지나갔다] [2주 이상이] [그가 떠난 지] [여행을]"
+  }
+]
+
+원본 한국어 문장 목록:
+{{BATCH}}`;
         if(type==='reference_generate'&&key==='wordweb'&&promptId==='dialogue')return `You are an expert English dialogue writer and English-Korean translator.
 Create a continuous, natural everyday conversation between 2 people based on this topic: "{{TOPIC}}"
 Rules:
@@ -7498,7 +7523,8 @@ Rules:
             let div = document.createElement('div');
 
             const configuredType = mtGetSlotType(i);
-            if (!mtGetNormalSlotSync(i) && configuredType) {
+            // 생성형/전자책 슬롯은 슬롯 번호와 무관하게 공통 typed 엔진이 유일한 렌더링 경로입니다.
+            if (configuredType && configuredType !== 'normal') {
                 if (mtRenderTypedSlot(div, i)) { grid.appendChild(div); continue; }
             }
 
@@ -8183,7 +8209,7 @@ Rules:
             const st={...prev,fileName:displayFileName,sourceRows:sourceRows.slice(),sourceRowsLock:sourceRows.slice(),retryRows:[],nextSourceIndex:resumeIndex,outputRows,nextRun:Date.now()+MT_SLOT9_INTERVAL_MS,lastRun:outputRows.length?Date.now():null,lastError:'',lastSession:null,starredSerials:Array.isArray(prev.starredSerials)?prev.starredSerials.slice():[],pattern};
             mtGeneratorStoreLoaded = true;
             mtSlot9SaveState(st);
-            mtSlot9StartAutoTrigger(true);
+            mtMigrateDedicatedGeneratorStates().then(()=>mtStartTypedTimer(9,false)).catch(()=>{});
             mtInitSlots();
             if(outputRows.length) alert(`[슬롯9] 기존 생성결과 ${outputRows.length}개를 복원했습니다.${remaining>0?` 이어서 ${remaining}개를 생성합니다.`:' 모든 원본의 생성이 완료되어 추가 생성은 없습니다.'}`);
             else alert(`[슬롯9] 원본 ${sourceRows.length}개를 등록했습니다. 자동 생성을 시작합니다.`);
@@ -8194,267 +8220,18 @@ Rules:
         const raw=await fetchGemini(prompt,{type:'ARRAY',minItems:koreanItems.length,maxItems:koreanItems.length,items:{type:'OBJECT',properties:{index:{type:'INTEGER'},english:{type:'STRING'}},required:['index','english']}},mtGetGeneratorAiConfig(mtGetSlot9AiConfig(), 'slot9', '슬롯9')); if(!raw) return null; const arr=Array.isArray(raw)?raw:mtWordWebExtractJsonValue(raw); if(!Array.isArray(arr)||arr.length!==koreanItems.length)return null; return arr.sort((a,b)=>Number(a.index)-Number(b.index)).map(x=>String(x.english||'').trim());
     }
  async function mtSlot9GenerateSix() {
-        if (mtSlot9Busy) return;
-
-        // 상태 조회/정규화 단계까지 포함해 전체 생성 시퀀스를 보호합니다.
-        // 이전 버전은 이 구간이 try 바깥이어서 예외/비정상 상태가 발생하면 로그 없이 종료될 수 있었습니다.
-        mtSlot9Busy = true;
-        try {
-            const st = mtSlot9GetState();
-            const retryRows = Array.isArray(st.retryRows) ? st.retryRows : [];
-            const canUseRetry = retryRows.length > 0;
-            const canUseFresh = Array.isArray(st.sourceRows) && st.nextSourceIndex < st.sourceRows.length;
-
-            // 파일이 없는 초기 대기 상태 또는 모든 생성이 끝난 정상 상태는 기록하지 않습니다.
-            // 다만 파일명이 사라졌는데 실제 데이터가 남아 있으면 상태 불일치로 기록합니다.
-            if (!st.fileName || (!canUseRetry && !canUseFresh)) {
-                const hasResidualData = !st.fileName && (
-                    (Array.isArray(st.sourceRows) && st.sourceRows.length > 0) ||
-                    (Array.isArray(st.outputRows) && st.outputRows.length > 0) ||
-                    retryRows.length > 0
-                );
-                if (hasResidualData) {
-                    mtForceRecordSlot9Failure(new Error('슬롯9 생성 상태 불일치: fileName이 없는데 생성 데이터가 남아 있습니다.'), {
-                        source:'slot9-preflight',
-                        responseObject:{fileName:st.fileName||'',sourceCount:Array.isArray(st.sourceRows)?st.sourceRows.length:0,outputCount:Array.isArray(st.outputRows)?st.outputRows.length:0,retryCount:retryRows.length,nextSourceIndex:st.nextSourceIndex}
-                    });
-                }
-                return;
-            }
-
-            st.lastError = '';
-            mtSlot9SaveState(st);
-            mtSlot9RenderStatus();
-
-            const aiConfig = mtGetSlot9AiConfig();
-            // [수정점 1] 에러 로그 기록기(diagnosticHandler)를 API 설정에 정상적으로 부착
-            const wrappedAiConfig = mtGetGeneratorAiConfig(aiConfig, 'slot9', '슬롯9');
-
-            const freshStart = Number(st.nextSourceIndex || 0);
-            const freshBatch = canUseRetry ? [] : st.sourceRows
-                .slice(freshStart, freshStart + 6)
-                .map(v => String(v ?? '').trim())
-                .filter(Boolean);
-
-            const retryBatch = canUseRetry ? retryRows.slice(0, 6).map(x => ({
-                sourceIndex: Number(x.sourceIndex),
-                korean: String(x.korean ?? '').trim()
-            })) : [];
-
-            const batch = canUseRetry
-                ? retryBatch.map(x => x.korean)
-                : freshBatch;
-
-            if (!batch.length) throw new Error('처리할 A열 원문이 없습니다.');
-
-const prompt=mtApplyGeneratorPrompt(mtGetGeneratorPrompt('slot9','main',mtGeneratorPromptDefault('slot9','self_generate','main')),{COUNT:batch.length,BATCH:JSON.stringify(batch)}).trim();
-
-            const raw = await fetchGemini(
-                prompt,
-                {
-                    type:'ARRAY', minItems:batch.length, maxItems:batch.length,
-                    items:{
-                        type:'OBJECT',
-                        properties:{
-                            source_korean:{type:'STRING'},
-                            english:{type:'STRING'},
-                            korean:{type:'STRING'},
-                            literal_korean:{type:'STRING'}
-                        },
-                        required:['source_korean','english','korean','literal_korean']
-                    }
-                },
-                wrappedAiConfig // [수정점 1 적용] 이제 로그 파일 시스템이 정상 작동합니다.
-            );
-
-            if (!raw) throw new Error('AI 요청 실패: ' + (wrappedAiConfig && wrappedAiConfig.lastError ? wrappedAiConfig.lastError : 'API 응답을 받지 못했습니다.'));
-
-            let resultList = Array.isArray(raw) ? raw : mtWordWebExtractJsonValue(raw);
-            if (!Array.isArray(resultList) || resultList.length !== batch.length) {
-                throw new Error(`AI 응답 문장 수가 ${batch.length}개가 아닙니다.`);
-            }
-
-            const normalize = s => String(s ?? '').normalize('NFC').replace(/\s+/g,' ').trim();
-            const isKoreanOnlyChunkList = literal => {
-                const s = String(literal || '').trim();
-                const chunks = s.match(/\[[^\[\]]+\]/g) || [];
-                if (!s || chunks.length < 2 || chunks.length > 8) return false;
-                if (s.replace(/\[[^\[\]]+\]/g,'').trim() !== '') return false;
-                return chunks.every(c => {
-                    const inside = c.slice(1,-1).trim();
-                    return inside && /[가-힣]/.test(inside) && !/[A-Za-z]/.test(inside);
-                });
-            };
-            const looksSuspiciousKorean = (eng, kor) => {
-                const e = normalize(eng), k = normalize(kor);
-                if (!e || !k || k.length < 2 || !/[가-힣]/.test(k)) return true;
-                if (/[A-Za-z]{3,}/.test(k)) return true;
-                if (e.toLowerCase() === k.toLowerCase()) return true;
-                const parts = k.split(/\s+/).filter(Boolean);
-                for (let span=1; span<=3; span++) {
-                    for (let j=0; j+span*3<=parts.length; j++) {
-                        const a=parts.slice(j,j+span).join(' '), b=parts.slice(j+span,j+span*2).join(' '), c=parts.slice(j+span*2,j+span*3).join(' ');
-                        if (a && a===b && b===c) return true;
-                    }
-                }
-                const maxLen = Math.max(120, e.replace(/\s+/g,'').length * 5 + 50);
-                return k.replace(/\s+/g,'').length > maxLen;
-            };
-            const validRow = (item, expectedSource) => {
-                if (normalize(item?.source_korean) !== normalize(expectedSource)) return false;
-                const eng = normalize(item?.english), kor = normalize(item?.korean), lit = String(item?.literal_korean || '').trim();
-                if (eng.length < 2 || kor.length < 2) return false;
-                if (looksSuspiciousKorean(eng, kor)) return false;
-                if (!isKoreanOnlyChunkList(lit)) return false;
-                return true;
-            };
-
-            resultList = resultList.map((x, i) => ({
-                source_korean:String(x?.source_korean ?? ''),
-                english:String(x?.english ?? '').trim(),
-                korean:String(x?.korean ?? '').trim(),
-                literal_korean:String(x?.literal_korean ?? '').trim(),
-                batchPos:i
-            }));
-
-            const failed = [];
-            resultList.forEach((item, i) => {
-                if (!validRow(item, batch[i])) failed.push({ index:i, sourceKorean:batch[i], reason:'로컬 검증 실패' });
-            });
-
-            // 품질 검증은 그대로 유지합니다.
-            // 다만 검증 실패 행을 문장별 추가 API로 복구하면 무료 quota가 빠르게 소진될 수 있으므로
-            // 실패 행은 retryRows로 넘겨 다음 배치에서 다시 생성합니다.
-            const unresolved = [];
-            resultList.forEach((item, i) => {
-                if (!validRow(item, batch[i])) unresolved.push(i);
-            });
-
-            const successful = resultList
-                .map((item,i) => validRow(item,batch[i]) ? {item, batchIndex:i} : null)
-                .filter(Boolean);
-
-            const p = mtSlot9GetPattern(st);
-            let serialStart = (st.outputRows || []).length + 1;
-            for (const s of successful) {
-                const row=[];
-                const width=Math.max(p.sourceKorCol,p.engCol,p.mainKorCol,p.subKorCol,p.serialCol);
-                for(let c=0;c<width;c++) row[c]='';
-                const sourceIndex = canUseRetry ? retryBatch[s.batchIndex].sourceIndex : freshStart + s.batchIndex;
-                row[p.sourceKorCol-1] = String(st.sourceRows[sourceIndex] ?? batch[s.batchIndex]);
-                row[p.engCol-1] = s.item.english;
-                row[p.mainKorCol-1] = s.item.korean;
-                row[p.subKorCol-1] = s.item.literal_korean;
-                row[p.serialCol-1] = String(serialStart++);
-                st.outputRows.push(row);
-            }
-
-            if (!canUseRetry) st.nextSourceIndex = freshStart + batch.length;
-            else st.retryRows = retryRows.slice(batch.length);
-
-            const newFailed = unresolved.map(i => ({
-                sourceIndex: canUseRetry ? retryBatch[i].sourceIndex : freshStart + i,
-                korean: batch[i]
-            }));
-            st.retryRows = (Array.isArray(st.retryRows) ? st.retryRows : []).concat(newFailed);
-
-            st.lastRun=Date.now();
-            st.nextRun=Date.now()+MT_SLOT9_INTERVAL_MS;
-            st.lastError = unresolved.length
-                ? `${successful.length}개 저장, ${unresolved.length}개는 다음 자동 실행에서 재시도합니다.`
-                : '';
-            st.sourceRows = st.sourceRows.slice();
-            st.sourceRowsLock = st.sourceRows.slice();
-            mtSlot9SaveState(st);
-            mtSlot9RenderStatus(unresolved.length ? st.lastError : `${successful.length}문장 생성 완료`);
-            mtInitSlots();
-
-        } catch (e) {
-            // 모든 최종 실패를 반드시 로그에 남깁니다. diagnosticHandler가 놓친 저장/검증/타임아웃 전파도 포함합니다.
-            let lastDiag = null;
-            try { lastDiag = mtSlot9GetState()?.lastDiagnostic || null; } catch (_) {}
-            const msg = String(e?.message || e || '알 수 없는 오류');
-            const diagMsg = String(lastDiag?.errorMessage || '');
-            const sameRecent = !!lastDiag && diagMsg.includes(msg) && (Date.now() - Number(lastDiag.timestampMs || 0) <= 10000);
-            if (!sameRecent) mtForceRecordSlot9Failure(e, {...(lastDiag || {}), source:'slot9-generate-catch'});
-            // 실패 원인별로 다음 실행 시점을 다르게 잡습니다.
-            // 일일 quota 초과는 5분마다 무의미하게 재요청하지 않고 24시간 후 다시 확인합니다.
-            let latestSt = null;
-            try { latestSt = mtSlot9GetState(); } catch (_) {}
-            if (!latestSt) {
-                mtSlot9Busy = false;
-                return;
-            }
-            latestSt.lastRun = Date.now();
-            const errorText = String(e?.message || e || '');
-            const isDailyQuota = /PerDayPerProjectPerModel-FreeTier|일일 Gemini API quota|quota.*PerDay/i.test(errorText);
-            const isTemporaryQuota = /quota.*초과|RESOURCE_EXHAUSTED|retry in/i.test(errorText);
-            const is503 = /HTTP 503|high demand|UNAVAILABLE/i.test(errorText);
-            const isTimeout = /시간이 초과|timed out|timeout/i.test(errorText);
-            const isNetwork = /Failed to fetch|NetworkError|Load failed/i.test(errorText);
-            latestSt.nextRun = isDailyQuota
-                ? Date.now() + (24 * 60 * 60 * 1000)
-                : isTemporaryQuota
-                    ? Date.now() + (15 * 60 * 1000)
-                    : is503
-                        ? Date.now() + (2 * 60 * 1000)
-                        : isTimeout
-                            ? Date.now() + (3 * 60 * 1000)
-                            : isNetwork
-                                ? Date.now() + (60 * 1000)
-                                : Date.now() + MT_SLOT9_INTERVAL_MS;
-            if (!latestSt.lastDiagnostic) {
-                latestSt.lastError = errorText;
-            }
-            mtSlot9SaveState(latestSt);
-            mtSlot9RenderStatus();
-            console.error('[슬롯9]', e);
-        } finally {
-            mtSlot9Busy = false;
-        }
+        // 슬롯9 전용 생성 엔진 폐기: 이제 slot9도 일반 self_generate 공통 엔진만 사용합니다.
+        if (mtGetSlotType(9) !== 'self_generate') mtSetSlotType(9,'self_generate');
+        return mtTypedSelfGenerate(9);
     }
+
     function mtSlot9StartAutoTrigger(reset=false){
-        if(mtSlot9TimerId) clearTimeout(mtSlot9TimerId);
-        const st=mtSlot9GetState();
-        if(!st.fileName || !Array.isArray(st.sourceRows) || ((st.nextSourceIndex>=st.sourceRows.length) && (!Array.isArray(st.retryRows) || !st.retryRows.length))){ mtSlot9TimerId=null; return; }
-        if(reset || !st.nextRun){ st.nextRun=Date.now()+MT_SLOT9_INTERVAL_MS; mtSlot9SaveState(st); }
-        const delay=Math.max(1000, Number(st.nextRun)-Date.now());
-        mtSlot9TimerId=setTimeout(async()=>{
-            mtSlot9TimerId=null;
-            try {
-                await mtSlot9GenerateSix();
-            } finally {
-                mtSlot9Busy=false;
-                mtSlot9StartAutoTrigger(false);
-            }
-        },delay);
-        mtSlot9RenderStatus();
-    }
-    // 내보내기 시 생성형/전자책의 별표 이력을 카드 데이터에 함께 반영합니다.
-    function mtBuildExportRowsWithStarred(rows, pattern, starredSerials, headerLabel='중요') {
-        const list = Array.isArray(rows) ? rows : [];
-        const p = pattern || { serialCol: 4 };
-        const serialIdx = Math.max(0, Number(p.serialCol || 1) - 1);
-        const starSet = new Set((Array.isArray(starredSerials) ? starredSerials : []).map(String));
-        if (!list.length) return [['중요']];
-        const width = Math.max(...list.map(r => Array.isArray(r) ? r.length : 0), serialIdx + 1);
-        const out = list.map(r => {
-            const row = Array.isArray(r) ? r.slice() : [];
-            while (row.length < width) row.push('');
-            const serial = String(row[serialIdx] ?? '').trim();
-            row.push(starSet.has(serial) ? '★' : '');
-            return row;
-        });
-        return out;
-    }
-
-    function mtAddExportHeader(rows, headerLabel='중요') {
-        const data = Array.isArray(rows) ? rows.map(r => Array.isArray(r) ? r.slice() : []) : [];
-        if (!data.length) return [[headerLabel]];
-        const width = Math.max(...data.map(r => r.length));
-        const header = Array(width).fill('');
-        header[width - 1] = headerLabel;
-        return [header, ...data];
+        // 슬롯9 전용 타이머 폐기: 공통 self_generate 타이머만 사용합니다.
+        try{ if(mtSlot9TimerId) clearTimeout(mtSlot9TimerId); mtSlot9TimerId=null; }catch(_){ }
+        if(mtGetSlotType(9)!=='self_generate') mtSetSlotType(9,'self_generate');
+        const st=mtGetTypedState(9);
+        if(reset || !st.nextRun){ st.nextRun=Date.now()+mtGetGeneratorTypeIntervalMs('self_generate'); mtSaveTypedState(9,st); }
+        mtStartTypedTimer(9, false);
     }
 
     function mtSlot9DownloadClick(e){
@@ -10012,16 +9789,82 @@ ${JSON.stringify(finalPayload)}`;
         return n;
     }
     async function mtTypedSelfGenerate(slotIndex) {
-        const state=mtGetTypedState(slotIndex); if(state.type!=='self_generate'||!state.fileName)return;
-        const start=Number(state.nextSourceIndex||0); if(start>=state.sourceRows.length)return;
-        const batch=state.sourceRows.slice(start,Math.min(start+mtGetGeneratorSettings('self_generate').batchSize,state.sourceRows.length));
-        const prompt=mtApplyGeneratorPrompt(mtGetGeneratorPrompt('self_generate','main',mtGeneratorPromptDefault('self_generate','self_generate','main'),'self_generate'),{COUNT:batch.length,BATCH:JSON.stringify(batch.map((k,i)=>({index:i,korean:k})))}).trim();
-        const raw=await fetchGemini(prompt,{type:'ARRAY',minItems:batch.length,maxItems:batch.length,items:{type:'OBJECT',properties:{index:{type:'INTEGER'},english:{type:'STRING'}},required:['index','english']}},mtGetGeneratorAiConfig(mtGetGeneratorTypeAiConfig('self_generate'), 'generator:self_generate', '자체생성'));
-        const arr=Array.isArray(raw)?raw:mtWordWebExtractJsonValue(raw); if(!Array.isArray(arr)||arr.length!==batch.length) throw new Error('AI 문장 생성 결과가 정확하지 않습니다.');
-        const p=state.pattern || {engCol:2,mainKorCol:3,subKorCol:4,serialCol:5}; state.pattern=p;
+        const state=mtGetTypedState(slotIndex);
+        if(state.type!=='self_generate'||!state.fileName)return;
+        const start=Number(state.nextSourceIndex||0);
+        if(start>=state.sourceRows.length)return;
+
+        const settings=mtGetGeneratorSettings('self_generate');
+        const batch=state.sourceRows.slice(start,Math.min(start+settings.batchSize,state.sourceRows.length));
+        const prompt=mtApplyGeneratorPrompt(
+            mtGetGeneratorPrompt('self_generate','main',mtGeneratorPromptDefault('self_generate','self_generate','main'),'self_generate'),
+            {COUNT:batch.length,BATCH:JSON.stringify(batch.map((k,i)=>({index:i,korean:k})))}
+        ).trim();
+
+        const raw=await fetchGemini(prompt,
+            {
+                type:'ARRAY',
+                minItems:batch.length,
+                maxItems:batch.length,
+                items:{
+                    type:'OBJECT',
+                    properties:{
+                        source_korean:{type:'STRING'},
+                        english:{type:'STRING'},
+                        literal_korean:{type:'STRING'}
+                    },
+                    required:['source_korean','english','literal_korean']
+                }
+            },
+            mtGetGeneratorAiConfig(mtGetGeneratorTypeAiConfig('self_generate'),'generator:self_generate','자체형')
+        );
+
+        const arr=Array.isArray(raw)?raw:mtWordWebExtractJsonValue(raw);
+        if(!Array.isArray(arr)||arr.length!==batch.length) throw new Error('AI 문장 생성 결과가 정확하지 않습니다.');
+
+        const normalize=v=>String(v??'').normalize('NFC').replace(/\\s+/g,' ').trim();
+        const koreanChunkList=v=>{
+            const text=String(v??'').trim();
+            const chunks=text.match(/\\[[^\\[\\]]+\\]/g)||[];
+            if(!text||chunks.length<2||chunks.length>8)return false;
+            if(text.replace(/\\[[^\\[\\]]+\\]/g,'').trim()!=='')return false;
+            return chunks.every(c=>{const inside=c.slice(1,-1).trim();return inside&&/[가-힣]/.test(inside)&&!/[A-Za-z]/.test(inside);});
+        };
+
+        const normalized=arr.map((x,i)=>({
+            index:Number.isInteger(Number(x?.index))?Number(x.index):i,
+            source_korean:String(x?.source_korean??''),
+            english:String(x?.english??'').trim(),
+            literal_korean:String(x?.literal_korean??'').trim()
+        })).sort((a,b)=>a.index-b.index);
+
+        normalized.forEach((x,i)=>{
+            if(normalize(x.source_korean)!==normalize(batch[i])) throw new Error(`${i+1}번째 source_korean이 원본과 일치하지 않습니다.`);
+            if(x.english.length<2) throw new Error(`${i+1}번째 영어 문장이 비어 있습니다.`);
+            if(!koreanChunkList(x.literal_korean)) throw new Error(`${i+1}번째 literal_korean 형식이 올바르지 않습니다.`);
+        });
+
+        const p=state.pattern || {sourceKorCol:1,engCol:2,mainKorCol:3,subKorCol:4,serialCol:5};
+        state.pattern={sourceKorCol:1,engCol:2,mainKorCol:3,subKorCol:4,serialCol:5,...p};
         const current=mtTypedSerialNext(state);
-        arr.sort((a,b)=>Number(a.index)-Number(b.index)).forEach((x,i)=>{const row=Array(Math.max(p.engCol,p.mainKorCol,p.subKorCol,p.serialCol)).fill(''); row[p.engCol-1]=String(x.english||'').trim(); row[p.mainKorCol-1]=batch[i]; row[p.subKorCol-1]=batch[i]; row[p.serialCol-1]=String(current+i); state.outputRows.push(row);});
-        state.nextSourceIndex=start+batch.length; state.lastRun=Date.now(); state.nextRun=Date.now()+mtGetGeneratorTypeIntervalMs(state.type); state.lastError=''; state.lastDiagnostic=null; mtSaveTypedState(slotIndex,state); mtInitSlots();
+        normalized.forEach((x,i)=>{
+            const row=Array(Math.max(state.pattern.sourceKorCol,state.pattern.engCol,state.pattern.mainKorCol,state.pattern.subKorCol,state.pattern.serialCol)).fill('');
+            // source_korean = 주문장(원본 문장), literal_korean = 보조문장(영어 어순 직독직해)
+            row[state.pattern.sourceKorCol-1]=x.source_korean;
+            row[state.pattern.engCol-1]=x.english;
+            row[state.pattern.mainKorCol-1]=x.source_korean;
+            row[state.pattern.subKorCol-1]=x.literal_korean;
+            row[state.pattern.serialCol-1]=String(current+i);
+            state.outputRows.push(row);
+        });
+
+        state.nextSourceIndex=start+batch.length;
+        state.lastRun=Date.now();
+        state.nextRun=Date.now()+mtGetGeneratorTypeIntervalMs(state.type);
+        state.lastError='';
+        state.lastDiagnostic=null;
+        mtSaveTypedState(slotIndex,state);
+        mtInitSlots();
     }
     async function mtTypedReferenceGenerate(slotIndex) {
         const state=mtGetTypedState(slotIndex); if(state.type!=='reference_generate'||!state.fileName||!state.topics.length)return;
