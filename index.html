@@ -2538,7 +2538,7 @@ body { background: var(--bench-v2-bg) !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v76</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v68</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -3751,7 +3751,7 @@ body { background: var(--bench-v2-bg) !important; }
 
             const mtBackupData = {};
             // PC 백업에 실제 저장소의 원본 JSON을 그대로 담아 복원 시 카드 수/내용/별표/세션을 100% 유지합니다.
-            for (let i = 1; i <= 8; i++) {
+            for (let i = 1; i <= 11; i++) {
                 const valObj = mtGetNormalSlotSync(i);
                 if (valObj) mtBackupData[i] = JSON.stringify(valObj);
             }
@@ -3766,7 +3766,7 @@ body { background: var(--bench-v2-bg) !important; }
             // generator_*는 이전 백업 파일과의 호환을 위해 함께 유지합니다.
             mtBackupData['generator_states'] = {};
             mtBackupData['generator_types'] = {};
-            for(let i=1;i<=10;i++){
+            for(let i=1;i<=11;i++){
                 const slotType=mtGetSlotType(i);
                 if(slotType) mtBackupData['slot_types'][i]=slotType;
                 if(['ebook','self_generate','reference_generate'].includes(slotType)) mtBackupData['typed_slots'][i]=JSON.stringify(mtGetTypedState(i));
@@ -3824,7 +3824,7 @@ body { background: var(--bench-v2-bg) !important; }
                 // 기존 생성 상태가 새로 불러온 typed 데이터를 덮어쓰지 못하게 합니다.
 
                 await mtInitNormalSlotCache();
-                for(let i = 1; i <= 8; i++) {
+                for(let i = 1; i <= 11; i++) {
                     if(parsed.mtBackupData[i]) {
                         try { mtSetNormalSlotSync(i, JSON.parse(parsed.mtBackupData[i])); } catch (_) {}
                     } else {
@@ -3847,7 +3847,7 @@ body { background: var(--bench-v2-bg) !important; }
                 if(parsed.mtBackupData.slot_types){
                     for(const [k,v] of Object.entries(parsed.mtBackupData.slot_types)){
                         const slot=Number(k);
-                        if(slot>=1 && slot<=10 && ['normal','ebook','self_generate','reference_generate'].includes(v)) {
+                        if(slot>=1 && slot<=11 && ['normal','ebook','self_generate','reference_generate'].includes(v)) {
                             mtSetSlotType(slot,v);
                             if(parsed.mtBackupData.typed_slots?.[k]){ try { mtSaveTypedState(slot,JSON.parse(parsed.mtBackupData.typed_slots[k])); } catch(_) {} }
                         }
@@ -3972,12 +3972,18 @@ body { background: var(--bench-v2-bg) !important; }
         if (container.style.display === 'flex') container.style.display = 'none';
     }
 
-    function switchMainTab(tabId) {
+    function switchMainTab(tabId, clickEvent) {
         document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
         document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
         document.getElementById(tabId).classList.add('active');
-        event.target.classList.add('active');
+        const target=clickEvent?.currentTarget || (typeof event!=='undefined' ? event.target : null);
+        if(target) target.classList.add('active');
         if(tabId === 'quizTab') resetToSetup();
+        if(tabId === 'boardTab') {
+            // 상세 화면에 머문 채 탭을 다시 열면 빈 화면처럼 보일 수 있어 항상 목록부터 안전하게 표시합니다.
+            if(typeof switchBoardView==='function') switchBoardView('boardListView');
+            if(typeof renderBoardList==='function') renderBoardList();
+        }
         if(tabId === 'maskingTypingTab') {
             if(typeof mtInitSlots === 'function') mtInitSlots();
         }
@@ -5883,7 +5889,7 @@ Rules:
 
             // 아직 IndexedDB에 없는 슬롯이 있으면 구 localStorage 데이터에서 보충합니다.
             // 일부 슬롯만 먼저 이전된 환경도 안전하게 마이그레이션합니다.
-            for (let i = 1; i <= 8; i++) {
+            for (let i = 1; i <= 11; i++) {
                 if (loaded[String(i)] || !mtIsNormalTypeSlot(i)) continue;
                 try {
                     const raw = localStorage.getItem('word_slot_' + i);
@@ -5902,7 +5908,7 @@ Rules:
             if (needsPersistMigration || legacy) {
                 await mtPersistNormalSlotCache();
                 // IndexedDB 저장 성공 후에만 기존 localStorage 원본과 통합 레코드를 제거합니다.
-                for (let i = 1; i <= 8; i++) {
+                for (let i = 1; i <= 11; i++) {
                     try { localStorage.removeItem('word_slot_' + i); } catch (_) {}
                 }
             }
@@ -5932,7 +5938,7 @@ Rules:
         if (slotIndex != null) {
             mtNormalSlotPendingWrites.add(String(Number(slotIndex)));
         } else {
-            for (let i = 1; i <= 8; i++) mtNormalSlotPendingWrites.add(String(i));
+            for (let i = 1; i <= 11; i++) mtNormalSlotPendingWrites.add(String(i));
         }
         clearTimeout(mtNormalSlotSaveTimer);
         mtNormalSlotSaveTimer = setTimeout(() => {
@@ -5944,7 +5950,7 @@ Rules:
     async function mtPersistNormalSlotCache() {
         let db = null;
         const pending = new Set(mtNormalSlotPendingWrites);
-        if (!pending.size) for (let i = 1; i <= 8; i++) pending.add(String(i));
+        if (!pending.size) for (let i = 1; i <= 11; i++) pending.add(String(i));
         try {
             db = await initDB();
             const tx = db.transaction(MT_NORMAL_SLOT_STORE_NAME, 'readwrite');
@@ -6538,8 +6544,8 @@ Rules:
         const grid=document.getElementById('mtSlotsGrid'); if(!grid)return;
         grid.innerHTML='';
         const allStarredWords=mtCollectAllStarredWords();
-        // 슬롯 11은 항상 ★ 카드 모아보기 전용입니다. 사용자 데이터 슬롯으로 렌더링하지 않습니다.
-        const dataSlots = Array.from({length:10},(_,k)=>k+1);
+        // 슬롯 1~11은 사용자 데이터용이며, ★ 모아보기는 그 다음 위치에 둡니다.
+        const dataSlots = Array.from({length:11},(_,k)=>k+1);
         for(const i of dataSlots) mtClearGhostEmptyType(i);
         // 슬롯 위치는 절대 재정렬하지 않습니다. 사용자가 선택한 슬롯 번호를 항상 그대로 유지합니다.
         const ordered = dataSlots.slice();
@@ -6585,8 +6591,8 @@ Rules:
         nodes.filter(node=>!node.classList.contains('mt-empty-card')).forEach(node=>grid.appendChild(node));
         emptyNodes.forEach(node=>grid.appendChild(node));
 
-        // ★ 카드 모아보기는 항상 11번째 슬롯 위치에 고정.
-        const starDiv=document.createElement('div'); starDiv.className='mt-slot mt-premium-slot has-data mt-star-fixed-slot11';
+        // ★ 카드 모아보기는 데이터 슬롯 11개 뒤에 고정.
+        const starDiv=document.createElement('div'); starDiv.className='mt-slot mt-premium-slot has-data mt-star-fixed-slot12';
         starDiv.innerHTML=`<div class="mt-slot-title">★ 모아보기</div><div class="mt-slot-card-count-line"><span class="mt-slot-card-count-badge">${allStarredWords.length}</span><span class="mt-slot-card-count-label"></span></div><div class="mt-slot-desc"></div><div class="mt-slot-actions-row"><button class="btn-download" onclick="event.stopPropagation();mtExportStarred(event)">엑셀로 모아서 내보내기</button></div>`;
         starDiv.onclick=()=>allStarredWords.length?mtPromptAction('star',{name:'★ 카드 모아보기',words:allStarredWords,isStarSlot:true}):alert('★ 표시된 카드가 없습니다.');
         grid.appendChild(starDiv);
@@ -7149,7 +7155,7 @@ ${JSON.stringify(finalPayload)}`;
         let db=null;
         try{
             db=await initDB();
-            const types={}; for(let i=1;i<=10;i++){const type=mtGetSlotType(i);if(type)types[i]=type;}
+            const types={}; for(let i=1;i<=11;i++){const type=mtGetSlotType(i);if(type)types[i]=type;}
             const snapshot={types,states:mtSlotStateCache,savedAt:Date.now()};
             const tx=db.transaction(MT_TYPED_SLOT_STORE_NAME,'readwrite');
             tx.objectStore(MT_TYPED_SLOT_STORE_NAME).put(snapshot,MT_TYPED_SLOT_DATA_KEY);
@@ -9440,7 +9446,8 @@ ${JSON.stringify(finalPayload)}`;
     // v2: 게시판 외에 대용량 소설 슬롯/단어장도 IndexedDB로 분리 저장
     // v7: 오류 로그 전용 IndexedDB store가 기존 설치에서도 실제 생성되도록 스키마 버전을 올립니다.
     // 이전 v6에서는 onupgradeneeded에 store 생성 코드만 추가되고 DB_VERSION이 올라가지 않아,
-    const DB_VERSION = 8;
+    // v77: 기존 설치에도 모든 확장 저장소가 생성되도록 버전을 올립니다.
+    const DB_VERSION = 9;
     const STORE_NAME = "boardsStore";
     const SLOT_STORE_NAME = "slotsStore";
     const VOCA_STORE_NAME = "vocaStore";
@@ -9543,7 +9550,11 @@ ${JSON.stringify(finalPayload)}`;
             const request = tx.objectStore(STORE_NAME).get("communityBoardsData");
             await new Promise((resolve) => {
                 request.onsuccess = () => {
-                    if (request.result) boardDataList = request.result.map(b => migrateBoardData(b));
+                    if (Array.isArray(request.result)) {
+                        boardDataList = request.result.filter(b => b && typeof b === 'object').map(b => migrateBoardData(b));
+                    } else {
+                        boardDataList = [];
+                    }
                     resolve();
                 };
                 request.onerror = () => resolve();
@@ -9701,6 +9712,11 @@ ${JSON.stringify(finalPayload)}`;
         const grid = document.getElementById('boardGrid');
         if (!grid) return;
 
+        // 손상되었거나 이전 형식인 저장 데이터가 있어도 게시판 탭 전체가 멈추지 않도록 정리합니다.
+        boardDataList = Array.isArray(boardDataList)
+            ? boardDataList.filter(board => board && typeof board === 'object').map(board => migrateBoardData(board))
+            : [];
+
         if (boardDataList.length === 0) {
             grid.innerHTML = '<div class="board-empty-msg">등록된 게시판이 없습니다. 위에서 파일을 업로드하거나 텍스트를 붙여넣으세요.</div>';
             return;
@@ -9708,6 +9724,7 @@ ${JSON.stringify(finalPayload)}`;
 
         const fragment = document.createDocumentFragment();
         boardDataList.forEach(board => {
+            if (!Array.isArray(board.items)) board.items = [];
             const slot = document.createElement('div');
             slot.className = 'board-slot';
             slot.dataset.boardId = board.id;
@@ -9767,9 +9784,9 @@ ${JSON.stringify(finalPayload)}`;
     }
 
     function switchBoardView(viewId) {
-        document.getElementById('boardListView').classList.remove('active-view');
-        document.getElementById('boardDetailView').classList.remove('active-view');
-        document.getElementById(viewId).classList.add('active-view');
+        const list=document.getElementById('boardListView'), detail=document.getElementById('boardDetailView'), target=document.getElementById(viewId);
+        if(!list || !detail || !target) return;
+        list.classList.remove('active-view'); detail.classList.remove('active-view'); target.classList.add('active-view');
     }
 
     function goToList() {
@@ -10390,6 +10407,13 @@ ${JSON.stringify(finalPayload)}`;
 </script>
 
 <style id="v63-slot-unified-fix">
+/* 단어장과 라운드퀴즈도 전자책처럼 콘텐츠 하단까지 순백색 바탕을 유지합니다. */
+#vocaTab, #quizTab {
+  background:#fff !important;
+  min-height:calc(100vh - 230px);
+  box-sizing:border-box;
+}
+#vocaTab .pagination-container, #quizTab .quiz-card { background:#fff !important; }
 .mt-ebook-title-edit-btn {
   display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px;
   padding:0; border:1px solid #d1d5db; border-radius:6px; background:#fff; color:#475569;
@@ -10406,7 +10430,7 @@ ${JSON.stringify(finalPayload)}`;
 .mt-slot-meta-badge, .mt-gen-type-badge-inline { display:inline-flex !important; align-items:center; min-height:20px; padding:3px 7px; border-radius:999px; background:#f3f4f6 !important; color:#475569 !important; border:1px solid #e5e7eb; font-size:10px; font-weight:800; }
 .mt-slot-unified .mt-gen-actions, .mt-slot-unified .mt-slot-actions-row { display:flex; align-items:center; gap:5px; flex-wrap:wrap; }
 .mt-slot-unified .mt-gen-actions button, .mt-slot-unified .mt-slot-actions-row button { height:26px; }
-.mt-star-fixed-slot11 { grid-column:auto !important; order:9999 !important; }
+.mt-star-fixed-slot11, .mt-star-fixed-slot12 { grid-column:auto !important; order:9999 !important; }
 .mt-slot-slotno { font-size:9px; color:#a1a1aa; margin-top:-4px; margin-bottom:6px; }
 #mt-main-menu #mtEbookViewer, #mt-main-menu #mt-flashcard { display:none !important; }
 
