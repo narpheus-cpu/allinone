@@ -2538,7 +2538,7 @@ body { background: var(--bench-v2-bg) !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v68</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v81</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -6608,7 +6608,7 @@ Rules:
         try{mtDeleteNormalSlotSync(slot);}catch(_){ }
         try{localStorage.removeItem(MT_SLOT_TYPE_STORAGE_PREFIX+String(slot));}catch(_){ }
         try{localStorage.removeItem('mt_slot_state_'+String(slot));}catch(_){ }
-        try{delete mtSlotStateCache[String(slot)];}catch(_){ }
+        try{delete mtSlotTypeMemory[String(slot)];delete mtSlotStateCache[String(slot)];}catch(_){ }
         try{mtQueueTypedSlotStatePersistence();}catch(_){ }
         try{localStorage.removeItem('mt_slot_self_generate_api_key_'+slot);localStorage.removeItem('mt_slot_reference_generate_api_key_'+slot);localStorage.removeItem(`${MT_GENERATOR_SLOT_API_KEY_PREFIX}self_generate_${slot}`);localStorage.removeItem(`${MT_GENERATOR_SLOT_API_KEY_PREFIX}reference_generate_${slot}`);}catch(_){ }
         if(Number(mtActiveSlotIndex)===slot) mtActiveSlotIndex=null;
@@ -7140,25 +7140,34 @@ ${JSON.stringify(finalPayload)}`;
     }
     function mtSaveTypedState(slotIndex,state){
         const idx=Number(slotIndex), key=String(idx); mtSlotStateCache[key]=state;
-        try{localStorage.setItem('mt_slot_state_'+key,JSON.stringify(state));}catch(_){}
+        try{localStorage.setItem('mt_slot_state_'+key,JSON.stringify(state));}catch(e){console.warn('[유형 슬롯] localStorage 저장 실패. IndexedDB 영구 저장을 계속 시도합니다.',e);}
         mtQueueTypedSlotStatePersistence();
     }
     let mtTypedSlotStateSaveTimer = null;
     let mtTypedSlotStateHydrated = false;
+    // 삭제 직후 재등록처럼 저장 요청이 겹쳐도, 이전 스냅샷이 최신 데이터를 덮어쓰지 않도록 직렬화합니다.
+    let mtTypedSlotStateWriteChain = Promise.resolve();
     function mtQueueTypedSlotStatePersistence(){
         clearTimeout(mtTypedSlotStateSaveTimer);
         mtTypedSlotStateSaveTimer=setTimeout(()=>{ mtPersistTypedSlotStates().catch(e=>console.warn('[유형 슬롯] 영구 저장 실패:',e)); },0);
     }
     async function mtPersistTypedSlotStates(){
+        const types={}; for(let i=1;i<=11;i++){const type=mtGetSlotType(i);if(type)types[i]=type;}
+        // 저장을 시작한 순간의 내용을 복사해, 진행 중인 UI 변경과 서로 섞이지 않게 합니다.
+        const states=JSON.parse(JSON.stringify(mtSlotStateCache));
+        const snapshot={types,states,savedAt:Date.now()};
+        const write=async()=>{
         let db=null;
         try{
             db=await initDB();
-            const types={}; for(let i=1;i<=11;i++){const type=mtGetSlotType(i);if(type)types[i]=type;}
-            const snapshot={types,states:mtSlotStateCache,savedAt:Date.now()};
             const tx=db.transaction(MT_TYPED_SLOT_STORE_NAME,'readwrite');
             tx.objectStore(MT_TYPED_SLOT_STORE_NAME).put(snapshot,MT_TYPED_SLOT_DATA_KEY);
             await waitForTransaction(tx);
         } finally { if(db)db.close(); }
+        };
+        const queued=mtTypedSlotStateWriteChain.catch(()=>{}).then(write);
+        mtTypedSlotStateWriteChain=queued.catch(()=>{});
+        return queued;
     }
     async function mtInitTypedSlotStateCache(){
         if(mtTypedSlotStateHydrated)return;
@@ -8246,7 +8255,11 @@ ${JSON.stringify(finalPayload)}`;
             if(!state.topics.length)throw new Error('[차례] 시트에서 유효한 주제를 찾지 못했습니다.');
             state.pattern={engCol:3,serialCol:2,mainKorCol:4,subKorCol:5,topicOutputCol:1}; state.refQueue=state.topics.slice().sort(()=>Math.random()-0.5); state.nextSourceIndex=0; state.retryRows=[];
         }
-        mtSetSlotType(slot,type); mtSaveTypedState(slot,state); mtInitSlots();
+        mtSetSlotType(slot,type); mtSaveTypedState(slot,state);
+        // 파일 등록 직후에는 생성 결과가 아직 없어도 원문·유형을 즉시 IndexedDB에 확정합니다.
+        // 따라서 바로 새로고침해도 새로 만든 생성형 슬롯이 사라지지 않습니다.
+        await mtPersistTypedSlotStates();
+        mtInitSlots();
         mtGeneratorRun(slot,true);
     }
     async function mtGeneratorSelfBatch(slotIndex){
