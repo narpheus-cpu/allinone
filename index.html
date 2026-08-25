@@ -11717,6 +11717,16 @@ ${JSON.stringify(finalPayload)}`;
             });
 
             mtInputEl.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    // [영어를 타이핑하세요] 입력칸이 완전히 비어 있을 때만
+                    // 현재 학습 화면을 닫고 [타이핑 to 언마스크] 슬롯 목록으로 돌아갑니다.
+                    if (String(this.value || '') === '') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        mtGoMainMenu();
+                    }
+                    return;
+                }
                 if (e.key === 'Tab') {
                     if (mtRevealNextMaskSegment()) {
                         e.preventDefault();
