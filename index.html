@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v69</title>
+    <title>올인원 영작-단어장 시스템 · v70</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -1807,7 +1807,7 @@ body { background: var(--bench-v2-bg) !important; }
 
 .mt-slot-actions-row {
     display:flex !important; justify-content:space-between !important; align-items:center !important; gap:10px !important;
-    margin-top:auto !important; padding-top:16px !important; border-top:1px solid var(--bench-v2-border) !important;
+    margin-top:0 !important; padding-top:16px !important; border-top:1px solid var(--bench-v2-border) !important;
 }
 .mt-slot-actions-row .mt-slot-meta-badge { margin:0 !important; }
 .mt-slot-actions-row button, .mt-slot-actions-row .btn-download, .mt-slot-actions-row .mt-btn-delete {
@@ -1817,7 +1817,7 @@ body { background: var(--bench-v2-bg) !important; }
 }
 .mt-slot-actions-row button:hover { background:#f4f4f5 !important; color:#000 !important; }
 .mt-slot-actions-row .mt-btn-delete:hover { background:#18181b !important; color:#fff !important; }
-.mt-slot-empty { margin-top:auto !important; padding:0 !important; background:transparent !important; color:var(--bench-v2-muted) !important; font-size:12px !important; font-weight:700 !important; }
+.mt-slot-empty { margin-top:0 !important; padding:0 !important; background:transparent !important; color:var(--bench-v2-muted) !important; font-size:12px !important; font-weight:700 !important; }
 
 /* Premium / important collection = full inverse card, exactly like benchmark. */
 .mt-slot.mt-premium-slot {
@@ -2259,7 +2259,7 @@ body { background: var(--bench-v2-bg) !important; }
 </style>
 
 <style id="v28CompactSlotActions">
-.mt-slot-actions-row{display:flex !important;flex-wrap:nowrap !important;align-items:center !important;justify-content:flex-start !important;gap:2px !important;min-width:0 !important;white-space:nowrap !important;overflow:hidden !important;}
+.mt-slot-actions-row{display:flex !important;flex-wrap:nowrap !important;margin-top:0 !important;align-items:center !important;justify-content:flex-start !important;gap:2px !important;min-width:0 !important;white-space:nowrap !important;overflow:hidden !important;}
 .mt-slot-actions-row>.mt-slot-meta-badge,.mt-slot-actions-row>button{flex:0 0 auto !important;margin:0 !important;white-space:nowrap !important;min-width:0 !important;}
 .mt-slot-actions-row .mt-slot-meta-badge{padding:3px 6px !important;min-height:24px !important;font-size:9px !important;line-height:1 !important;}
 .mt-slot-actions-row button{min-height:24px !important;height:24px !important;padding:3px 6px !important;font-size:9px !important;line-height:1 !important;}
@@ -2361,11 +2361,49 @@ body { background: var(--bench-v2-bg) !important; }
 .mt-action-close-btn { width:auto !important; min-width:54px !important; max-width:70px !important; height:30px !important; padding:5px 10px !important; margin:0 !important; font-size:11px !important; display:inline-flex !important; align-items:center !important; justify-content:center !important; }
 </style>
 
-<style id="v69SlotCompactOverride">
-/* v69: 데이터 슬롯은 콘텐츠 높이만 사용. 빈 슬롯은 기존 높이 유지. */
-.mt-slot.has-data { min-height: 0 !important; }
-.mt-slot.has-data .mt-slot-progress-row { margin-bottom: 5px !important; }
+<style id="v70SlotCompactOverride">
+/* v70: 데이터 슬롯은 콘텐츠 높이만 사용. 빈 슬롯은 기존 높이 유지. */
+.mt-slot.has-data { min-height: 0 !important; justify-content: flex-start !important; }
+.mt-slot.has-data .mt-slot-progress-row { margin-bottom: 5px !important; min-height: 0 !important; }
 .mt-slot.has-data .mt-slot-api-row { margin-top: 3px !important; margin-bottom: 4px !important; }
+</style>
+
+<style id="v70CompactSlotFinal">
+/* v70: 데이터 슬롯의 인위적인 세로 빈 공간 제거 */
+.mt-slot.has-data {
+  min-height:0 !important;
+  height:auto !important;
+  justify-content:flex-start !important;
+  align-content:flex-start !important;
+}
+.mt-slot.has-data .mt-slot-actions-row {
+  margin-top:0 !important;
+  padding-top:8px !important;
+  height:auto !important;
+  min-height:24px !important;
+  flex:0 0 auto !important;
+  align-self:stretch !important;
+}
+.mt-slot.has-data .mt-slot-progress-row {
+  min-height:0 !important;
+  height:auto !important;
+  margin-top:0 !important;
+  margin-bottom:4px !important;
+  padding:0 !important;
+}
+.mt-slot.has-data .mt-slot-api-row {
+  height:auto !important;
+  min-height:0 !important;
+  margin-top:2px !important;
+  margin-bottom:3px !important;
+  padding:0 !important;
+}
+.mt-slot.has-data .mt-slot-desc {
+  margin-bottom:4px !important;
+}
+.mt-slot.has-data .mt-slot-stat-row {
+  margin-bottom:4px !important;
+}
 </style>
 </head>
 <body>
@@ -2373,7 +2411,7 @@ body { background: var(--bench-v2-bg) !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v68</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v70</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -9926,7 +9964,7 @@ ${JSON.stringify(finalPayload)}`;
 .mt-slot.mt-type-reference_generate .mt-slot-meta-badge{background:#16a34a!important;color:#fff!important;border-color:#16a34a!important;}
 .mt-slot .mt-slot-type-line{justify-content:flex-end!important;}
 .mt-slot .mt-slot-stat-row{align-items:center!important;}
-.mt-slot-actions-row{margin-top:auto!important;padding-top:10px!important;border-top:none!important;justify-content:flex-start!important;align-items:center!important;}
+.mt-slot-actions-row{margin-top:0!important;padding-top:8px!important;border-top:none!important;justify-content:flex-start!important;align-items:center!important;}
 .mt-slot-actions-row > button{background:transparent!important;color:#374151!important;border:none!important;box-shadow:none!important;font-size:10px!important;font-weight:700!important;padding:4px 6px!important;min-height:24px!important;height:24px!important;}
 .mt-slot-actions-row > button:hover{background:#f3f4f6!important;color:#111827!important;}
 .mt-slot-actions-row .mt-btn-delete{background:transparent!important;color:#374151!important;border:none!important;}
