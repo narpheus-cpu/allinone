@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v56</title>
+    <title>올인원 영작-단어장 시스템 · v57</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -2349,7 +2349,7 @@ body { background: var(--bench-v2-bg) !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v56</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v57</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -4368,6 +4368,7 @@ Rules:
         const t=mtNormalizeGeneratorTypeKey(type,type), settings=mtGetGeneratorSettings(t), modal=document.getElementById('mtGeneratorPromptEditorModal'); if(!modal)return;
         modal.querySelectorAll('[data-setting]').forEach(el=>{const k=el.dataset.setting; settings[k]=el.tagName==='SELECT'?el.value:Number(el.value);});
         if(!mtSaveGeneratorSettings(t,settings)){alert('생성 설정 저장에 실패했습니다. 브라우저 저장공간을 확인해 주세요.');return;}
+        if(t==='self_generate'){ for(let i=1;i<=11;i++){ if(mtGetSlotType(i)==='self_generate'){ const st=mtGetTypedState(i); if(st.fileName){ st.nextRun=Date.now()+mtGetGeneratorTypeIntervalMs('self_generate'); mtSaveTypedState(i,st); } } } }
         let ok=true;mtGeneratorPromptDefinitions(t,t).forEach(def=>{const el=modal.querySelector(`[data-prompt-id="${def.id}"]`);if(!el||!mtSaveGeneratorPrompt(t,def.id,el.value,t))ok=false;});
         if(!ok){alert('프롬프트 저장에 실패했습니다.');return;}
         for(let i=1;i<=11;i++){if(mtGetSlotType(i)===t) mtStartTypedTimer(i,false);}
@@ -8355,13 +8356,16 @@ ${JSON.stringify(finalPayload)}`;
         const work=[...retryTake,...freshRows];
         if(!work.length)return;
 
-        const config=mtGetGeneratorTypeAiConfig('self_generate');
-        const apiKey=String(config.apiKey||localStorage.getItem('gemini_api_key')||'').trim();
-        if(!apiKey) throw new Error(config.missingKeyMessage||'Gemini API Key가 없습니다.');
+        // 자체형은 업로드된 [자체형 시험]의 실행 방식을 그대로 사용합니다.
+        // 모델 순서도 시험 파일과 동일하게 유지하여 첫 요청부터 가벼운 모델로 빠르게 처리합니다.
+        const apiKey=String(
+            mtGetGeneratorTypeApiKey('self_generate') ||
+            localStorage.getItem('gemini_api_key') ||
+            localStorage.getItem('geminiApiKey') || ''
+        ).trim();
+        if(!apiKey) throw new Error('API 키를 입력해주세요.');
 
-        // 업로드된 자체형 시험 파일의 핵심 생성 로직을 이식합니다.
-        const MODELS=[config.models?.[0]||settings.preferredModel,'gemini-3.1-flash-lite','gemini-3.5-flash-lite']
-            .filter(Boolean).filter((m,i,a)=>a.indexOf(m)===i);
+        const MODELS=['gemini-3.1-flash-lite','gemini-3.5-flash-lite'];
         const SYSTEM_PROMPT=mtGetGeneratorPrompt(
             'self_generate','main',
             mtGeneratorPromptDefault('self_generate','self_generate','main'),
@@ -8373,7 +8377,7 @@ ${JSON.stringify(finalPayload)}`;
         }).replace(/\{\{BATCH\}\}/g,String(text??'')).trim();
 
         const sleep=ms=>new Promise(resolve=>setTimeout(resolve,Math.max(0,ms)));
-        const maxTotalAttempts=Math.max(1,Number(settings.maxModelAttempts||5))*MODELS.length;
+        const maxTotalAttempts=Math.max(1,Math.floor(Number(settings.maxModelAttempts)||5))*MODELS.length;
         const requestTimeoutMs=Math.max(5000,Number(settings.requestTimeoutSec||90)*1000);
         const maxOutputTokens=Math.max(256,Number(settings.maxOutputTokens||4096));
 
@@ -8398,16 +8402,25 @@ ${JSON.stringify(finalPayload)}`;
                         const data=await response.json().catch(()=>null);
                         if(response.ok){
                             const output=String(data?.candidates?.[0]?.content?.parts?.map(p=>p?.text||'').join('')||'').trim();
-                            if(!output){
-                                lastError=new Error('AI 응답 본문이 비어 있습니다.');
-                                mtRecordGeneratorErrorLog(`typed_${slotIndex}`,{slotLabel:'자체형',model,httpStatus:response.status,finishReason:data?.candidates?.[0]?.finishReason||'',promptFeedback:data?.promptFeedback??null,contentParts:data?.candidates?.[0]?.content?.parts??null,responseObject:data,errorMessage:lastError.message,source:'self-generate-empty'});
-                            }else{
-                                return output;
-                            }
+                            if(output)return output;
+                            lastError=new Error('AI 응답 본문이 비어 있습니다.');
+                            mtRecordGeneratorErrorLog(`typed_${slotIndex}`,{
+                                slotLabel:'자체형',model,httpStatus:response.status,
+                                finishReason:data?.candidates?.[0]?.finishReason||'',
+                                promptFeedback:data?.promptFeedback??null,
+                                contentParts:data?.candidates?.[0]?.content?.parts??null,
+                                responseObject:data,errorMessage:lastError.message,
+                                source:'self-generate-empty'
+                            });
                         }else{
                             const errMsg=data?.error?.message||`API Error (${response.status})`;
                             lastError=new Error(errMsg);
-                            mtRecordGeneratorErrorLog(`typed_${slotIndex}`,{slotLabel:'자체형',model,httpStatus:response.status,finishReason:'',promptFeedback:data?.error?.details??null,contentParts:null,responseObject:data,errorMessage:errMsg,source:'self-generate-api'});
+                            mtRecordGeneratorErrorLog(`typed_${slotIndex}`,{
+                                slotLabel:'자체형',model,httpStatus:response.status,
+                                finishReason:'',promptFeedback:data?.error?.details??null,
+                                contentParts:null,responseObject:data,errorMessage:errMsg,
+                                source:'self-generate-api'
+                            });
                             if(response.status===429){
                                 const match=errMsg.match(/retry in\s+(\d+(?:\.\d+)?)s/i);
                                 if(match?.[1]){
@@ -8418,25 +8431,38 @@ ${JSON.stringify(finalPayload)}`;
                             }
                         }
                     }catch(error){
-                        lastError=error?.name==='AbortError'?new Error(`API 요청이 ${settings.requestTimeoutSec||90}초 후 시간 초과되었습니다.`):(error instanceof Error?error:new Error(String(error)));
-                        mtRecordGeneratorErrorLog(`typed_${slotIndex}`,{slotLabel:'자체형',model,httpStatus:null,finishReason:'',promptFeedback:null,contentParts:null,responseObject:null,errorMessage:lastError.message,source:'self-generate-network'});
+                        lastError=error?.name==='AbortError'
+                            ?new Error(`API 요청이 ${settings.requestTimeoutSec||90}초 후 시간 초과되었습니다.`)
+                            :(error instanceof Error?error:new Error(String(error)));
+                        mtRecordGeneratorErrorLog(`typed_${slotIndex}`,{
+                            slotLabel:'자체형',model,httpStatus:null,finishReason:'',
+                            promptFeedback:null,contentParts:null,responseObject:null,
+                            errorMessage:lastError.message,source:'self-generate-network'
+                        });
                     }
                     totalAttempts++;
                 }
                 if(totalAttempts<maxTotalAttempts) await sleep(10000);
             }
-            throw lastError||new Error(`${sourceIndex+1}행 생성에 실패했습니다.`);
+            throw lastError||new Error(`${Number(sourceIndex)+1}행 생성에 실패했습니다.`);
         }
 
-        // 시험 파일처럼 배치의 각 원문을 독립 요청하되, Promise.all로 병렬 처리합니다.
+        // 시험 파일과 동일하게 한 배치의 각 원문을 Promise.all로 동시에 처리합니다.
         const results=await Promise.all(work.map(async item=>{
             if(!item.korean)return {item,error:new Error('원문이 비어 있습니다.')};
             try{
-                const raw=await fetchSelfWithFallback(item.korean,item.sourceIndex);
-                const clean=String(raw).replace(/^\s*```(?:text|tsv|plaintext)?\s*/i,'').replace(/\s*```\s*$/i,'').trim();
-                const line=clean.split(/\r?\n/).map(x=>x.trim()).filter(Boolean)[0]||'';
-                const cols=line.split('|').map(x=>x.trim());
-                return {item,result:{source_korean:cols[0]||item.korean,english:cols[1]||'',literal_korean:cols.slice(2).join('|').trim()}};
+                const resultText=await fetchSelfWithFallback(item.korean,item.sourceIndex);
+                const lines=String(resultText||'').trim().split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+                const line=lines[0]||'';
+                const cols=line.split('|').map(col=>col.trim());
+                return {
+                    item,
+                    result:{
+                        source_korean:cols[0]||item.korean,
+                        english:cols[1]||'',
+                        literal_korean:cols.slice(2).join('|').trim()
+                    }
+                };
             }catch(error){
                 return {item,error};
             }
@@ -8486,24 +8512,18 @@ ${JSON.stringify(finalPayload)}`;
         });
 
         const retryTakeKeys=new Set(retryTake.map(x=>`${x.sourceIndex}::${x.korean}`));
-        const failedKeys=new Set(failed.map(x=>`${x.sourceIndex}::${x.korean}`));
-        const remainingRetry=retryItems.slice(retryTake.length).filter(x=>!failedKeys.has(`${x.sourceIndex}::${x.korean}`));
-        // 현재 시도한 재시도 항목이 성공하면 제거되고, 실패하면 다시 retryRows에 들어갑니다.
+        const remainingRetry=retryItems.slice(retryTake.length);
         const retryFromCurrent=failed.filter(x=>retryTakeKeys.has(`${x.sourceIndex}::${x.korean}`));
-        state.retryRows=[...remainingRetry,...retryFromCurrent,...failed.filter(x=>!retryTakeKeys.has(`${x.sourceIndex}::${x.korean}`))];
-        state.nextSourceIndex=Math.min(sourceRows.length,freshStart+freshCapacity);
+        const freshFailures=failed.filter(x=>!retryTakeKeys.has(`${x.sourceIndex}::${x.korean}`));
+        state.retryRows=[...remainingRetry,...retryFromCurrent,...freshFailures];
+        state.nextSourceIndex=Math.min(sourceRows.length,freshStart+freshRows.length);
         state.lastRun=Date.now();
-        state.nextRun=Date.now()+mtGetGeneratorTypeIntervalMs(state.type);
+        state.nextRun=Date.now()+mtGetGeneratorTypeIntervalMs('self_generate');
         state.lastError=failed.length?`${accepted.length}개 저장, ${failed.length}개는 다음 자동 실행에서 재시도합니다.`:'';
         state.lastDiagnostic=failed.length?{errorMessage:failed[0].reason,source:'self-generate-validation'}:null;
         mtSaveTypedState(slotIndex,state);
         mtInitSlots();
-
-        if(settings.batchDelaySec>0 && state.nextSourceIndex<sourceRows.length){
-            await sleep(settings.batchDelaySec*1000);
-        }
     }
-
     async function mtTypedReferenceGenerate(slotIndex) {
         const state=mtGetTypedState(slotIndex); if(state.type!=='reference_generate'||!state.fileName||!state.topics.length)return;
         const topic=state.topics[Math.floor(Math.random()*state.topics.length)].topic;
