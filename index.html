@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v89</title>
+    <title>올인원 영작-단어장 시스템 · v90</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -2538,7 +2538,7 @@ body { background: var(--bench-v2-bg) !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v89</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v90</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -7746,6 +7746,11 @@ ${JSON.stringify(finalPayload)}`;
         const key=String(slotIndex);
         let page=mtGetEbookPage(key);
         const totalPages=Math.max(1,Math.ceil(words.length/MT_EBOOK_PAGE_SIZE));
+        const resumeIndex=isEbook ? Number(st.lastEbookStudyIndex) : NaN;
+        // 마지막으로 완료한 카드가 있는 페이지를 우선 표시합니다.
+        if(Number.isInteger(resumeIndex) && resumeIndex>=0 && resumeIndex<words.length){
+            page=Math.floor(resumeIndex/MT_EBOOK_PAGE_SIZE)+1;
+        }
         page=Math.min(Math.max(page,1),totalPages);
         mtSaveEbookPage(key, page);
         const main=document.getElementById('mt-main-menu'), viewer=document.getElementById('mtEbookViewer');
@@ -7789,6 +7794,10 @@ ${JSON.stringify(finalPayload)}`;
             item.onclick=()=>{if(isEbook)mtOpenEbookTyping(Number(slotIndex),absoluteIndex);else mtOpenGeneratorCardAt(Number(slotIndex),absoluteIndex);};
             list.appendChild(item);
         });
+        // 목록을 다시 열면 마지막으로 언마스킹한 항목이 화면 가운데 가까이에 오도록 합니다.
+        if(isEbook && Number.isInteger(resumeIndex) && resumeIndex>=start && resumeIndex<start+pageWords.length){
+            requestAnimationFrame(()=>list.querySelector(`.mt-ebook-item[data-index="${resumeIndex}"]`)?.scrollIntoView({block:'center',inline:'nearest'}));
+        }
         mtEbookUpdateSelectionUi(Number(slotIndex), pageWords, start);
         const selectPageBtn=document.getElementById('mtEbookSelectPageBtn');
         if(selectPageBtn) selectPageBtn.onclick=(e)=>{ e.preventDefault(); e.stopPropagation(); mtEbookTogglePageSelection(Number(slotIndex), pageWords, start); };
@@ -8002,8 +8011,7 @@ ${JSON.stringify(finalPayload)}`;
         const slot=mtEbookActiveSlot,index=Number(mtCurrentStudyWords?.[0]?.originalIndex);
         const completed = mtIsCurrentMaskFullyUnmasked();
         if(completed && Number.isInteger(index)){
-            const st=mtGetTypedState(slot), set=new Set((st.ebookReadIndexes||[]).map(Number));
-            set.add(index); st.ebookReadIndexes=Array.from(set).sort((a,b)=>a-b); mtSaveTypedState(slot,st);
+            mtCommitEbookCompletion(slot,mtCurrentStudyWords?.[0]);
         }
         mtRecordEbookCompletedCardIfReady();
         mtEbookTypingActive=false;
@@ -9100,6 +9108,27 @@ ${JSON.stringify(finalPayload)}`;
         return true;
     }
 
+    // 언마스킹 완료는 화면 이동·새로고침보다 먼저 동기적으로 localStorage에 확정한다.
+    // 따라서 목록으로 돌아가지 않거나 제목을 눌러 메인으로 바로 가도 완료 색상이 사라지지 않는다.
+    function mtCommitEbookCompletion(slotIndex, word) {
+        const slot=Number(slotIndex);
+        const originalIndex=Number(word?.originalIndex);
+        if(!Number.isInteger(slot) || !Number.isInteger(originalIndex)) return false;
+        const st=mtGetTypedState(slot);
+        if(st?.type!=='ebook') return false;
+        const read=new Set((st.ebookReadIndexes||[]).map(Number).filter(Number.isInteger));
+        const changed=!read.has(originalIndex);
+        read.add(originalIndex);
+        st.ebookReadIndexes=Array.from(read).sort((a,b)=>a-b);
+        // 다음 입장 때 이 카드가 보이는 페이지와 위치로 복귀합니다.
+        st.lastEbookStudyIndex=originalIndex;
+        st.lastEbookCompletedAt=Date.now();
+        mtSaveTypedState(slot,st);
+        // IndexedDB 스냅샷도 즉시 시작해 localStorage를 못 쓰는 환경까지 보완합니다.
+        try{mtPersistTypedSlotStates().catch(e=>console.warn('전자책 완료 상태 영구 저장 실패:',e));}catch(_){}
+        return changed;
+    }
+
     function mtRecordEbookCompletedCardIfReady() {
         if (!mtEbookTypingActive || mtCardCompletionRecorded) return false;
         if (!mtIsCurrentMaskFullyUnmasked()) return false;
@@ -9110,6 +9139,7 @@ ${JSON.stringify(finalPayload)}`;
         if (Number.isInteger(slot) && currentWord) {
             const st = mtGetTypedState(slot);
             const originalIndex = Number.isInteger(Number(currentWord.originalIndex)) ? Number(currentWord.originalIndex) : Number(mtCurrentIndex);
+            mtCommitEbookCompletion(slot,currentWord);
             const key = mtNormalizeCompletionKey(currentWord, originalIndex);
             const counts = mtGetSuccessCountsObject(st);
             counts[key] = Math.max(0, Number(counts[key] || 0)) + 1;
@@ -9128,11 +9158,7 @@ ${JSON.stringify(finalPayload)}`;
         const current = mtCurrentStudyWords?.[mtCurrentIndex];
         const currentOriginalIndex = Number(current?.originalIndex);
         if (Number.isInteger(currentOriginalIndex)) {
-            const st = mtGetTypedState(slot);
-            const set = new Set((st.ebookReadIndexes || []).map(Number));
-            set.add(currentOriginalIndex);
-            st.ebookReadIndexes = Array.from(set).sort((a,b)=>a-b);
-            mtSaveTypedState(slot, st);
+            mtCommitEbookCompletion(slot,current);
         }
         mtRecordEbookCompletedCardIfReady();
 
@@ -10322,6 +10348,12 @@ ${JSON.stringify(finalPayload)}`;
       if (typingTabBtn) typingTabBtn.classList.add('active');
 
       // 학습 화면/전자책 뷰어/전자책 팝업을 모두 닫고 슬롯 목록으로 복귀
+      // 제목을 눌러 즉시 메인으로 가는 경로도 완료 상태를 먼저 확정합니다.
+      if (typeof mtEbookTypingActive !== 'undefined' && mtEbookTypingActive &&
+          typeof mtCommitEbookCompletion === 'function' &&
+          typeof mtIsCurrentMaskFullyUnmasked === 'function' && mtIsCurrentMaskFullyUnmasked()) {
+        mtCommitEbookCompletion(mtEbookActiveSlot, mtCurrentStudyWords?.[mtCurrentIndex]);
+      }
       if (typeof mtEbookTypingActive !== 'undefined') mtEbookTypingActive = false;
       if (mainMenu) mainMenu.style.display = 'block';
       if (flash) {
@@ -10460,7 +10492,7 @@ ${JSON.stringify(finalPayload)}`;
   (function syncAppVersionFromFileName(){
     // 파일을 다른 이름으로 저장하거나 브라우저가 경로를 변환해도, 기본 표시가
     // 사라지지 않게 한다. 정상 파일명에서는 아래 값이 자동으로 새 번호로 대체된다.
-    const fallbackVersion='v89';
+    const fallbackVersion='v90';
     let fileName='';
     try{fileName=decodeURIComponent(String(location.pathname||'').split('/').pop()||'');}
     catch(_){fileName=String(location.pathname||'').split('/').pop()||'';}
