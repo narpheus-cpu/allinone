@@ -2538,7 +2538,7 @@ body { background: var(--bench-v2-bg) !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v68</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v78</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -10405,8 +10405,38 @@ ${JSON.stringify(finalPayload)}`;
   window.mtRegisterConfiguredEmptySlotFile=function(){if(window.mtConfiguredEmptySlot==null)return;const s=Number(window.mtConfiguredEmptySlot),t=window.mtPendingSlotType;window.mtCloseConfiguredEmptySlotModal();if(t==='normal'||t==='ebook')return window.mtOpenNormalImportSourceModal(s,t);if(t)return window.mtTriggerUpload(s,t);window.mtOpenSlotTypeModal(s);};
 })();
 </script>
+<script id="v78-board-placement-guard">
+(function () {
+  function repairBoardPlacement() {
+    const board=document.getElementById('boardTab');
+    const tabs=document.querySelector('.container > .tabs');
+    if (!board || !tabs) return;
+    // 잘못된 HTML 흐름으로 게시판이 헤더 버튼 옆에 붙은 경우에도 메뉴 바로 다음으로 되돌립니다.
+    if (board.parentElement !== tabs.parentElement || board.previousElementSibling !== tabs) {
+      tabs.insertAdjacentElement('afterend', board);
+    }
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', repairBoardPlacement, {once:true});
+  else repairBoardPlacement();
+})();
+</script>
 
 <style id="v63-slot-unified-fix">
+/* v78: 게시판은 메뉴바의 형제 블록으로, 반드시 메뉴 아래 전체 너비에 배치합니다. */
+.container > #boardTab.tab-content {
+  clear:both !important;
+  display:none;
+  position:relative !important;
+  width:100% !important;
+  max-width:100% !important;
+  min-width:0 !important;
+  box-sizing:border-box !important;
+  margin:0 !important;
+  float:none !important;
+  flex:0 0 100% !important;
+}
+.container > #boardTab.tab-content.active { display:block !important; }
+#boardTab .board-header-section, #boardTab .board-upload-section, #boardTab .board-grid { width:100%; box-sizing:border-box; }
 /* 단어장과 라운드퀴즈도 전자책처럼 콘텐츠 하단까지 순백색 바탕을 유지합니다. */
 #vocaTab, #quizTab {
   background:#fff !important;
