@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v90</title>
+    <title>올인원 영작-단어장 시스템 · v91</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -2538,7 +2538,7 @@ body { background: var(--bench-v2-bg) !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v90</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v91</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -7514,6 +7514,8 @@ ${JSON.stringify(finalPayload)}`;
         state.pattern={engCol:1,mainKorCol:2,subKorCol:3,serialCol:4};
         state.starredSerials=importedStarredSerials;
         state.ebookReadIndexes=[];
+        // 새 전자책으로 교체할 때는 이전 전자책의 독립 완료 기록도 함께 초기화합니다.
+        try{localStorage.removeItem(MT_EBOOK_COMPLETION_RECORD_PREFIX+Number(slot));}catch(_){}
         state.lastSession=null;
         state.lastError='';
         mtSetSlotType(slot,'ebook');
@@ -7521,7 +7523,7 @@ ${JSON.stringify(finalPayload)}`;
         mtCloseEbookColumnModal();mtInitSlots();mtOpenEbookViewer(slot);
     }
 
-    function mtGetEbookWords(slotIndex){ const st=mtGetTypedState(slotIndex); const p=st.pattern||{engCol:1,mainKorCol:2,subKorCol:3,serialCol:4}; const read=new Set((st.ebookReadIndexes||[]).map(Number)); return (st.outputRows||[]).map((r,i)=>({eng:String(r?.[p.engCol-1]??'').trim(),kor:String(r?.[p.mainKorCol-1]??'').trim(),subKor:String(r?.[p.subKorCol-1]??'').trim(),serial:String(r?.[p.serialCol-1]??(i+1)).trim(),originalIndex:i,ebookRead:read.has(i)})).filter(w=>w.kor&&w.eng); }
+    function mtGetEbookWords(slotIndex){ const st=mtRestoreEbookCompletionRecord(slotIndex,mtGetTypedState(slotIndex)); const p=st.pattern||{engCol:1,mainKorCol:2,subKorCol:3,serialCol:4}; const read=new Set((st.ebookReadIndexes||[]).map(Number)); return (st.outputRows||[]).map((r,i)=>({eng:String(r?.[p.engCol-1]??'').trim(),kor:String(r?.[p.mainKorCol-1]??'').trim(),subKor:String(r?.[p.subKorCol-1]??'').trim(),serial:String(r?.[p.serialCol-1]??(i+1)).trim(),originalIndex:i,ebookRead:read.has(i)})).filter(w=>w.kor&&w.eng); }
     let mtEbookEditTarget = null;
 
     function mtDeleteEbookItem(slotIndex, index, event) {
@@ -9108,6 +9110,35 @@ ${JSON.stringify(finalPayload)}`;
         return true;
     }
 
+    const MT_EBOOK_COMPLETION_RECORD_PREFIX='mt_ebook_completion_record_v1_';
+    function mtEbookCompletionRowKey(row,index,pattern){
+        const p=pattern||{};
+        const serial=String(row?.[(p.serialCol||4)-1]??(index+1)).trim();
+        const eng=String(row?.[(p.engCol||1)-1]??'').trim().replace(/\s+/g,' ').toLowerCase();
+        const kor=String(row?.[(p.mainKorCol||2)-1]??'').trim().replace(/\s+/g,' ');
+        return serial+'|'+eng+'|'+kor;
+    }
+    function mtGetEbookCompletionRecord(slotIndex){
+        try{
+            const raw=localStorage.getItem(MT_EBOOK_COMPLETION_RECORD_PREFIX+Number(slotIndex));
+            const parsed=raw?JSON.parse(raw):null;
+            return parsed&&typeof parsed==='object'?parsed:{keys:[],lastIndex:null};
+        }catch(_){return {keys:[],lastIndex:null};}
+    }
+    function mtSaveEbookCompletionRecord(slotIndex,record){
+        try{localStorage.setItem(MT_EBOOK_COMPLETION_RECORD_PREFIX+Number(slotIndex),JSON.stringify(record));}catch(e){console.warn('전자책 완료 기록 저장 실패:',e);}
+    }
+    function mtRestoreEbookCompletionRecord(slotIndex,state){
+        const st=state||mtGetTypedState(Number(slotIndex));
+        if(!st || st.type!=='ebook' || !Array.isArray(st.outputRows)) return st;
+        const record=mtGetEbookCompletionRecord(slotIndex);
+        const keys=new Set([...(st.ebookReadKeys||[]).map(String),...(record.keys||[]).map(String)]);
+        (st.ebookReadIndexes||[]).map(Number).filter(Number.isInteger).forEach(i=>{if(st.outputRows[i])keys.add(mtEbookCompletionRowKey(st.outputRows[i],i,st.pattern));});
+        st.ebookReadKeys=Array.from(keys);
+        st.ebookReadIndexes=st.outputRows.map((row,i)=>keys.has(mtEbookCompletionRowKey(row,i,st.pattern))?i:-1).filter(i=>i>=0);
+        if(Number.isInteger(Number(record.lastIndex)))st.lastEbookStudyIndex=Number(record.lastIndex);
+        return st;
+    }
     // 언마스킹 완료는 화면 이동·새로고침보다 먼저 동기적으로 localStorage에 확정한다.
     // 따라서 목록으로 돌아가지 않거나 제목을 눌러 메인으로 바로 가도 완료 색상이 사라지지 않는다.
     function mtCommitEbookCompletion(slotIndex, word) {
@@ -9120,6 +9151,14 @@ ${JSON.stringify(finalPayload)}`;
         const changed=!read.has(originalIndex);
         read.add(originalIndex);
         st.ebookReadIndexes=Array.from(read).sort((a,b)=>a-b);
+        const row=st.outputRows?.[originalIndex];
+        const record=mtGetEbookCompletionRecord(slot);
+        const keys=new Set((record.keys||[]).map(String));
+        if(row) keys.add(mtEbookCompletionRowKey(row,originalIndex,st.pattern));
+        record.keys=Array.from(keys);
+        record.lastIndex=originalIndex;
+        record.completedAt=Date.now();
+        mtSaveEbookCompletionRecord(slot,record);
         // 다음 입장 때 이 카드가 보이는 페이지와 위치로 복귀합니다.
         st.lastEbookStudyIndex=originalIndex;
         st.lastEbookCompletedAt=Date.now();
@@ -10492,7 +10531,7 @@ ${JSON.stringify(finalPayload)}`;
   (function syncAppVersionFromFileName(){
     // 파일을 다른 이름으로 저장하거나 브라우저가 경로를 변환해도, 기본 표시가
     // 사라지지 않게 한다. 정상 파일명에서는 아래 값이 자동으로 새 번호로 대체된다.
-    const fallbackVersion='v90';
+    const fallbackVersion='v91';
     let fileName='';
     try{fileName=decodeURIComponent(String(location.pathname||'').split('/').pop()||'');}
     catch(_){fileName=String(location.pathname||'').split('/').pop()||'';}
