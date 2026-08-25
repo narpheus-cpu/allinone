@@ -8415,10 +8415,16 @@ ${JSON.stringify(finalPayload)}`;
                     else if(type==='reference_generate') await mtTypedReferenceGenerate(slotIndex);
                 }catch(e){
                     const latest=mtGetTypedState(slotIndex);
-                    if(!latest.lastDiagnostic){
-                        latest.lastError=String(e?.message||e);
-                        try{latest.lastDiagnostic=mtRecordGeneratorErrorLog(`generator:${type}`,{slotLabel:mtGetSlotTypeLabel(type),errorMessage:latest.lastError,source:'typed-catch'});}catch(_){}
-                    }
+                    latest.lastError=String(e?.message||e);
+                    try{
+                        // 실패할 때마다 오류로그를 기록합니다. 중복 방지는 mtRecordGeneratorErrorLog 내부의
+                        // timestampMs + model + errorMessage 기준 로직에 맡깁니다.
+                        latest.lastDiagnostic=mtRecordGeneratorErrorLog(`generator:${type}`,{
+                            slotLabel:mtGetSlotTypeLabel(type),
+                            errorMessage:latest.lastError,
+                            source:'typed-catch'
+                        }) || latest.lastDiagnostic || null;
+                    }catch(_){}
                     mtSaveTypedState(slotIndex,latest);mtInitSlots();
                 }finally{mtStartTypedTimer(slotIndex,false);}
             })(); return;
