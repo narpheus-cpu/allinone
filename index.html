@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v51</title>
+    <title>올인원 영작-단어장 시스템 · v52</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -2331,13 +2331,21 @@ body { background: var(--bench-v2-bg) !important; }
 .mt-slot-actions-row>button{padding:3px 5px!important;font-size:9px!important;line-height:1.05!important;white-space:nowrap!important}
 .mt-slot-actions-row>.mt-slot-meta-badge{padding:3px 6px!important;white-space:nowrap!important}
 @media(max-width:768px){.mt-slot-actions-row{gap:1px!important}.mt-slot-actions-row>button{padding:3px 4px!important;font-size:8px!important}}
-</style></head>
+</style>
+<style id="noSlotHoverMotionV52">
+/* 슬롯 hover 시 카드가 꿈틀거리거나 이동하는 애니메이션 제거 */
+.mt-slot, .mt-slot:hover, .mt-slot.has-data:hover, .mt-slot.mt-special-slot:hover, .mt-slot.mt-generator-slot:hover {
+    transform: none !important;
+    transition: none !important;
+}
+</style>
+</head>
 <body>
 
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v51</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v52</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -4216,26 +4224,20 @@ body { background: var(--bench-v2-bg) !important; }
 제공되는 각각의 원본 한국어 문장에 대해 정확히 하나의 A2 수준 영어 문장과, 영어 어순에 맞춘 한국어 직독직해(대괄호 청크)를 생성하세요.
 
 엄격한 규칙:
-1. 원본 한국어는 변경하지 말고 'source_korean'에 그대로 복사하세요.
-2. 인사말, 이름, 날짜, 시간 표현, 작별 인사 등 관련 없는 내용을 추가하지 마세요.
-3. 영어 문장은 원본 한국어의 의미를 정확히 보존해야 합니다(A2 레벨).
-4. 'literal_korean'은 영어의 구/단어 순서와 정확히 일치하도록 한국어 대괄호 청크로 나누어 작성하세요.
-5. 오직 유효한 JSON 배열만 반환하세요. 마크다운 포맷(예: \`\`\`json)을 포함하지 마세요.
-6. 안전하지 않거나 민감한 콘텐츠의 경우 관련 없는 내용을 추가하는 대신 플랫폼 안전 요구사항을 따르세요.
+1. 1열은 입력된 원본 한국어 문장을 한 글자도 바꾸지 말고 그대로 출력하세요.
+2. 2열은 원본 한국어의 의미와 뉘앙스를 정확히 보존한 자연스러운 A2 수준 일상영어를 출력하세요.
+3. 3열은 2열 영어의 어순에 1:1 대응하는 한국어 직독직해식 청크를 출력하세요. 각 청크는 대괄호로 감싸세요.
+4. 각 행의 열은 TAB 문자 1개로만 구분하세요. 다른 구분기호를 사용하지 마세요.
+5. 헤더를 출력하지 마세요. 설명, 번호, 마크다운, 코드펜스도 출력하지 마세요.
+6. 입력 문장 순서와 출력 행 순서를 반드시 일치시키세요.
+7. 입력 문장 수와 출력 행 수를 정확히 일치시키세요.
+8. 각 출력 행은 정확히 3개 열이어야 합니다.
+9. 안전하지 않거나 민감한 콘텐츠의 경우 관련 없는 내용을 추가하지 말고 플랫폼 안전 요구사항을 따르세요.
 
-필수 JSON 키:
-"source_korean", "english", "literal_korean"
+출력 예시:
+그가 여행을 떠난 지 벌써 보름이 넘었다.\tIt has already been over two weeks since he left on a trip.\t[이미 지나갔다] [2주 이상이] [그가 떠난 지] [여행을]
 
-예시:
-[
-  {
-    "source_korean": "그가 여행을 떠난 지 벌써 보름이 넘었다.",
-    "english": "It has already been over two weeks since he left on a trip.",
-    "literal_korean": "[이미 지나갔다] [2주 이상이] [그가 떠난 지] [여행을]"
-  }
-]
-
-원본 한국어 문장 목록:
+원본 한국어 문장 목록 (총 {{COUNT}}개):
 {{BATCH}}`;
         if(type==='reference_generate'&&promptId==='dialogue')return `You are an expert English dialogue writer and English-Korean translator.
 Create a continuous, natural everyday conversation between 2 people based on this topic: "{{TOPIC}}"
@@ -8312,81 +8314,118 @@ ${JSON.stringify(finalPayload)}`;
     async function mtTypedSelfGenerate(slotIndex) {
         const state=mtGetTypedState(slotIndex);
         if(state.type!=='self_generate'||!state.fileName)return;
-        const start=Number(state.nextSourceIndex||0);
-        if(start>=state.sourceRows.length)return;
 
         const settings=mtGetGeneratorSettings('self_generate');
-        const batch=state.sourceRows.slice(start,Math.min(start+settings.batchSize,state.sourceRows.length));
+        const sourceRows=Array.isArray(state.sourceRows)?state.sourceRows:[];
+        if(!sourceRows.length)return;
+        if(!Array.isArray(state.retryRows)) state.retryRows=[];
+
+        // 실패했던 행을 먼저 재시도하고, 부족한 만큼 새 원문을 추가합니다.
+        const retryItems=state.retryRows
+            .map(x=>({sourceIndex:Number(x?.sourceIndex),korean:String(x?.korean??'').trim()}))
+            .filter(x=>Number.isInteger(x.sourceIndex)&&x.sourceIndex>=0&&x.korean);
+        const retryTake=retryItems.slice(0,settings.batchSize);
+        const freshCapacity=Math.max(0,settings.batchSize-retryTake.length);
+        const freshStart=Number(state.nextSourceIndex||0);
+        const freshRows=[];
+        for(let i=0;i<sourceRows.length&&freshRows.length<freshCapacity;i++){
+            const idx=freshStart+i;
+            if(idx>=sourceRows.length)break;
+            freshRows.push({sourceIndex:idx,korean:String(sourceRows[idx]??'').trim()});
+        }
+        const work=[...retryTake,...freshRows].filter(x=>x.korean);
+        if(!work.length)return;
+
+        const batch=work.map(x=>x.korean);
         const prompt=mtApplyGeneratorPrompt(
             mtGetGeneratorPrompt('self_generate','main',mtGeneratorPromptDefault('self_generate','self_generate','main'),'self_generate'),
-            {COUNT:batch.length,BATCH:JSON.stringify(batch.map((k,i)=>({index:i,korean:k})))}
+            {COUNT:batch.length,BATCH:batch.join('\n')}
         ).trim();
 
-        const raw=await fetchGemini(prompt,
-            {
-                type:'ARRAY',
-                minItems:batch.length,
-                maxItems:batch.length,
-                items:{
-                    type:'OBJECT',
-                    properties:{
-                        source_korean:{type:'STRING'},
-                        english:{type:'STRING'},
-                        literal_korean:{type:'STRING'}
-                    },
-                    required:['source_korean','english','literal_korean']
-                }
-            },
+        // 자체형은 JSON Schema를 사용하지 않고 순수 텍스트(TAB 3열)로 생성합니다.
+        const raw=await fetchGemini(
+            prompt,
+            null,
             mtGetGeneratorAiConfig(mtGetGeneratorTypeAiConfig('self_generate'),`typed_${slotIndex}`,'자체형')
         );
+        if(raw==null||String(raw).trim()==='') throw new Error('AI 응답이 비어 있습니다.');
 
-        const arr=Array.isArray(raw)?raw:mtExtractJsonValue(raw);
-        if(!Array.isArray(arr)||arr.length!==batch.length) throw new Error('AI 문장 생성 결과가 정확하지 않습니다.');
+        const lines=String(raw)
+            .replace(/^```(?:text|tsv)?\s*/i,'')
+            .replace(/\s*```$/i,'')
+            .split(/\r?\n/)
+            .map(v=>v.trim())
+            .filter(Boolean);
 
-        const normalize=v=>String(v??'').normalize('NFC').replace(/\\s+/g,' ').trim();
-        const koreanChunkList=v=>{
-            const text=String(v??'').trim();
-            const chunks=text.match(/\\[[^\\[\\]]+\\]/g)||[];
-            if(!text||chunks.length<2||chunks.length>8)return false;
-            if(text.replace(/\\[[^\\[\\]]+\\]/g,'').trim()!=='')return false;
-            return chunks.every(c=>{const inside=c.slice(1,-1).trim();return inside&&/[가-힣]/.test(inside)&&!/[A-Za-z]/.test(inside);});
-        };
-
-        const normalized=arr.map((x,i)=>({
-            index:Number.isInteger(Number(x?.index))?Number(x.index):i,
-            source_korean:String(x?.source_korean??''),
-            english:String(x?.english??'').trim(),
-            literal_korean:String(x?.literal_korean??'').trim()
-        })).sort((a,b)=>a.index-b.index);
-
-        normalized.forEach((x,i)=>{
-            if(normalize(x.source_korean)!==normalize(batch[i])) throw new Error(`${i+1}번째 source_korean이 원본과 일치하지 않습니다.`);
-            if(x.english.length<2) throw new Error(`${i+1}번째 영어 문장이 비어 있습니다.`);
-            if(!koreanChunkList(x.literal_korean)) throw new Error(`${i+1}번째 literal_korean 형식이 올바르지 않습니다.`);
+        const parsed=lines.map(line=>{
+            const cols=line.split('\t');
+            return {
+                source_korean:String(cols[0]??'').trim(),
+                english:String(cols[1]??'').trim(),
+                literal_korean:String(cols.slice(2).join('\t')??'').trim()
+            };
         });
 
-        const p=state.pattern || {sourceKorCol:1,engCol:2,mainKorCol:3,subKorCol:4,serialCol:5};
-        state.pattern={sourceKorCol:1,engCol:2,mainKorCol:3,subKorCol:4,serialCol:5,...p};
-        const current=mtTypedSerialNext(state);
-        normalized.forEach((x,i)=>{
-            const row=Array(Math.max(state.pattern.sourceKorCol,state.pattern.engCol,state.pattern.mainKorCol,state.pattern.subKorCol,state.pattern.serialCol)).fill('');
-            // source_korean = 주문장(원본 문장), literal_korean = 보조문장(영어 어순 직독직해)
-            row[state.pattern.sourceKorCol-1]=x.source_korean;
-            row[state.pattern.engCol-1]=x.english;
-            row[state.pattern.mainKorCol-1]=x.source_korean;
-            row[state.pattern.subKorCol-1]=x.literal_korean;
-            row[state.pattern.serialCol-1]=String(current+i);
+        const normalize=v=>String(v??'').normalize('NFC').replace(/\s+/g,' ').trim();
+        const koreanChunkList=v=>{
+            const text=String(v??'').trim();
+            const chunks=text.match(/\[[^\[\]]+\]/g)||[];
+            if(!text||chunks.length<1||chunks.length>12)return false;
+            // 대괄호 청크 외부의 설명은 허용하지 않되, 앞뒤 공백/일반 문장부호만 무시합니다.
+            const outside=text.replace(/\[[^\[\]]+\]/g,'').replace(/[\s.,!?;:·]+/g,'');
+            if(outside!=='')return false;
+            return chunks.every(c=>{
+                const inside=c.slice(1,-1).trim();
+                return inside&&/[가-힣]/.test(inside);
+            });
+        };
+
+        // 행 단위로 검증: 정상 행은 즉시 저장하고 실패 행만 retryRows로 넘깁니다.
+        const accepted=[];
+        const failed=[];
+        for(let i=0;i<work.length;i++){
+            const item=parsed[i];
+            const original=work[i].korean;
+            if(!item){ failed.push({sourceIndex:work[i].sourceIndex,korean:original,reason:'빈 행'}); continue; }
+            if(normalize(item.source_korean)!==normalize(original)){
+                failed.push({sourceIndex:work[i].sourceIndex,korean:original,reason:'원문 불일치'}); continue;
+            }
+            if(item.english.length<2){
+                failed.push({sourceIndex:work[i].sourceIndex,korean:original,reason:'영어 문장 비어 있음'}); continue;
+            }
+            if(!koreanChunkList(item.literal_korean)){
+                failed.push({sourceIndex:work[i].sourceIndex,korean:original,reason:'직독직해 형식 오류'}); continue;
+            }
+            accepted.push({...item,sourceIndex:work[i].sourceIndex});
+        }
+
+        const p={sourceKorCol:1,engCol:2,mainKorCol:1,subKorCol:3,serialCol:4};
+        state.pattern={...(state.pattern||{}),...p};
+        let current=mtTypedSerialNext(state);
+        accepted.forEach((x,i)=>{
+            const row=Array(4).fill('');
+            row[0]=x.source_korean; // 1열 주문장
+            row[1]=x.english;       // 2열 영어문장
+            row[2]=x.literal_korean; // 3열 보조문장
+            row[3]=String(current+i);
             state.outputRows.push(row);
         });
 
-        state.nextSourceIndex=start+batch.length;
+        const retryKey=new Set(failed.map(x=>`${x.sourceIndex}::${x.korean}`));
+        const remainingRetry=retryItems.slice(retryTake.length).filter(x=>!retryKey.has(`${x.sourceIndex}::${x.korean}`));
+        state.retryRows=[...remainingRetry,...failed];
+        // 새 원문은 이번 실행에서 모두 소비 대상으로 이동. 실패한 것은 retryRows가 다음 배치에서 우선 재시도합니다.
+        state.nextSourceIndex=Math.min(sourceRows.length,freshStart+freshRows.length);
         state.lastRun=Date.now();
         state.nextRun=Date.now()+mtGetGeneratorTypeIntervalMs(state.type);
-        state.lastError='';
+        state.lastError=failed.length
+            ? `${accepted.length}개 저장, ${failed.length}개는 다음 자동 실행에서 재시도합니다.`
+            : '';
         state.lastDiagnostic=null;
         mtSaveTypedState(slotIndex,state);
         mtInitSlots();
     }
+
     async function mtTypedReferenceGenerate(slotIndex) {
         const state=mtGetTypedState(slotIndex); if(state.type!=='reference_generate'||!state.fileName||!state.topics.length)return;
         const topic=state.topics[Math.floor(Math.random()*state.topics.length)].topic;
