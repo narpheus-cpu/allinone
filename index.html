@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v93</title>
+    <title>올인원 영작-단어장 시스템 · v94</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -25,7 +25,7 @@
             --novel-font-size: 15px;
             --voca-font-size: 15px;
 
-            /* 타이핑 to 언마스크 폰트 및 레이아웃 변수 */
+            /* 언마스킹 영작 폰트 및 레이아웃 변수 */
             --mt-kor-size: 26px;
             --mt-paren-size: 16px;
             --mt-eng-box-size: 22px;
@@ -367,7 +367,7 @@
         }
 
         /* ========================================== */
-        /* 타이핑 to 언마스크 뷰 전용 스타일 */
+        /* 언마스킹 영작 뷰 전용 스타일 */
         /* ========================================== */
         .mt-slots-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px; }
         .mt-slot { border: 2px dashed #ccc; border-radius: 8px; padding: 20px; cursor: pointer; transition: all 0.2s; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 80px; background: white; position: relative;}
@@ -1034,7 +1034,7 @@
             transform: translateY(-1px);
         }
 
-        /* 타이핑 to 언마스크 슬롯 대시보드 */
+        /* 언마스킹 영작 슬롯 대시보드 */
         .mt-slots-grid {
             grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
             gap: 12px;
@@ -2538,7 +2538,7 @@ body { background: var(--bench-v2-bg) !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v93</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v94</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -2573,7 +2573,7 @@ body { background: var(--bench-v2-bg) !important; }
 
     <!-- 메인 탭 메뉴 -->
     <div class="tabs">
-        <button class="tab-btn active" onclick="switchMainTab('maskingTypingTab')">타이핑 to 언마스크</button>
+        <button class="tab-btn active" onclick="switchMainTab('maskingTypingTab')">언마스킹 영작</button>
         <button class="tab-btn" onclick="switchMainTab('vocaTab')">단어장</button>
         <button class="tab-btn" onclick="switchMainTab('quizTab')">라운드퀴즈</button>
         <button class="tab-btn" onclick="switchMainTab('boardTab')">게시판</button>
@@ -2821,7 +2821,7 @@ body { background: var(--bench-v2-bg) !important; }
     </div>
 
     <!-- ========================================== -->
-    <!-- 4. 타이핑 to 언마스크 탭 -->
+    <!-- 4. 언마스킹 영작 탭 -->
     <!-- ========================================== -->
     <div id="maskingTypingTab" class="tab-content active">
         <!-- 메인 화면 -->
@@ -2830,7 +2830,7 @@ body { background: var(--bench-v2-bg) !important; }
             <input type="file" id="mtFileUpload" style="display:none;" accept=".xlsx, .xls, .txt" />
         </div>
 
-        <!-- 타이핑 to 언마스크 상세 통계 모달 -->
+        <!-- 언마스킹 영작 상세 통계 모달 -->
         
         <div id="mtSlotTypeModal" class="modal-overlay" style="display:none;">
             <div class="modal-card mt-type-modal-card">
@@ -2984,7 +2984,7 @@ body { background: var(--bench-v2-bg) !important; }
             <div class="modal-card" style="width:min(960px, 94vw); max-height:88vh; overflow:auto; text-align:left; padding:22px;">
                 <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:14px;">
                     <div>
-                        <h3 style="margin:0 0 4px;">타이핑 to 언마스크 상세통계</h3>
+                        <h3 style="margin:0 0 4px;">언마스킹 영작 상세통계</h3>
                         <div id="mtStatsSummaryLine" style="font-size:12px; color:#6b7280;"></div>
                     </div>
                     <button class="btn-excel" type="button" onclick="mtCloseStatsModal()">닫기</button>
@@ -3285,7 +3285,7 @@ body { background: var(--bench-v2-bg) !important; }
                 <button class="btn-excel" style="padding: 10px 24px; font-size: 13px;" onclick="mtNextWordFromButton()">다음 카드</button>
             </div>
 
-            <!-- AI 도움 편집기 (타이핑 to 언마스크 탭) -->
+            <!-- AI 도움 편집기 (언마스킹 영작 탭) -->
             <div id="aiPromptEditArea_mt" class="ai-prompt-edit-box" style="position: relative; width: 100%; max-width: 500px; margin: 0 auto 15px auto;">
                 <span class="prompt-help-text">※ {메인한국어}, {서브한국어}, {영어} 태그는 현재 카드의 한국어 주문장, 한국어 직독직해 청크, 영어문장으로 치환됩니다.</span>
                 <textarea id="aiPromptTextarea_mt"></textarea>
@@ -3581,10 +3581,10 @@ body { background: var(--bench-v2-bg) !important; }
 - 해당 답안이 해당 한국어에 대한 올바른 구어체 영작으로 볼 수 있는지만 판단할 것
 - 문장부호, 대소문자 사용법은 깡그리 무시하고 아예 언급자체를 절대하지 말 것.`;
 
-    // 2. 타이핑 to 언마스크(MT) 탭 기본 템플릿
+    // 2. 언마스킹 영작(MT) 탭 기본 템플릿
     const defaultPromptMT = `[{메인한국어}], [{서브한국어}], [{영어}] 에서의 영어문장과 비슷한 표현을 알려주고, 각각의 뉘앙스가 어떠한 차이가 있는지 알려줘`;
 
-    // 2-1. 타이핑 to 언마스크(MT) 탭 [자유 입력] AI채점 템플릿
+    // 2-1. 언마스킹 영작(MT) 탭 [자유 입력] AI채점 템플릿
     const defaultPromptMtGrade = `'{한국어}'에 대한 영어 번역인 '{자유입력}'이(가) 올바른 지 채점해줘
 
 [출력 형식]
@@ -4838,7 +4838,7 @@ Process the Original Korean sentence and return ONLY a valid JSON object matchin
         alert(`단어장에 성공적으로 추가되었습니다:\n[${eng}] : ${mean}`);
     }
 
-    // 타이핑 to 언마스크(MT) 탭 전용 [원키 단어장에 추가] (영작하기 탭 기능과 동일한 구조)
+    // 언마스킹 영작(MT) 탭 전용 [원키 단어장에 추가] (영작하기 탭 기능과 동일한 구조)
     function mtQuickAddVocaDirect() {
         const eng = document.getElementById('mtQuickEngInput').value.trim();
         let mean = document.getElementById('mtQuickMeanInput').value.trim();
@@ -5351,7 +5351,7 @@ Rules:
 
 
     /* ========================================== */
-    /* 4. 타이핑 to 언마스크 기능 관리             */
+    /* 4. 언마스킹 영작 기능 관리             */
     /* ========================================== */
     let mtCurrentUploadedFileName = ""; 
     let mtActiveSlotIndex = null;
@@ -5415,12 +5415,12 @@ Rules:
         return Number.isFinite(value) && value >= 1 ? Math.floor(value) : fallback;
     }
 
-    // 타이핑 to 언마스크 영구 통계
+    // 언마스킹 영작 영구 통계
     const MT_STATS_STORAGE_KEY = 'typing_unmask_stats_v1';
     let mtCardCompletionRecorded = false;
     let mtCardSuccessCountRecorded = false;
 
-    // 타이핑 to 언마스크 전용 글꼴/레이아웃 상태
+    // 언마스킹 영작 전용 글꼴/레이아웃 상태
     // CSS 기본값과 동일한 값을 사용하고, 이전 저장값이 있으면 복원합니다.
     const MT_FONT_DEFAULTS = Object.freeze({
         kor: 26,
@@ -10357,7 +10357,7 @@ ${JSON.stringify(finalPayload)}`;
             await loadFromDatabase();
             renderBoardList();
 
-            // 타이핑 to 언마스크 초기화 (슬롯 불러오기 연동)
+            // 언마스킹 영작 초기화 (슬롯 불러오기 연동)
             mtApplyFontSettings();
             await mtInitNormalSlotCache();
             await mtInitTypedSlotStateCache();
@@ -10382,14 +10382,14 @@ ${JSON.stringify(finalPayload)}`;
   function goHomeFromTitle(){
     try {
       // 여기서 말하는 메인화면은 전체 앱의 첫 화면이 아니라
-      // [타이핑 to 언마스크] 탭의 슬롯 목록 화면입니다.
+      // [언마스킹 영작] 탭의 슬롯 목록 화면입니다.
       const typingTab = document.getElementById('maskingTypingTab');
       const mainMenu = document.getElementById('mt-main-menu');
       const flash = document.getElementById('mt-flashcard');
       const ebook = document.getElementById('mtEbookViewer');
       const backdrop = document.getElementById('mtEbookModalBackdrop');
 
-      // 다른 탭에서 눌러도 반드시 [타이핑 to 언마스크] 탭으로 이동
+      // 다른 탭에서 눌러도 반드시 [언마스킹 영작] 탭으로 이동
       document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
       document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
       if (typingTab) typingTab.classList.add('active');
@@ -10418,7 +10418,7 @@ ${JSON.stringify(finalPayload)}`;
       // 슬롯 목록을 최신 상태로 다시 그립니다.
       if (typeof mtInitSlots === 'function') mtInitSlots();
     } catch (e) {
-      console.error('타이핑 to 언마스크 메인화면 이동 오류:', e);
+      console.error('언마스킹 영작 메인화면 이동 오류:', e);
     }
   }
   document.addEventListener('DOMContentLoaded', function(){
@@ -10543,7 +10543,7 @@ ${JSON.stringify(finalPayload)}`;
   (function syncAppVersionFromFileName(){
     // 파일을 다른 이름으로 저장하거나 브라우저가 경로를 변환해도, 기본 표시가
     // 사라지지 않게 한다. 정상 파일명에서는 아래 값이 자동으로 새 번호로 대체된다.
-    const fallbackVersion='v93';
+    const fallbackVersion='v94';
     let fileName='';
     try{fileName=decodeURIComponent(String(location.pathname||'').split('/').pop()||'');}
     catch(_){fileName=String(location.pathname||'').split('/').pop()||'';}
@@ -10709,5 +10709,24 @@ ${JSON.stringify(finalPayload)}`;
   min-height:24px !important;
   box-sizing:border-box !important;
   align-self:center !important;
+}
+</style>
+<style id="v94-slot-badge-right-alignment">
+/* 슬롯 숫자만 왼쪽에 두고, 유형·별표 카운트 뱃지는 하나의 오른쪽 묶음으로 정렬합니다. */
+.mt-slot.mt-type-normal .mt-slot-stat-row > div:first-child,
+.mt-slot.mt-type-ebook .mt-slot-stat-row > div:first-child,
+.mt-slot.mt-type-self_generate .mt-slot-stat-row > div:first-child,
+.mt-slot.mt-type-reference_generate .mt-slot-stat-row > div:first-child {
+  margin-right:auto !important;
+}
+.mt-slot.mt-type-normal .mt-slot-stat-row > .mt-slot-type-line,
+.mt-slot.mt-type-ebook .mt-slot-stat-row > .mt-slot-type-line {
+  margin-left:0 !important;
+  justify-content:flex-end !important;
+}
+.mt-slot.mt-type-self_generate .mt-slot-type-tools,
+.mt-slot.mt-type-reference_generate .mt-slot-type-tools {
+  margin-left:auto !important;
+  justify-content:flex-end !important;
 }
 </style>
