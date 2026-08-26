@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v97</title>
+    <title>올인원 영작-단어장 시스템 · v98</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -2542,7 +2542,7 @@ body { background: var(--bench-v2-bg) !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v97</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v98</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -3204,8 +3204,8 @@ body { background: var(--bench-v2-bg) !important; }
                 <div><div style="display:flex;align-items:center;gap:6px;"><div class="mt-ebook-title" id="mtEbookViewerTitle">전자책</div><button type="button" class="mt-ebook-title-edit-btn" onclick="mtRenameEbookViewerTitle()" title="슬롯 제목 수정" aria-label="슬롯 제목 수정">✎</button></div><div class="mt-ebook-subtitle" id="mtEbookViewerSubtitle"></div></div>
                 <div style="display:flex;align-items:center;gap:6px;">
                     <button id="mtEbookEnglishToggleBtn" type="button" class="btn-excel" onclick="mtToggleEbookEnglishMode()">영어변환</button>
-                    <label class="mt-ebook-font-control" title="전자책 목록 글꼴 크기"><span>글꼴</span><input id="mtEbookListFontSizeInput" type="number" min="10" max="36" value="18" inputmode="numeric" oninput="mtSetEbookListFont(this.value)"><span>px</span></label>
-                    <label class="mt-ebook-font-control" title="전자책 목록 행의 상하 여백"><span>행 여백</span><input id="mtEbookListRowPaddingInput" type="number" min="0" max="40" value="12" inputmode="numeric" oninput="mtSetEbookListRowPadding(this.value)"><span>px</span></label>
+                    <label class="mt-ebook-font-control" title="전자책 목록 글꼴 크기"><span>글꼴</span><input class="mt-list-font-size-input" type="number" min="10" max="36" value="18" inputmode="numeric" oninput="window.mtApplyListAppearanceFromControl(this)"><span>px</span></label>
+                    <label class="mt-ebook-font-control" title="전자책 목록 행의 상하 여백"><span>행 여백</span><input class="mt-list-row-padding-input" type="number" min="0" max="40" value="12" inputmode="numeric" oninput="window.mtApplyListAppearanceFromControl(this)"><span>px</span></label>
                     <button class="btn-excel" onclick="mtCloseEbookViewer()">← 슬롯 목록</button>
                 </div>
             </div>
@@ -10515,7 +10515,7 @@ ${JSON.stringify(finalPayload)}`;
 <div id="mtGeneratorListModal" class="modal-overlay" style="display:none;z-index:6400;">
   <div class="modal-card" style="width:min(1100px,96vw);max-height:90vh;overflow:hidden;text-align:left;">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div><div id="mtGeneratorListTitle" style="font-size:16px;font-weight:800;color:#111827;">생성 목록</div><div id="mtGeneratorListSubtitle" style="font-size:11px;color:#64748b;margin-top:3px;"></div></div><button class="btn-excel" onclick="mtCloseGeneratorList()">닫기</button></div>
-    <div class="mt-generator-toolbar" style="margin-top:10px;"><div class="mt-generator-toolbar-left"><button class="btn-excel" onclick="mtToggleGeneratorListSelectAll()">페이지 전체 선택</button><span id="mtGeneratorListSelectedCount" style="font-size:10px;font-weight:700;color:#64748b;">0개 선택</span></div><div class="mt-generator-toolbar-right"><button class="btn-danger" onclick="mtDeleteSelectedGeneratorRows()">선택 삭제</button></div></div>
+    <div class="mt-generator-toolbar" style="margin-top:10px;"><div class="mt-generator-toolbar-left"><button class="btn-excel" onclick="mtToggleGeneratorListSelectAll()">페이지 전체 선택</button><span id="mtGeneratorListSelectedCount" style="font-size:10px;font-weight:700;color:#64748b;">0개 선택</span></div><div class="mt-generator-toolbar-right"><label class="mt-ebook-font-control" title="목록 글꼴 크기"><span>글꼴</span><input class="mt-list-font-size-input" type="number" min="10" max="36" value="18" inputmode="numeric" oninput="window.mtApplyListAppearanceFromControl(this)"><span>px</span></label><label class="mt-ebook-font-control" title="목록 행의 상하 여백"><span>행 여백</span><input class="mt-list-row-padding-input" type="number" min="0" max="40" value="7" inputmode="numeric" oninput="window.mtApplyListAppearanceFromControl(this)"><span>px</span></label><button class="btn-danger" onclick="mtDeleteSelectedGeneratorRows()">선택 삭제</button></div></div>
     <div id="mtGeneratorListBody" class="mt-generator-list-body"></div>
     <div id="mtGeneratorListPagination" style="display:flex;justify-content:center;align-items:center;gap:8px;padding-top:10px;"></div>
   </div>
@@ -10609,7 +10609,7 @@ ${JSON.stringify(finalPayload)}`;
   (function syncAppVersionFromFileName(){
     // 파일을 다른 이름으로 저장하거나 브라우저가 경로를 변환해도, 기본 표시가
     // 사라지지 않게 한다. 정상 파일명에서는 아래 값이 자동으로 새 번호로 대체된다.
-    const fallbackVersion='v97';
+    const fallbackVersion='v98';
     let fileName='';
     try{fileName=decodeURIComponent(String(location.pathname||'').split('/').pop()||'');}
     catch(_){fileName=String(location.pathname||'').split('/').pop()||'';}
@@ -10796,3 +10796,60 @@ ${JSON.stringify(finalPayload)}`;
   justify-content:flex-end !important;
 }
 </style>
+<style id="v98-list-appearance-controls">
+/* 마지막에 선언해 기존 테마의 규칙보다 우선하도록 고정합니다. */
+:root { --mt-list-font-size:18px; --mt-list-row-padding:12px; }
+#mtEbookList .mt-ebook-item-main { font-size:var(--mt-list-font-size) !important; }
+#mtEbookList .mt-ebook-item { padding-top:var(--mt-list-row-padding) !important; padding-bottom:var(--mt-list-row-padding) !important; }
+#mtGeneratorListBody .mt-generator-list-text { font-size:var(--mt-list-font-size) !important; }
+#mtGeneratorListBody .mt-generator-list-row { padding-top:var(--mt-list-row-padding) !important; padding-bottom:var(--mt-list-row-padding) !important; }
+</style>
+<script id="v98-list-appearance-controls-script">
+/* 목록을 새로 그린 뒤에도 유지되는 공통 목록 표시 설정입니다. */
+(function(){
+  const FONT_KEY='mt_list_appearance_font_px_v98';
+  const PAD_KEY='mt_list_appearance_padding_px_v98';
+  const clamp=(value,min,max,fallback)=>{
+    const n=Number(value);
+    return Number.isFinite(n) ? Math.min(max,Math.max(min,n)) : fallback;
+  };
+  const read=()=>({
+    font:clamp(localStorage.getItem(FONT_KEY),10,36,18),
+    padding:clamp(localStorage.getItem(PAD_KEY),0,40,12)
+  });
+  const apply=(settings=read())=>{
+    document.documentElement.style.setProperty('--mt-list-font-size',settings.font+'px');
+    document.documentElement.style.setProperty('--mt-list-row-padding',settings.padding+'px');
+    document.querySelectorAll('.mt-list-font-size-input').forEach(input=>{
+      if(document.activeElement!==input) input.value=settings.font;
+    });
+    document.querySelectorAll('.mt-list-row-padding-input').forEach(input=>{
+      if(document.activeElement!==input) input.value=settings.padding;
+    });
+    // 기존에 이미 표시 중인 행도 우선순위와 무관하게 즉시 변경합니다.
+    document.querySelectorAll('#mtEbookList .mt-ebook-item-main, #mtGeneratorListBody .mt-generator-list-text').forEach(el=>el.style.setProperty('font-size',settings.font+'px','important'));
+    document.querySelectorAll('#mtEbookList .mt-ebook-item, #mtGeneratorListBody .mt-generator-list-row').forEach(el=>{
+      el.style.setProperty('padding-top',settings.padding+'px','important');
+      el.style.setProperty('padding-bottom',settings.padding+'px','important');
+    });
+  };
+  window.mtApplyListAppearanceFromControl=function(input){
+    const current=read();
+    const isFont=input.classList.contains('mt-list-font-size-input');
+    const settings=isFont
+      ? {font:clamp(input.value,10,36,current.font),padding:current.padding}
+      : {font:current.font,padding:clamp(input.value,0,40,current.padding)};
+    localStorage.setItem(FONT_KEY,String(settings.font));
+    localStorage.setItem(PAD_KEY,String(settings.padding));
+    apply(settings);
+  };
+  // inline 이벤트가 막히거나 이름 충돌이 나더라도, 입력 이벤트 자체를 받아 적용합니다.
+  document.addEventListener('input',event=>{
+    const input=event.target;
+    if(input instanceof HTMLInputElement && (input.classList.contains('mt-list-font-size-input') || input.classList.contains('mt-list-row-padding-input'))){
+      window.mtApplyListAppearanceFromControl(input);
+    }
+  });
+  apply();
+})();
+</script>
