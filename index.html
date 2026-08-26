@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v95</title>
+    <title>올인원 영작-단어장 시스템 · v96</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -24,6 +24,7 @@
             --accent-green: #16a34a;
             --novel-font-size: 15px;
             --voca-font-size: 15px;
+            --mt-ebook-list-font-size: 18px;
 
             /* 언마스킹 영작 폰트 및 레이아웃 변수 */
             --mt-kor-size: 26px;
@@ -405,6 +406,8 @@
         .mt-ebook-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:20px; }
         .mt-ebook-title { font-size:20px; font-weight:800; color:#111827; }
         .mt-ebook-subtitle { font-size:11px; color:#64748b; margin-top:4px; }
+        .mt-ebook-font-control { display:inline-flex; align-items:center; gap:3px; min-height:28px; padding:2px 5px; border:1px solid var(--border-color); border-radius:6px; background:#fff; color:#475569; font-size:10px; font-weight:700; box-sizing:border-box; }
+        .mt-ebook-font-control input { width:36px; padding:1px 2px; border:0; outline:0; background:transparent; color:#111827; text-align:center; font:inherit; font-size:11px; font-weight:800; }
         .mt-ebook-list { max-width:900px; margin:0 auto; }
         .mt-ebook-list-toolbar { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:0 auto 10px; max-width:900px; padding:8px 10px; border:1px solid #e2e8f0; border-radius:9px; background:#f8fafc; flex-wrap:wrap; }
         .mt-ebook-list-toolbar-left, .mt-ebook-list-toolbar-right { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
@@ -416,12 +419,12 @@
         .mt-ebook-item-inner { display:flex; align-items:flex-start; min-width:0; flex:1; }
         .mt-ebook-item-main-wrap { min-width:0; flex:1; }
 
-        .mt-ebook-item { padding:16px 4px; border-bottom:1px solid #e5e7eb; cursor:pointer; transition:background .15s,color .15s; }
+        .mt-ebook-item { padding:12px 4px; border-bottom:1px solid #e5e7eb; cursor:pointer; transition:background .15s,color .15s; }
         .mt-ebook-item:hover { background:#f8fafc; }
         .mt-ebook-item.read { color:#b0b6bf; }
         .mt-ebook-item.read .mt-ebook-item-main { color:#a6adb7; }
         .mt-ebook-item-num { display:inline-block; width:34px; color:#94a3b8; font-size:11px; vertical-align:top; padding-top:2px; }
-        .mt-ebook-item-main { display:inline; font-size:18px; line-height:1.7; font-weight:600; color:#111827; }
+        .mt-ebook-item-main { display:inline; font-size:var(--mt-ebook-list-font-size); line-height:1.7; font-weight:600; color:#111827; }
         .mt-ebook-item-edit-btn {
             display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px;
             margin-right:8px; border:1px solid #e2e8f0; border-radius:7px; background:#fff;
@@ -2455,7 +2458,7 @@ body { background: var(--bench-v2-bg) !important; }
 .mt-generator-grid input,.mt-generator-grid select,.mt-generator-grid textarea{width:100%;box-sizing:border-box;padding:7px 8px;border:1px solid #cbd5e1;border-radius:7px;font-size:11px}
 .mt-generator-grid textarea{min-height:220px;resize:vertical;line-height:1.45}
 .mt-generator-list-body{max-height:62vh;overflow:auto;border-top:1px solid #e5e7eb}
-.mt-generator-list-row{display:grid;grid-template-columns:28px 44px minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);gap:7px;padding:9px 8px;border-bottom:1px solid #eef2f7;align-items:start}
+.mt-generator-list-row{display:grid;grid-template-columns:28px 44px minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);gap:7px;padding:6.75px 8px;border-bottom:1px solid #eef2f7;align-items:start}
 .mt-generator-list-row:hover{background:#f8fafc}
 .mt-generator-list-num{font-size:10px;font-weight:800;color:#64748b;text-align:center}
 .mt-generator-list-text{font-size:11px;line-height:1.45;word-break:break-word;color:#111827;cursor:pointer}
@@ -2538,7 +2541,7 @@ body { background: var(--bench-v2-bg) !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v95</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v96</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -3200,6 +3203,7 @@ body { background: var(--bench-v2-bg) !important; }
                 <div><div style="display:flex;align-items:center;gap:6px;"><div class="mt-ebook-title" id="mtEbookViewerTitle">전자책</div><button type="button" class="mt-ebook-title-edit-btn" onclick="mtRenameEbookViewerTitle()" title="슬롯 제목 수정" aria-label="슬롯 제목 수정">✎</button></div><div class="mt-ebook-subtitle" id="mtEbookViewerSubtitle"></div></div>
                 <div style="display:flex;align-items:center;gap:6px;">
                     <button id="mtEbookEnglishToggleBtn" type="button" class="btn-excel" onclick="mtToggleEbookEnglishMode()">영어변환</button>
+                    <label class="mt-ebook-font-control" title="전자책 목록 글꼴 크기"><span>글꼴</span><input id="mtEbookListFontSizeInput" type="number" min="10" max="36" value="18" inputmode="numeric" onchange="mtSetEbookListFont(this.value)"><span>px</span></label>
                     <button class="btn-excel" onclick="mtCloseEbookViewer()">← 슬롯 목록</button>
                 </div>
             </div>
@@ -3927,14 +3931,18 @@ body { background: var(--bench-v2-bg) !important; }
     const blacklistedModels = new Set();
     let novelFontSize = parseInt(localStorage.getItem('myNovelFontSize')) || 15;
     let vocaFontSize = parseInt(localStorage.getItem('myVocaFontSize')) || 15;
+    let mtEbookListFontSize = parseInt(localStorage.getItem('mtEbookListFontSize')) || 18;
 
     function applyFontSettings() {
         document.documentElement.style.setProperty('--novel-font-size', novelFontSize + 'px');
         document.documentElement.style.setProperty('--voca-font-size', vocaFontSize + 'px');
+        document.documentElement.style.setProperty('--mt-ebook-list-font-size', mtEbookListFontSize + 'px');
         const novelInput = document.getElementById('novelFontSizeInput');
         if (novelInput) novelInput.value = novelFontSize;
         const vocaInput = document.getElementById('vocaFontSizeInput');
         if (vocaInput) vocaInput.value = vocaFontSize;
+        const ebookInput = document.getElementById('mtEbookListFontSizeInput');
+        if (ebookInput) ebookInput.value = mtEbookListFontSize;
     }
 
     function adjustNovelFont(delta) {
@@ -3947,6 +3955,13 @@ body { background: var(--bench-v2-bg) !important; }
         if (isNaN(size)) size = 15;
         novelFontSize = Math.max(10, Math.min(30, size));
         localStorage.setItem('myNovelFontSize', novelFontSize);
+        applyFontSettings();
+    }
+    function mtSetEbookListFont(val) {
+        let size = parseInt(val, 10);
+        if (isNaN(size)) size = 18;
+        mtEbookListFontSize = Math.max(10, Math.min(36, size));
+        localStorage.setItem('mtEbookListFontSize', mtEbookListFontSize);
         applyFontSettings();
     }
     function adjustVocaFont(delta) {
@@ -10558,7 +10573,7 @@ ${JSON.stringify(finalPayload)}`;
   (function syncAppVersionFromFileName(){
     // 파일을 다른 이름으로 저장하거나 브라우저가 경로를 변환해도, 기본 표시가
     // 사라지지 않게 한다. 정상 파일명에서는 아래 값이 자동으로 새 번호로 대체된다.
-    const fallbackVersion='v95';
+    const fallbackVersion='v96';
     let fileName='';
     try{fileName=decodeURIComponent(String(location.pathname||'').split('/').pop()||'');}
     catch(_){fileName=String(location.pathname||'').split('/').pop()||'';}
