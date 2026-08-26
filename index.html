@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v101</title>
+    <title>올인원 영작-단어장 시스템 · v102</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -2542,7 +2542,7 @@ body { background: var(--bench-v2-bg) !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v101</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v102</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -3204,8 +3204,8 @@ body { background: var(--bench-v2-bg) !important; }
                 <div><div style="display:flex;align-items:center;gap:6px;"><div class="mt-ebook-title" id="mtEbookViewerTitle">전자책</div><button type="button" class="mt-ebook-title-edit-btn" onclick="mtRenameEbookViewerTitle()" title="슬롯 제목 수정" aria-label="슬롯 제목 수정">✎</button></div><div class="mt-ebook-subtitle" id="mtEbookViewerSubtitle"></div></div>
                 <div style="display:flex;align-items:center;gap:6px;">
                     <button id="mtEbookEnglishToggleBtn" type="button" class="btn-excel" onclick="mtToggleEbookEnglishMode()">영어변환</button>
-                    <label class="mt-ebook-font-control" title="목록 글꼴 크기"><span>글꼴</span><input class="mt-list-font-size-input" type="number" min="10" max="36" value="18" inputmode="numeric" oninput="var n=Math.max(10,Math.min(36,Number(this.value)||10));document.documentElement.style.setProperty('--mt-live-list-font-size',n+'px');document.querySelectorAll('#mtEbookList .mt-ebook-item-main').forEach(function(el){el.style.setProperty('font-size',n+'px','important')});try{localStorage.setItem('mt_live_list_font_px',String(n))}catch(e){}"><span>px</span></label>
-                    <label class="mt-ebook-font-control" title="목록 행의 상하 여백"><span>행 여백</span><input class="mt-list-row-padding-input" type="number" min="0" max="40" value="12" inputmode="numeric" oninput="var n=Number(this.value);if(Number.isFinite(n)){n=Math.max(0,Math.min(40,n));document.documentElement.style.setProperty('--mt-live-list-padding-y',n+'px');document.querySelectorAll('#mtEbookList .mt-ebook-item').forEach(function(el){el.style.setProperty('padding-top',n+'px','important');el.style.setProperty('padding-bottom',n+'px','important')});try{localStorage.setItem('mt_live_list_padding_px',String(n))}catch(e){}}"><span>px</span></label>
+                    <label class="mt-ebook-font-control" title="목록 글꼴 크기"><span>글꼴</span><input class="mt-list-font-size-input" type="number" min="10" max="36" value="18" inputmode="numeric" oninput="var n=Math.max(10,Math.min(36,Number(this.value)||10));document.documentElement.style.setProperty('--mt-live-list-font-size',n+'px');document.querySelectorAll('#mtEbookList .mt-ebook-item-main').forEach(function(el){el.style.setProperty('font-size',n+'px','important')});if(window.mtListUiSave)window.mtListUiSave('font',n)"><span>px</span></label>
+                    <label class="mt-ebook-font-control" title="목록 행의 상하 여백"><span>행 여백</span><input class="mt-list-row-padding-input" type="number" min="0" max="40" value="12" inputmode="numeric" oninput="var n=Number(this.value);if(Number.isFinite(n)){n=Math.max(0,Math.min(40,n));document.documentElement.style.setProperty('--mt-live-list-padding-y',n+'px');document.querySelectorAll('#mtEbookList .mt-ebook-item').forEach(function(el){el.style.setProperty('padding-top',n+'px','important');el.style.setProperty('padding-bottom',n+'px','important')});if(window.mtListUiSave)window.mtListUiSave('padding',n)}"><span>px</span></label>
                     <button class="btn-excel" onclick="mtCloseEbookViewer()">← 슬롯 목록</button>
                 </div>
             </div>
@@ -10609,7 +10609,7 @@ ${JSON.stringify(finalPayload)}`;
   (function syncAppVersionFromFileName(){
     // 파일을 다른 이름으로 저장하거나 브라우저가 경로를 변환해도, 기본 표시가
     // 사라지지 않게 한다. 정상 파일명에서는 아래 값이 자동으로 새 번호로 대체된다.
-    const fallbackVersion='v101';
+    const fallbackVersion='v102';
     let fileName='';
     try{fileName=decodeURIComponent(String(location.pathname||'').split('/').pop()||'');}
     catch(_){fileName=String(location.pathname||'').split('/').pop()||'';}
@@ -10665,7 +10665,7 @@ ${JSON.stringify(finalPayload)}`;
   apply(read());
 })();
 </script>
-<script id="v100-list-appearance-restore">
+<script id="v100-list-appearance-restore-disabled" type="text/plain">
 (function(){
   let font=18, padding=12;
   try {
@@ -10682,6 +10682,109 @@ ${JSON.stringify(finalPayload)}`;
   };
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',syncInputs,{once:true});
   else syncInputs();
+})();
+</script>
+<script id="v102-list-ui-persistence">
+(function(){
+  const FONT_KEY='mt_live_list_font_px';
+  const PADDING_KEY='mt_live_list_padding_px';
+  const DB_NAME='mt_list_ui_settings_db';
+  const STORE_NAME='settings';
+  let state={font:18,padding:12};
+
+  const clamp=(value,min,max,fallback)=>{
+    const n=Number(value);
+    return Number.isFinite(n)?Math.max(min,Math.min(max,n)):fallback;
+  };
+  const getStorage=(name)=>{try{return window[name]||null;}catch(e){return null;}};
+  const localStore=getStorage('localStorage');
+  const sessionStore=getStorage('sessionStorage');
+  const readWebStorage=(storage,key)=>{
+    if(!storage)return null;
+    try {
+      const raw=storage.getItem(key);
+      return raw===null?null:Number(raw);
+    } catch(e) { return null; }
+  };
+  const writeWebStorage=(storage,key,value)=>{
+    if(!storage)return;
+    try { storage.setItem(key,String(value)); } catch(e) {}
+  };
+  const apply=()=>{
+    document.documentElement.style.setProperty('--mt-live-list-font-size',state.font+'px');
+    document.documentElement.style.setProperty('--mt-live-list-padding-y',state.padding+'px');
+    document.querySelectorAll('#mtEbookList .mt-ebook-item-main').forEach(el=>el.style.setProperty('font-size',state.font+'px','important'));
+    document.querySelectorAll('#mtEbookList .mt-ebook-item').forEach(el=>{
+      el.style.setProperty('padding-top',state.padding+'px','important');
+      el.style.setProperty('padding-bottom',state.padding+'px','important');
+    });
+    document.querySelectorAll('.mt-list-font-size-input').forEach(el=>{if(document.activeElement!==el)el.value=state.font;});
+    document.querySelectorAll('.mt-list-row-padding-input').forEach(el=>{if(document.activeElement!==el)el.value=state.padding;});
+  };
+  const openDb=()=>new Promise(resolve=>{
+    if(!window.indexedDB){resolve(null);return;}
+    try {
+      const request=indexedDB.open(DB_NAME,1);
+      request.onupgradeneeded=()=>{
+        const db=request.result;
+        if(!db.objectStoreNames.contains(STORE_NAME))db.createObjectStore(STORE_NAME);
+      };
+      request.onsuccess=()=>resolve(request.result);
+      request.onerror=()=>resolve(null);
+    } catch(e){resolve(null);}
+  });
+  const writeIndexedDb=async()=>{
+    const db=await openDb();
+    if(!db)return;
+    try {
+      const tx=db.transaction(STORE_NAME,'readwrite');
+      tx.objectStore(STORE_NAME).put({font:state.font,padding:state.padding},'appearance');
+      tx.oncomplete=()=>db.close();
+      tx.onerror=()=>db.close();
+    } catch(e){db.close();}
+  };
+  const readIndexedDb=async()=>{
+    const db=await openDb();
+    if(!db)return null;
+    return await new Promise(resolve=>{
+      try {
+        const tx=db.transaction(STORE_NAME,'readonly');
+        const request=tx.objectStore(STORE_NAME).get('appearance');
+        request.onsuccess=()=>{const value=request.result;db.close();resolve(value&&typeof value==='object'?value:null);};
+        request.onerror=()=>{db.close();resolve(null);};
+      } catch(e){db.close();resolve(null);}
+    });
+  };
+  const persist=()=>{
+    writeWebStorage(localStore,FONT_KEY,state.font);
+    writeWebStorage(localStore,PADDING_KEY,state.padding);
+    writeWebStorage(sessionStore,FONT_KEY,state.font);
+    writeWebStorage(sessionStore,PADDING_KEY,state.padding);
+    writeIndexedDb();
+  };
+  window.mtListUiSave=(kind,value)=>{
+    if(kind==='font')state.font=clamp(value,10,36,state.font);
+    if(kind==='padding')state.padding=clamp(value,0,40,state.padding);
+    apply();
+    persist();
+  };
+
+  const localFont=readWebStorage(localStore,FONT_KEY);
+  const localPadding=readWebStorage(localStore,PADDING_KEY);
+  const sessionFont=readWebStorage(sessionStore,FONT_KEY);
+  const sessionPadding=readWebStorage(sessionStore,PADDING_KEY);
+  if(localFont!==null||sessionFont!==null)state.font=clamp(localFont!==null?localFont:sessionFont,10,36,18);
+  if(localPadding!==null||sessionPadding!==null)state.padding=clamp(localPadding!==null?localPadding:sessionPadding,0,40,12);
+  apply();
+
+  readIndexedDb().then(saved=>{
+    // Web Storage에 값이 없을 때만 IndexedDB 백업을 복원합니다.
+    if(saved && localFont===null && sessionFont===null)state.font=clamp(saved.font,10,36,state.font);
+    if(saved && localPadding===null && sessionPadding===null)state.padding=clamp(saved.padding,0,40,state.padding);
+    apply();
+    persist();
+  });
+  window.addEventListener('pagehide',persist);
 })();
 </script>
 </body>
