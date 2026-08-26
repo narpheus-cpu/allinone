@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v102</title>
+    <title>올인원 영작-단어장 시스템 · v103</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -2536,13 +2536,19 @@ body { background: var(--bench-v2-bg) !important; }
   margin-bottom:4px !important;
 }
 </style>
+<style id="v103-board-ebook-visibility-guard">
+/* 게시판이 열려 있는 동안에는 어떤 전자책 뷰어도 화면에 남지 않게 합니다. */
+body:has(#boardTab.active) #maskingTypingTab #mtEbookViewer,
+body:has(#boardTab.active) #maskingTypingTab #mt-flashcard,
+body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
+</style>
 </head>
 <body>
 
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v102</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v103</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -4022,12 +4028,26 @@ body { background: var(--bench-v2-bg) !important; }
         if (container.style.display === 'flex') container.style.display = 'none';
     }
 
+    // 다른 메인 탭으로 이동할 때 전자책/학습 화면은 반드시 닫습니다.
+    // 이전에 열었던 전자책 뷰어가 게시판 아래에 남는 것을 막는 공통 차단기입니다.
+    function mtHideLearningViewsOutsideTypingTab() {
+        ['mtEbookViewer', 'mtEbookModalBackdrop', 'mt-flashcard'].forEach(id => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.style.display = 'none';
+            el.classList.remove('is-open');
+        });
+        mtEbookTypingActive = false;
+        mtEbookActiveSlot = null;
+    }
+
     function switchMainTab(tabId, clickEvent) {
         document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
         document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
         document.getElementById(tabId).classList.add('active');
         const target=clickEvent?.currentTarget || (typeof event!=='undefined' ? event.target : null);
         if(target) target.classList.add('active');
+        if(tabId !== 'maskingTypingTab') mtHideLearningViewsOutsideTypingTab();
         if(tabId === 'quizTab') resetToSetup();
         if(tabId === 'boardTab') {
             // 상세 화면에 머문 채 탭을 다시 열면 빈 화면처럼 보일 수 있어 항상 목록부터 안전하게 표시합니다.
@@ -10609,7 +10629,7 @@ ${JSON.stringify(finalPayload)}`;
   (function syncAppVersionFromFileName(){
     // 파일을 다른 이름으로 저장하거나 브라우저가 경로를 변환해도, 기본 표시가
     // 사라지지 않게 한다. 정상 파일명에서는 아래 값이 자동으로 새 번호로 대체된다.
-    const fallbackVersion='v102';
+    const fallbackVersion='v103';
     let fileName='';
     try{fileName=decodeURIComponent(String(location.pathname||'').split('/').pop()||'');}
     catch(_){fileName=String(location.pathname||'').split('/').pop()||'';}
