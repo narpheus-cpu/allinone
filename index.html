@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v94</title>
+    <title>올인원 영작-단어장 시스템 · v95</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -2538,7 +2538,7 @@ body { background: var(--bench-v2-bg) !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v94</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v95</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -9034,6 +9034,21 @@ ${JSON.stringify(finalPayload)}`;
         }
     }
 
+    // 표시 문장은 그대로 유지하고, 입력 비교에서만 스마트 따옴표와
+    // 키보드로 입력 가능한 일반 따옴표를 서로 같은 문자로 처리합니다.
+    function mtNormalizeTypingPunctuation(value) {
+        return String(value || '')
+            .replace(/[“”„‟＂]/g, '"')
+            .replace(/[‘’‚‛＇]/g, "'")
+            .toLowerCase();
+    }
+    function mtTypingTextMatches(left, right) {
+        return mtNormalizeTypingPunctuation(left) === mtNormalizeTypingPunctuation(right);
+    }
+    function mtTypingCharsMatch(left, right) {
+        return mtNormalizeTypingPunctuation(left) === mtNormalizeTypingPunctuation(right);
+    }
+
     function mtIsCurrentTypedAnswerComplete() {
         const currentWord = mtCurrentStudyWords[mtCurrentIndex];
         if (!currentWord) return false;
@@ -9041,8 +9056,8 @@ ${JSON.stringify(finalPayload)}`;
         const input = document.getElementById('mtEngInput');
         const typed = String(input?.value || '');
         const typingTarget = target.replace(/[.!?,'"。！？]+\s*$/, '');
-        return typed.toLowerCase() === typingTarget.toLowerCase() ||
-               typed.toLowerCase() === target.toLowerCase();
+        return mtTypingTextMatches(typed, typingTarget) ||
+               mtTypingTextMatches(typed, target);
     }
 
     // 전자책에서는 '모든 마스킹이 해제된 상태'를 카드 완료로 봅니다.
@@ -9107,7 +9122,7 @@ ${JSON.stringify(finalPayload)}`;
 
         // 입력으로 문장 전체가 완성된 경우
         const typingTarget = target.replace(/[.!?,'"。！？]+\s*$/, '');
-        if (typed.toLowerCase() === typingTarget.toLowerCase() || typed.toLowerCase() === target.toLowerCase()) return true;
+        if (mtTypingTextMatches(typed, typingTarget) || mtTypingTextMatches(typed, target)) return true;
 
         // 마스킹 대상(영문/숫자) 전체가 직접 입력 또는 힌트 공개되었는지 확인
         for (let i = 0; i < target.length; i++) {
@@ -9533,7 +9548,7 @@ ${JSON.stringify(finalPayload)}`;
         const v=String(typed||'');
         if(!t) return false;
         const typingTarget=t.replace(/[.!?,"'。！？]+\s*$/,'');
-        const complete=v.toLowerCase()===typingTarget.toLowerCase() || v.toLowerCase()===t.toLowerCase();
+        const complete=mtTypingTextMatches(v,typingTarget) || mtTypingTextMatches(v,t);
         if(complete){
             mtCardHadDirectTyping=true;
             mtCompleteCurrentCardIfTyped();
@@ -9550,7 +9565,7 @@ ${JSON.stringify(finalPayload)}`;
         const target=String(current.eng||'');
         const typed=String(input?.value||'');
         const typingTarget=target.replace(/[.!?,"'。！？]+\s*$/,'');
-        const complete=typed.toLowerCase()===typingTarget.toLowerCase() || typed.toLowerCase()===target.toLowerCase();
+        const complete=mtTypingTextMatches(typed,typingTarget) || mtTypingTextMatches(typed,target);
         if(complete){
             mtCardHadDirectTyping=true;
             mtRecordPersistentCardCompletion();
@@ -9570,7 +9585,7 @@ ${JSON.stringify(finalPayload)}`;
             if(!target){ input.value=''; mtRenderMask(''); return; }
             let typed=String(input.value||'');
             let validLength=0;
-            while(validLength<typed.length && validLength<target.length && typed[validLength].toLowerCase()===target[validLength].toLowerCase()) validLength++;
+            while(validLength<typed.length && validLength<target.length && mtTypingCharsMatch(typed[validLength],target[validLength])) validLength++;
             if(validLength!==typed.length) typed=typed.slice(0,validLength);
             input.value=typed;
             if(typed.length>0) mtCardHadDirectTyping=true;
@@ -9595,7 +9610,7 @@ ${JSON.stringify(finalPayload)}`;
                 const current=mtCurrentStudyWords?.[mtCurrentIndex]; if(!current)return;
                 const target=String(current.eng||''), typed=String(input.value||'');
                 const typingTarget=target.replace(/[.!?,"'。！？]+\s*$/,'');
-                const complete=typed.toLowerCase()===typingTarget.toLowerCase() || typed.toLowerCase()===target.toLowerCase() || mtIsCurrentMaskFullyUnmasked();
+                const complete=mtTypingTextMatches(typed,typingTarget) || mtTypingTextMatches(typed,target) || mtIsCurrentMaskFullyUnmasked();
                 if(complete){
                     mtCardHadDirectTyping=true;
                     mtCompleteCurrentCardIfTyped();
@@ -10543,7 +10558,7 @@ ${JSON.stringify(finalPayload)}`;
   (function syncAppVersionFromFileName(){
     // 파일을 다른 이름으로 저장하거나 브라우저가 경로를 변환해도, 기본 표시가
     // 사라지지 않게 한다. 정상 파일명에서는 아래 값이 자동으로 새 번호로 대체된다.
-    const fallbackVersion='v94';
+    const fallbackVersion='v95';
     let fileName='';
     try{fileName=decodeURIComponent(String(location.pathname||'').split('/').pop()||'');}
     catch(_){fileName=String(location.pathname||'').split('/').pop()||'';}
