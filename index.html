@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v103</title>
+    <title>올인원 영작-단어장 시스템 · v104</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -2542,13 +2542,22 @@ body:has(#boardTab.active) #maskingTypingTab #mtEbookViewer,
 body:has(#boardTab.active) #maskingTypingTab #mt-flashcard,
 body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
 </style>
+<style id="v104-star-collection-count">
+/* 모아보기 카드의 숫자는 다른 슬롯의 카드 수와 같은 요소·크기를 사용합니다. */
+#mtSlotsGrid .mt-slot.mt-premium-slot .mt-slot-count {
+  color:#fff !important;
+  background:transparent !important;
+  border:0 !important;
+  padding:0 !important;
+}
+</style>
 </head>
 <body>
 
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v103</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v104</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -6351,6 +6360,13 @@ Rules:
         const all=[];
         for(let i=1;i<=11;i++){
             const type=mtGetSlotType(i);
+            if(type==='ebook'){
+                // 전자책은 별표가 outputRows가 아니라 starredSerials에 저장됩니다.
+                // 목록용 단어 객체에도 starred 값을 넣어 모아보기 집계에서 빠지지 않게 합니다.
+                const words=mtGetEbookWords(i);
+                words.forEach((w,idx)=>{if(w?.starred)all.push({kor:w.kor,eng:w.eng,subKor:w.subKor,starred:true,originalIndex:idx,sourceSlot:i,sourceIndex:idx,serial:w.serial});});
+                continue;
+            }
             if(type==='self_generate'||type==='reference_generate'){
                 const words=mtGetGeneratorWords(i); words.forEach((w,idx)=>{if(w?.starred)all.push({kor:w.kor,eng:w.eng,subKor:w.subKor,starred:true,originalIndex:idx,sourceSlot:i,sourceIndex:idx,serial:w.serial});});
                 continue;
@@ -6659,7 +6675,7 @@ Rules:
 
         // ★ 카드 모아보기는 데이터 슬롯 11개 뒤에 고정.
         const starDiv=document.createElement('div'); starDiv.className='mt-slot mt-premium-slot has-data mt-star-fixed-slot12';
-        starDiv.innerHTML=`<div class="mt-slot-title">★ 모아보기</div><div class="mt-slot-card-count-line"><span class="mt-slot-card-count-badge">${allStarredWords.length}</span><span class="mt-slot-card-count-label"></span></div><div class="mt-slot-desc"></div><div class="mt-slot-actions-row"><button class="btn-download" onclick="event.stopPropagation();mtExportStarred(event)">엑셀로 모아서 내보내기</button></div>`;
+        starDiv.innerHTML=`<div class="mt-slot-title">★ 모아보기</div><div class="mt-slot-stat-row"><div><div class="mt-slot-count">${allStarredWords.length}</div><div class="mt-slot-count-label"></div></div></div><div class="mt-slot-desc"></div><div class="mt-slot-actions-row"><button class="btn-download" onclick="event.stopPropagation();mtExportStarred(event)">엑셀로 모아서 내보내기</button></div>`;
         starDiv.onclick=()=>allStarredWords.length?mtPromptAction('star',{name:'★ 카드 모아보기',words:allStarredWords,isStarSlot:true}):alert('★ 표시된 카드가 없습니다.');
         grid.appendChild(starDiv);
     }
@@ -7601,7 +7617,7 @@ ${JSON.stringify(finalPayload)}`;
         mtCloseEbookColumnModal();mtInitSlots();mtOpenEbookViewer(slot);
     }
 
-    function mtGetEbookWords(slotIndex){ const st=mtRestoreEbookCompletionRecord(slotIndex,mtGetTypedState(slotIndex)); const p=st.pattern||{engCol:1,mainKorCol:2,subKorCol:3,serialCol:4}; const read=new Set((st.ebookReadIndexes||[]).map(Number)); return (st.outputRows||[]).map((r,i)=>({eng:String(r?.[p.engCol-1]??'').trim(),kor:String(r?.[p.mainKorCol-1]??'').trim(),subKor:String(r?.[p.subKorCol-1]??'').trim(),serial:String(r?.[p.serialCol-1]??(i+1)).trim(),originalIndex:i,ebookRead:read.has(i)})).filter(w=>w.kor&&w.eng); }
+    function mtGetEbookWords(slotIndex){ const st=mtRestoreEbookCompletionRecord(slotIndex,mtGetTypedState(slotIndex)); const p=st.pattern||{engCol:1,mainKorCol:2,subKorCol:3,serialCol:4}; const read=new Set((st.ebookReadIndexes||[]).map(Number)); const stars=new Set((st.starredSerials||[]).map(String)); return (st.outputRows||[]).map((r,i)=>{const serial=String(r?.[p.serialCol-1]??(i+1)).trim();return {eng:String(r?.[p.engCol-1]??'').trim(),kor:String(r?.[p.mainKorCol-1]??'').trim(),subKor:String(r?.[p.subKorCol-1]??'').trim(),serial,originalIndex:i,ebookRead:read.has(i),starred:stars.has(serial)};}).filter(w=>w.kor&&w.eng); }
     let mtEbookEditTarget = null;
 
     function mtDeleteEbookItem(slotIndex, index, event) {
@@ -9339,12 +9355,21 @@ ${JSON.stringify(finalPayload)}`;
         document.getElementById('mtStarBtn').innerText = currentWord.starred ? '★' : '☆';
 
         if (mtActiveSlotIndex === 'star') {
-            const srcSlot = currentWord.sourceSlot;
+            const srcSlot = Number(currentWord.sourceSlot);
             const srcIdx = Number(currentWord.sourceIndex);
-            if (Number.isInteger(Number(srcSlot)) && Number(srcSlot) >= 1 && Number(srcSlot) <= 8) {
-                const parsed = mtGetNormalSlotSync(srcSlot);
-                if (parsed) {
-                    const wordsArr = Array.isArray(parsed) ? parsed : parsed.words;
+            const sourceType = mtGetSlotType(srcSlot);
+            if (Number.isInteger(srcSlot) && srcSlot >= 1 && srcSlot <= 11) {
+                if (sourceType && sourceType !== 'normal') {
+                    // 전자책·자체형·참조형은 공통적으로 일련번호 목록에 별표를 저장합니다.
+                    const state = mtGetTypedState(srcSlot);
+                    const serial = String(currentWord.serial || '').trim();
+                    const set = new Set((state.starredSerials || []).map(String));
+                    if (currentWord.starred) set.add(serial); else set.delete(serial);
+                    state.starredSerials = Array.from(set);
+                    mtSaveTypedState(srcSlot, state);
+                } else {
+                    const parsed = mtGetNormalSlotSync(srcSlot);
+                    const wordsArr = Array.isArray(parsed) ? parsed : parsed?.words;
                     if (Array.isArray(wordsArr) && wordsArr[srcIdx]) {
                         wordsArr[srcIdx].starred = currentWord.starred;
                         const next = Array.isArray(parsed)
@@ -9368,6 +9393,8 @@ ${JSON.stringify(finalPayload)}`;
             mtSetNormalSlotSync(mtActiveSlotIndex, mtOriginalSlotData);
         }
         mtSaveSessionState();
+        // 별표 변경 직후 모아보기 슬롯과 각 슬롯의 ★ 카운트를 다시 계산합니다.
+        mtInitSlots();
     }
 
     function mtIsAlwaysVisibleChunkPunctuation(target, index) {
@@ -10629,7 +10656,7 @@ ${JSON.stringify(finalPayload)}`;
   (function syncAppVersionFromFileName(){
     // 파일을 다른 이름으로 저장하거나 브라우저가 경로를 변환해도, 기본 표시가
     // 사라지지 않게 한다. 정상 파일명에서는 아래 값이 자동으로 새 번호로 대체된다.
-    const fallbackVersion='v103';
+    const fallbackVersion='v104';
     let fileName='';
     try{fileName=decodeURIComponent(String(location.pathname||'').split('/').pop()||'');}
     catch(_){fileName=String(location.pathname||'').split('/').pop()||'';}
