@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v96</title>
+    <title>올인원 영작-단어장 시스템 · v97</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -25,6 +25,7 @@
             --novel-font-size: 15px;
             --voca-font-size: 15px;
             --mt-ebook-list-font-size: 18px;
+            --mt-ebook-list-row-padding-y: 12px;
 
             /* 언마스킹 영작 폰트 및 레이아웃 변수 */
             --mt-kor-size: 26px;
@@ -419,7 +420,7 @@
         .mt-ebook-item-inner { display:flex; align-items:flex-start; min-width:0; flex:1; }
         .mt-ebook-item-main-wrap { min-width:0; flex:1; }
 
-        .mt-ebook-item { padding:12px 4px; border-bottom:1px solid #e5e7eb; cursor:pointer; transition:background .15s,color .15s; }
+        .mt-ebook-item { padding:var(--mt-ebook-list-row-padding-y) 4px; border-bottom:1px solid #e5e7eb; cursor:pointer; transition:background .15s,color .15s; }
         .mt-ebook-item:hover { background:#f8fafc; }
         .mt-ebook-item.read { color:#b0b6bf; }
         .mt-ebook-item.read .mt-ebook-item-main { color:#a6adb7; }
@@ -2541,7 +2542,7 @@ body { background: var(--bench-v2-bg) !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v96</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v97</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -3203,7 +3204,8 @@ body { background: var(--bench-v2-bg) !important; }
                 <div><div style="display:flex;align-items:center;gap:6px;"><div class="mt-ebook-title" id="mtEbookViewerTitle">전자책</div><button type="button" class="mt-ebook-title-edit-btn" onclick="mtRenameEbookViewerTitle()" title="슬롯 제목 수정" aria-label="슬롯 제목 수정">✎</button></div><div class="mt-ebook-subtitle" id="mtEbookViewerSubtitle"></div></div>
                 <div style="display:flex;align-items:center;gap:6px;">
                     <button id="mtEbookEnglishToggleBtn" type="button" class="btn-excel" onclick="mtToggleEbookEnglishMode()">영어변환</button>
-                    <label class="mt-ebook-font-control" title="전자책 목록 글꼴 크기"><span>글꼴</span><input id="mtEbookListFontSizeInput" type="number" min="10" max="36" value="18" inputmode="numeric" onchange="mtSetEbookListFont(this.value)"><span>px</span></label>
+                    <label class="mt-ebook-font-control" title="전자책 목록 글꼴 크기"><span>글꼴</span><input id="mtEbookListFontSizeInput" type="number" min="10" max="36" value="18" inputmode="numeric" oninput="mtSetEbookListFont(this.value)"><span>px</span></label>
+                    <label class="mt-ebook-font-control" title="전자책 목록 행의 상하 여백"><span>행 여백</span><input id="mtEbookListRowPaddingInput" type="number" min="0" max="40" value="12" inputmode="numeric" oninput="mtSetEbookListRowPadding(this.value)"><span>px</span></label>
                     <button class="btn-excel" onclick="mtCloseEbookViewer()">← 슬롯 목록</button>
                 </div>
             </div>
@@ -3932,17 +3934,23 @@ body { background: var(--bench-v2-bg) !important; }
     let novelFontSize = parseInt(localStorage.getItem('myNovelFontSize')) || 15;
     let vocaFontSize = parseInt(localStorage.getItem('myVocaFontSize')) || 15;
     let mtEbookListFontSize = parseInt(localStorage.getItem('mtEbookListFontSize')) || 18;
+    let mtEbookListRowPadding = parseFloat(localStorage.getItem('mtEbookListRowPadding'));
+    if (isNaN(mtEbookListRowPadding)) mtEbookListRowPadding = 12;
 
     function applyFontSettings() {
         document.documentElement.style.setProperty('--novel-font-size', novelFontSize + 'px');
         document.documentElement.style.setProperty('--voca-font-size', vocaFontSize + 'px');
         document.documentElement.style.setProperty('--mt-ebook-list-font-size', mtEbookListFontSize + 'px');
+        document.documentElement.style.setProperty('--mt-ebook-list-row-padding-y', mtEbookListRowPadding + 'px');
         const novelInput = document.getElementById('novelFontSizeInput');
         if (novelInput) novelInput.value = novelFontSize;
         const vocaInput = document.getElementById('vocaFontSizeInput');
         if (vocaInput) vocaInput.value = vocaFontSize;
         const ebookInput = document.getElementById('mtEbookListFontSizeInput');
         if (ebookInput) ebookInput.value = mtEbookListFontSize;
+        const ebookPaddingInput = document.getElementById('mtEbookListRowPaddingInput');
+        if (ebookPaddingInput) ebookPaddingInput.value = mtEbookListRowPadding;
+        mtApplyEbookListAppearance();
     }
 
     function adjustNovelFont(delta) {
@@ -3962,7 +3970,34 @@ body { background: var(--bench-v2-bg) !important; }
         if (isNaN(size)) size = 18;
         mtEbookListFontSize = Math.max(10, Math.min(36, size));
         localStorage.setItem('mtEbookListFontSize', mtEbookListFontSize);
-        applyFontSettings();
+        mtApplyEbookListAppearance();
+    }
+    function mtSetEbookListRowPadding(val) {
+        let padding = parseFloat(val);
+        if (isNaN(padding)) padding = 12;
+        mtEbookListRowPadding = Math.max(0, Math.min(40, padding));
+        localStorage.setItem('mtEbookListRowPadding', mtEbookListRowPadding);
+        mtApplyEbookListAppearance();
+    }
+    // CSS 변수만 의존하지 않고, 이미 렌더링된 목록 행에도 값을 직접 적용합니다.
+    // 따라서 숫자를 입력하는 즉시 화면의 글자와 행 높이가 변합니다.
+    function mtApplyEbookListAppearance() {
+        const viewer = document.getElementById('mtEbookViewer');
+        if (viewer) {
+            viewer.style.setProperty('--mt-ebook-list-font-size', mtEbookListFontSize + 'px');
+            viewer.style.setProperty('--mt-ebook-list-row-padding-y', mtEbookListRowPadding + 'px');
+        }
+        document.querySelectorAll('#mtEbookList .mt-ebook-item-main').forEach(el => {
+            el.style.fontSize = mtEbookListFontSize + 'px';
+        });
+        document.querySelectorAll('#mtEbookList .mt-ebook-item').forEach(el => {
+            el.style.paddingTop = mtEbookListRowPadding + 'px';
+            el.style.paddingBottom = mtEbookListRowPadding + 'px';
+        });
+        const fontInput = document.getElementById('mtEbookListFontSizeInput');
+        if (fontInput && document.activeElement !== fontInput) fontInput.value = mtEbookListFontSize;
+        const paddingInput = document.getElementById('mtEbookListRowPaddingInput');
+        if (paddingInput && document.activeElement !== paddingInput) paddingInput.value = mtEbookListRowPadding;
     }
     function adjustVocaFont(delta) {
         vocaFontSize = Math.max(10, Math.min(30, vocaFontSize + delta));
@@ -7819,6 +7854,7 @@ ${JSON.stringify(finalPayload)}`;
             item.onclick=()=>{if(isEbook)mtOpenEbookTyping(Number(slotIndex),absoluteIndex);else mtOpenGeneratorCardAt(Number(slotIndex),absoluteIndex);};
             list.appendChild(item);
         });
+        mtApplyEbookListAppearance();
         // 목록을 다시 열면 마지막으로 언마스킹한 항목이 화면 가운데 가까이에 오도록 합니다.
         if(!preserveSelection && isEbook && Number.isInteger(resumeIndex) && resumeIndex>=start && resumeIndex<start+pageWords.length){
             requestAnimationFrame(()=>list.querySelector(`.mt-ebook-item[data-index="${resumeIndex}"]`)?.scrollIntoView({block:'center',inline:'nearest'}));
@@ -10573,7 +10609,7 @@ ${JSON.stringify(finalPayload)}`;
   (function syncAppVersionFromFileName(){
     // 파일을 다른 이름으로 저장하거나 브라우저가 경로를 변환해도, 기본 표시가
     // 사라지지 않게 한다. 정상 파일명에서는 아래 값이 자동으로 새 번호로 대체된다.
-    const fallbackVersion='v96';
+    const fallbackVersion='v97';
     let fileName='';
     try{fileName=decodeURIComponent(String(location.pathname||'').split('/').pop()||'');}
     catch(_){fileName=String(location.pathname||'').split('/').pop()||'';}
