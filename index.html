@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v107</title>
+    <title>올인원 영작-단어장 시스템 · v108</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -2558,7 +2558,7 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v107</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v108</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -5480,6 +5480,8 @@ Rules:
     }
     let mtEbookTypingActive = false;
     let mtEbookActiveSlot = null;
+    // 원본 행에 빈 행이 섞여 있어도, 실제 목록에서 보인 위치를 그대로 복귀 기준으로 씁니다.
+    let mtEbookCurrentListIndex = null;
     let mtEbookDisplayMode = 'kor'; // 'kor': 주문장, 'eng': 언마스킹 완료 문장만 영어로 표시
     const MT_EBOOK_PAGE_SIZE = 30;
     const MT_EBOOK_LAST_PAGE_STORAGE_KEY = 'mt_ebook_last_page_v1';
@@ -5502,6 +5504,29 @@ Rules:
     function mtGetEbookPage(slotIndex, fallback=1){
         const value = Number(mtEbookPage[String(slotIndex)]);
         return Number.isFinite(value) && value >= 1 ? Math.floor(value) : fallback;
+    }
+    // 전자책·자체형·참조형은 카드가 실제로 열린 순간의 위치를 기억합니다.
+    // 페이지 번호는 카드 위치로부터 다시 계산하므로, 문장 수가 바뀌어도 안전합니다.
+    function mtGetLastReadIndex(slotIndex, wordCount){
+        const st=mtGetTypedState(Number(slotIndex));
+        const candidates=[st.lastListReadIndex, st.lastEbookStudyIndex];
+        for(const value of candidates){
+            const index=Number(value);
+            if(Number.isInteger(index) && index>=0 && index<Number(wordCount)) return index;
+        }
+        return null;
+    }
+    function mtSaveLastReadPosition(slotIndex, index){
+        const slot=Number(slotIndex), safeIndex=Number(index);
+        const type=mtGetSlotType(slot);
+        if(!Number.isInteger(slot) || !Number.isInteger(safeIndex) || safeIndex<0 || !['ebook','self_generate','reference_generate'].includes(type)) return;
+        const st=mtGetTypedState(slot);
+        st.lastListReadIndex=safeIndex;
+        st.lastListReadAt=Date.now();
+        mtSaveEbookPage(slot,Math.floor(safeIndex/MT_EBOOK_PAGE_SIZE)+1);
+        mtSaveTypedState(slot,st);
+        // 새로고침·브라우저 종료가 바로 이어져도 위치가 남도록 IndexedDB 저장을 즉시 시작합니다.
+        try{mtPersistTypedSlotStates().catch(e=>console.warn('마지막 읽기 위치 저장 실패:',e));}catch(_){}
     }
 
     // 언마스킹 영작 영구 통계
@@ -7856,9 +7881,9 @@ ${JSON.stringify(finalPayload)}`;
         const key=String(slotIndex);
         let page=mtGetEbookPage(key);
         const totalPages=Math.max(1,Math.ceil(words.length/MT_EBOOK_PAGE_SIZE));
-        const resumeIndex=isEbook ? Number(st.lastEbookStudyIndex) : NaN;
-        // 마지막으로 완료한 카드가 있는 페이지를 우선 표시합니다.
-        if(!preserveSelection && Number.isInteger(resumeIndex) && resumeIndex>=0 && resumeIndex<words.length){
+        const resumeIndex=mtGetLastReadIndex(slotIndex,words.length);
+        // 마지막으로 읽은 카드가 있는 페이지를 우선 표시합니다.
+        if(!preserveSelection && Number.isInteger(resumeIndex)){
             page=Math.floor(resumeIndex/MT_EBOOK_PAGE_SIZE)+1;
         }
         page=Math.min(Math.max(page,1),totalPages);
@@ -7905,8 +7930,8 @@ ${JSON.stringify(finalPayload)}`;
             list.appendChild(item);
         });
         mtApplyEbookListAppearance();
-        // 목록을 다시 열면 마지막으로 언마스킹한 항목이 화면 가운데 가까이에 오도록 합니다.
-        if(!preserveSelection && isEbook && Number.isInteger(resumeIndex) && resumeIndex>=start && resumeIndex<start+pageWords.length){
+        // 어떤 유형이든 목록을 다시 열면 마지막으로 읽은 항목이 화면 가운데 가까이에 오도록 합니다.
+        if(!preserveSelection && Number.isInteger(resumeIndex) && resumeIndex>=start && resumeIndex<start+pageWords.length){
             requestAnimationFrame(()=>list.querySelector(`.mt-ebook-item[data-index="${resumeIndex}"]`)?.scrollIntoView({block:'center',inline:'nearest'}));
         }
         mtEbookUpdateSelectionUi(Number(slotIndex), pageWords, start);
@@ -8104,6 +8129,7 @@ ${JSON.stringify(finalPayload)}`;
     function mtOpenEbookTyping(slotIndex,index){
         const words=mtGetEbookWords(slotIndex), word=words[index]; if(!word)return;
         mtEbookTypingActive=true; mtEbookActiveSlot=Number(slotIndex); mtActiveSlotIndex=slotIndex;
+        mtEbookCurrentListIndex=Number(index);
         mtCurrentStudyWords=[word]; mtCurrentIndex=0;
         mtOriginalSlotData={name:mtGetTypedState(slotIndex).fileName,words:[word],lastSession:null,ebook:true};
         const backdrop=document.getElementById('mtEbookModalBackdrop'); if(backdrop) backdrop.style.display='block';
@@ -8126,6 +8152,7 @@ ${JSON.stringify(finalPayload)}`;
         }
         mtRecordEbookCompletedCardIfReady();
         mtEbookTypingActive=false;
+        mtEbookCurrentListIndex=null;
         const card=document.getElementById('mt-flashcard'); card.classList.remove('mt-ebook-typing'); card.style.display='none'; card.classList.remove('mt-ebook-freeform'); card.style.removeProperty('left'); card.style.removeProperty('top'); card.style.removeProperty('width'); card.style.removeProperty('height'); card.style.removeProperty('transform');
         const settingsBtn=document.getElementById('mtEbookPopupSettingsBtn'); if(settingsBtn) settingsBtn.style.display='none';
         const settingsPanel=document.getElementById('mtEbookPopupSettings'); if(settingsPanel) settingsPanel.classList.remove('open');
@@ -8553,7 +8580,15 @@ ${JSON.stringify(finalPayload)}`;
         mtOpenGeneratorPromptEditor(Number(m.dataset.slot),type);
     }
     let mtGeneratorListSlot=null,mtGeneratorListPage=1,mtGeneratorListSelected=new Set(); const MT_GEN_LIST_PAGE=30;
-    function mtOpenGeneratorList(slotIndex){mtGeneratorListSlot=Number(slotIndex);mtGeneratorListPage=1;mtGeneratorListSelected=new Set();mtRenderGeneratorList();document.getElementById('mtGeneratorListModal').style.display='flex';}
+    function mtOpenGeneratorList(slotIndex){
+        mtGeneratorListSlot=Number(slotIndex);
+        const rows=mtGetTypedState(mtGeneratorListSlot).outputRows||[];
+        const resumeIndex=mtGetLastReadIndex(mtGeneratorListSlot,rows.length);
+        mtGeneratorListPage=Number.isInteger(resumeIndex)?Math.floor(resumeIndex/MT_GEN_LIST_PAGE)+1:1;
+        mtGeneratorListSelected=new Set();
+        mtRenderGeneratorList();
+        document.getElementById('mtGeneratorListModal').style.display='flex';
+    }
     function mtCloseGeneratorList(){document.getElementById('mtGeneratorListModal').style.display='none';mtGeneratorListSlot=null;}
     function mtRenderGeneratorList(){
         const slot=mtGeneratorListSlot;
@@ -8570,12 +8605,17 @@ ${JSON.stringify(finalPayload)}`;
             const r=rows[i]||[];
             const row=document.createElement('div');
             row.className='mt-generator-list-row';
+            row.dataset.index=String(i);
             row.innerHTML=`<input type="checkbox" data-index="${i}" ${mtGeneratorListSelected.has(i)?'checked':''}><div class="mt-generator-list-num"><div>${i+1}</div><button class="btn-excel" style="font-size:8px;padding:2px 4px;margin-top:3px;">수정</button></div><div class="mt-generator-list-text" data-col="1"><div class="mt-generator-list-label">${st.type==='reference_generate'?'주제/주문장':'주문장'}</div>${mtEscapeHTML(st.type==='reference_generate'?String(r[3]||''):String(r[0]||''))}</div><div class="mt-generator-list-text" data-col="2"><div class="mt-generator-list-label">영어문장</div>${mtEscapeHTML(st.type==='reference_generate'?String(r[2]||''):String(r[1]||''))}</div><div class="mt-generator-list-text" data-col="3"><div class="mt-generator-list-label">보조문장</div>${mtEscapeHTML(st.type==='reference_generate'?String(r[4]||''):String(r[2]||''))}</div>`;
             row.querySelector('input').addEventListener('click',e=>e.stopPropagation());
             row.querySelector('input').addEventListener('change',e=>{if(e.target.checked)mtGeneratorListSelected.add(i);else mtGeneratorListSelected.delete(i);mtUpdateGeneratorListCount();});
             row.querySelector('button').addEventListener('click',e=>{e.stopPropagation();mtOpenGeneratorEditModal(slot,i);});
             row.addEventListener('click',()=>mtOpenGeneratorCardAt(slot,i));
             body.appendChild(row);
+        }
+        const resumeIndex=mtGetLastReadIndex(slot,rows.length);
+        if(Number.isInteger(resumeIndex) && resumeIndex>=start && resumeIndex<end){
+            requestAnimationFrame(()=>body.querySelector(`.mt-generator-list-row[data-index="${resumeIndex}"]`)?.scrollIntoView({block:'center',inline:'nearest'}));
         }
         const pg=document.getElementById('mtGeneratorListPagination');
         pg.innerHTML='';
@@ -8606,7 +8646,7 @@ ${JSON.stringify(finalPayload)}`;
     function mtDeleteSelectedGeneratorRows(){if(mtGeneratorListSlot==null||!mtGeneratorListSelected.size)return alert('삭제할 문장을 선택해 주세요.');if(!confirm(`선택한 ${mtGeneratorListSelected.size}개 문장을 삭제하시겠습니까?`))return;const st=mtGetTypedState(mtGeneratorListSlot),sel=new Set(mtGeneratorListSelected);st.outputRows=(st.outputRows||[]).filter((_,i)=>!sel.has(i));st.starredSerials=(st.starredSerials||[]).filter(s=>{const rows=st.outputRows;return rows.some(r=>String(r[(st.type==='reference_generate'?(st.pattern?.serialCol||2):(st.pattern?.serialCol||4))-1]??'')===String(s));});mtSaveTypedState(mtGeneratorListSlot,st);mtGeneratorListSelected.clear();mtRenderGeneratorList();mtInitSlots();}
     function mtOpenGeneratorCardAt(slotIndex,rowIndex){
         const words=mtGetGeneratorWords(slotIndex); if(!words.length)return;
-        const st=mtGetTypedState(slotIndex); mtActiveSlotIndex=slotIndex; mtOriginalSlotData={name:st.fileName||`슬롯 ${slotIndex}`,words,lastSession:null}; mtCurrentStudyWords=words; mtCurrentIndex=Math.max(0,Math.min(rowIndex,words.length-1)); mtEbookTypingActive=false; document.getElementById('mtGeneratorListModal').style.display='none'; document.getElementById('mt-main-menu').style.display='none'; document.getElementById('mt-flashcard').style.display='block'; mtLoadWord(mtCurrentIndex);
+        const st=mtGetTypedState(slotIndex); mtActiveSlotIndex=slotIndex; mtOriginalSlotData={name:st.fileName||`슬롯 ${slotIndex}`,words,lastSession:null}; mtCurrentStudyWords=words; mtCurrentIndex=Math.max(0,Math.min(rowIndex,words.length-1)); mtSaveLastReadPosition(slotIndex,mtCurrentIndex); mtEbookTypingActive=false; document.getElementById('mtGeneratorListModal').style.display='none'; document.getElementById('mt-main-menu').style.display='none'; document.getElementById('mt-flashcard').style.display='block'; mtLoadWord(mtCurrentIndex);
     }
     let mtGeneratorEditSlot=null,mtGeneratorEditIndex=null;
     function mtOpenGeneratorEditModal(slotIndex,rowIndex){
@@ -9208,6 +9248,15 @@ ${JSON.stringify(finalPayload)}`;
         mtCardHadDirectTyping = false;
 
         let currentWord = mtCurrentStudyWords[index];
+        const typedSlot=Number(mtActiveSlotIndex);
+        const typedSlotType=mtGetSlotType(typedSlot);
+        const readIndex=Number(currentWord?.originalIndex);
+        if(['ebook','self_generate','reference_generate'].includes(typedSlotType)){
+            const listIndex=mtEbookTypingActive && Number.isInteger(mtEbookCurrentListIndex)
+                ? mtEbookCurrentListIndex
+                : (Number.isInteger(readIndex)?readIndex:index);
+            mtSaveLastReadPosition(typedSlot,listIndex);
+        }
 
         const mainKor = String(currentWord.kor || '').trim();
         const subKor = String(currentWord.subKor || currentWord.literalKor || '').trim();
@@ -10804,7 +10853,7 @@ ${JSON.stringify(finalPayload)}`;
   (function syncAppVersionFromFileName(){
     // 파일을 다른 이름으로 저장하거나 브라우저가 경로를 변환해도, 기본 표시가
     // 사라지지 않게 한다. 정상 파일명에서는 아래 값이 자동으로 새 번호로 대체된다.
-    const fallbackVersion='v107';
+    const fallbackVersion='v108';
     let fileName='';
     try{fileName=decodeURIComponent(String(location.pathname||'').split('/').pop()||'');}
     catch(_){fileName=String(location.pathname||'').split('/').pop()||'';}
