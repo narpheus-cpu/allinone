@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v108</title>
+    <title>올인원 영작-단어장 시스템 · v109</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -2558,7 +2558,7 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v108</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v109</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -9313,19 +9313,53 @@ ${JSON.stringify(finalPayload)}`;
         }
     }
 
-    // 표시 문장은 그대로 유지하고, 입력 비교에서만 스마트 따옴표와
-    // 키보드로 입력 가능한 일반 따옴표를 서로 같은 문자로 처리합니다.
-    function mtNormalizeTypingPunctuation(value) {
+    // 문장 기호는 학습자가 입력할 대상이 아닙니다. 비교할 때는 모두 제외하고,
+    // 입력 도중에는 원문에 있는 기호와 바로 뒤 공백을 자동으로 채워 넣습니다.
+    function mtNormalizeTypingCharacter(value) {
         return String(value || '')
             .replace(/[“”„‟＂]/g, '"')
             .replace(/[‘’‚‛＇]/g, "'")
             .toLowerCase();
     }
+    function mtIsAutoTypingSymbol(value) {
+        return /[\p{P}\p{S}]/u.test(String(value || ''));
+    }
+    function mtNormalizeTypingPunctuation(value) {
+        return mtNormalizeTypingCharacter(value).replace(/[\p{P}\p{S}]/gu, '');
+    }
     function mtTypingTextMatches(left, right) {
         return mtNormalizeTypingPunctuation(left) === mtNormalizeTypingPunctuation(right);
     }
     function mtTypingCharsMatch(left, right) {
-        return mtNormalizeTypingPunctuation(left) === mtNormalizeTypingPunctuation(right);
+        return mtNormalizeTypingCharacter(left) === mtNormalizeTypingCharacter(right);
+    }
+    function mtAppendAutomaticTypingSymbols(target, index, text) {
+        let cursor=index, output=text, insertedWhitespace=false;
+        while(cursor<target.length && mtIsAutoTypingSymbol(target[cursor])) {
+            output+=target[cursor++];
+            while(cursor<target.length && /\s/.test(target[cursor])) {
+                output+=target[cursor++];
+                insertedWhitespace=true;
+            }
+        }
+        return { cursor, output, insertedWhitespace };
+    }
+    function mtAutofillTypingPunctuation(rawValue, targetValue) {
+        const raw=String(rawValue || ''), target=String(targetValue || '');
+        let output='', targetIndex=0;
+        for(let rawIndex=0;rawIndex<raw.length;rawIndex++) {
+            const typedChar=raw[rawIndex];
+            // 사용자가 기호를 직접 눌러도 허용하되, 원문 기호로 통일해 넣습니다.
+            if(mtIsAutoTypingSymbol(typedChar)) continue;
+            const auto=mtAppendAutomaticTypingSymbols(target,targetIndex,output);
+            targetIndex=auto.cursor;
+            output=auto.output;
+            // 쉼표·따옴표 뒤의 공백은 기호와 한 묶음으로 자동 입력합니다.
+            if(/\s/.test(typedChar) && auto.insertedWhitespace) continue;
+            if(targetIndex>=target.length || !mtTypingCharsMatch(typedChar,target[targetIndex])) break;
+            output+=target[targetIndex++];
+        }
+        return output;
     }
 
     function mtIsCurrentTypedAnswerComplete() {
@@ -9873,10 +9907,9 @@ ${JSON.stringify(finalPayload)}`;
             if(!current) return;
             const target=String(current.eng||'');
             if(!target){ input.value=''; mtRenderMask(''); return; }
-            let typed=String(input.value||'');
-            let validLength=0;
-            while(validLength<typed.length && validLength<target.length && mtTypingCharsMatch(typed[validLength],target[validLength])) validLength++;
-            if(validLength!==typed.length) typed=typed.slice(0,validLength);
+            // 원문 속 따옴표·쉼표·마침표 등은 사용자가 누르지 않아도 자동으로 보완합니다.
+            // 따라서 기호를 건너뛰고 다음 글자만 입력해도 정상적으로 이어집니다.
+            let typed=mtAutofillTypingPunctuation(input.value,target);
             input.value=typed;
             if(typed.length>0) mtCardHadDirectTyping=true;
             mtRecordTypedCompletedWords(typed,target);
@@ -10853,7 +10886,7 @@ ${JSON.stringify(finalPayload)}`;
   (function syncAppVersionFromFileName(){
     // 파일을 다른 이름으로 저장하거나 브라우저가 경로를 변환해도, 기본 표시가
     // 사라지지 않게 한다. 정상 파일명에서는 아래 값이 자동으로 새 번호로 대체된다.
-    const fallbackVersion='v108';
+    const fallbackVersion='v109';
     let fileName='';
     try{fileName=decodeURIComponent(String(location.pathname||'').split('/').pop()||'');}
     catch(_){fileName=String(location.pathname||'').split('/').pop()||'';}
