@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v111</title>
+    <title>올인원 영작-단어장 시스템 · v112</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -2559,7 +2559,7 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v111</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v112</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -6697,14 +6697,14 @@ Rules:
                     const sourceDone=type==='self_generate'?Math.min(sourceTotal,Math.max(0,Number(st.nextSourceIndex||0))):0;
                     const translationComplete=type==='self_generate'&&sourceTotal>0&&sourceDone>=sourceTotal;
                     const completionStatus=translationComplete?`<div class="mt-generator-complete-row"><span aria-hidden="true">✓</span><span>번역 완료 · 원문 ${sourceDone}/${sourceTotal}</span></div>`:'';
-                    const selfGeneratedCards=type==='self_generate'?rows.length:0;
-                    const selfGenerationPct=sourceTotal?Math.min(100,Math.round((selfGeneratedCards/sourceTotal)*100)):0;
-                    const todayKey=type==='reference_generate'?mtGetKoreaDateKey():'';
+                    const todayKey=mtGetKoreaDateKey();
+                    const selfTodayGenerated=type==='self_generate'?Math.max(0,Number(st.selfDailyGenerated?.[todayKey]||0)):0;
+                    const selfDailyPct=sourceTotal?Math.min(100,Math.round((selfTodayGenerated/sourceTotal)*100)):0;
                     const todayGenerated=type==='reference_generate'?Math.max(0,Number(st.referenceDailyGenerated?.[todayKey]||0)):0;
                     const referenceTotal=type==='reference_generate'?Math.max(rows.length,todayGenerated,Number(st.referenceTotalGeneratedCount||0)):0;
                     const referenceDailyPct=referenceTotal?Math.min(100,Math.round((todayGenerated/referenceTotal)*100)):0;
                     const generationProgress=type==='self_generate'
-                        ? mtSlotProgressRow(`생성진행률 ${selfGenerationPct}% (${selfGeneratedCards}/${sourceTotal})`)
+                        ? mtSlotProgressRow(`일일진행률 ${selfDailyPct}% (${selfTodayGenerated}/${sourceTotal})`)
                         : mtSlotProgressRow(`일일진행률 ${referenceDailyPct}% (${todayGenerated}/${referenceTotal})`);
                     div.innerHTML=`<div class="mt-slot-title">${mtEscapeHTML(title)}</div><div class="mt-slot-stat-row"><div><div class="mt-slot-count">${rows.length}</div><div class="mt-slot-count-label"></div></div><div class="mt-slot-type-tools"><span class="mt-slot-meta-badge mt-gen-type-badge-inline" style="display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;width:max-content;min-width:54px;height:24px;padding:3px 8px;margin:0;border-radius:6px;background:${badgeColor} !important;color:#fff !important;border:1px solid ${badgeColor} !important;font-size:9px !important;line-height:1 !important;font-weight:800 !important;white-space:nowrap;">${label}</span><button type="button" class="mt-slot-error-btn" onclick="event.stopPropagation();mtOpenGeneratorErrorLog(${i},'${type}')">오류로그</button><div class="mt-slot-star-count">★ ${star}</div></div></div>${generationProgress}${completionStatus}<div class="mt-slot-actions-row mt-generator-main-actions"><button class="btn-excel" onclick="event.stopPropagation();mtOpenGeneratorPromptEditor(${i},'${type}')">프롬프트</button><button class="btn-excel" onclick="event.stopPropagation();mtOpenGeneratorList(${i})">목록</button><button class="btn-excel" onclick="event.stopPropagation();mtOpenTypeChangeModal(${i})">변경</button><button class="btn-excel" onclick="event.stopPropagation();mtExportGeneratorSlot(event,${i})">내보내기</button><button type="button" class="btn-excel mt-slot-delete-btn" onclick="event.stopPropagation();mtDeleteSlot(event,${i})">삭제</button></div>`;
                     // 생성형도 카드 클릭 시 전자책과 같은 문장 목록 화면을 먼저 엽니다.
@@ -8512,6 +8512,10 @@ ${JSON.stringify(finalPayload)}`;
             if(cols.length<3 || !cols[0] || !cols[1] || !cols[2]) throw new Error(`자체형 일괄 응답 ${i+1}행 형식이 올바르지 않습니다.`);
             return [cols[0],cols[1],cols.slice(2).join(' | '),String(serialStart+i)];
         });
+        const todayKey=mtGetKoreaDateKey();
+        const daily=st.selfDailyGenerated&&typeof st.selfDailyGenerated==='object'?{...st.selfDailyGenerated}:{};
+        daily[todayKey]=Math.max(0,Number(daily[todayKey]||0))+results.length;
+        st.selfDailyGenerated=daily;
         st.outputRows.push(...results); st.nextSourceIndex=end; st.lastRun=Date.now(); st.translationComplete=false; mtSaveTypedState(slotIndex,st); mtInitSlots(); return true;
     }
     function mtRefParseJson(text){const s=String(text||'').trim();try{return JSON.parse(s);}catch(_){}const a=s.indexOf('['),b=s.lastIndexOf(']');if(a>=0&&b>a)return JSON.parse(s.slice(a,b+1));throw new Error('JSON 파싱 실패');}
@@ -10910,7 +10914,7 @@ ${JSON.stringify(finalPayload)}`;
   (function syncAppVersionFromFileName(){
     // 파일을 다른 이름으로 저장하거나 브라우저가 경로를 변환해도, 기본 표시가
     // 사라지지 않게 한다. 정상 파일명에서는 아래 값이 자동으로 새 번호로 대체된다.
-    const fallbackVersion='v111';
+    const fallbackVersion='v112';
     let fileName='';
     try{fileName=decodeURIComponent(String(location.pathname||'').split('/').pop()||'');}
     catch(_){fileName=String(location.pathname||'').split('/').pop()||'';}
