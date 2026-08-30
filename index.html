@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v112</title>
+    <title>올인원 영작-단어장 시스템 · v113</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -2559,7 +2559,7 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v112</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v113</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -2573,7 +2573,7 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
             <button class="btn-excel" onclick="toggleApiKeyInput()">API 키 설정</button>
             <button class="btn-excel" onclick="toggleFontInput()">글꼴 링크</button>
             <button class="btn-excel file-open-btn" onclick="loadFromLocalPC()">PC 백업 열기</button>
-            <button class="file-sync-btn" onclick="saveToLocalPC()">전체 데이터 저장</button>
+            <button class="file-sync-btn" onclick="saveToLocalPC()" title="최초 한 번 백업 폴더를 선택하면 20분마다 v1·v2·v3 순환 자동저장">전체 데이터 자동저장</button>
         </div>
     </div>
 
@@ -3755,77 +3755,130 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
     /* [공통] 로컬 파일 시스템 동기화 기능 (API)  */
     /* ========================================== */
     let globalFileHandle = null;
+    const MT_AUTO_BACKUP_INTERVAL_MS = 20 * 60 * 1000;
+    const MT_AUTO_BACKUP_DB_NAME = 'ForeignLangAutoBackupDB';
+    const MT_AUTO_BACKUP_DB_VERSION = 1;
+    const MT_AUTO_BACKUP_STORE = 'settings';
+    const MT_AUTO_BACKUP_STATE_KEY = 'rotationState';
+    let mtAutoBackupDirectoryHandle = null;
+    let mtAutoBackupNextVersion = 1;
+    let mtAutoBackupTimerId = null;
+    let mtAutoBackupRunning = false;
 
-    async function saveToLocalPC() {
-        try {
-            if (!window.showSaveFilePicker) return alert("이 브라우저는 로컬 파일 덮어쓰기(File System Access API)를 지원하지 않습니다. PC용 크롬, 엣지 등을 사용해 주세요.");
+    function mtOpenAutoBackupDb() {
+        return new Promise((resolve,reject)=>{
+            if(!window.indexedDB){reject(new Error('IndexedDB를 사용할 수 없습니다.'));return;}
+            const request=indexedDB.open(MT_AUTO_BACKUP_DB_NAME,MT_AUTO_BACKUP_DB_VERSION);
+            request.onupgradeneeded=()=>{const db=request.result;if(!db.objectStoreNames.contains(MT_AUTO_BACKUP_STORE))db.createObjectStore(MT_AUTO_BACKUP_STORE);};
+            request.onsuccess=()=>resolve(request.result);
+            request.onerror=()=>reject(request.error||new Error('자동저장 설정 DB 열기 실패'));
+        });
+    }
+    async function mtReadAutoBackupState(){
+        let db=null;
+        try{
+            db=await mtOpenAutoBackupDb();
+            const tx=db.transaction(MT_AUTO_BACKUP_STORE,'readonly');
+            const request=tx.objectStore(MT_AUTO_BACKUP_STORE).get(MT_AUTO_BACKUP_STATE_KEY);
+            return await new Promise((resolve,reject)=>{request.onsuccess=()=>resolve(request.result||null);request.onerror=()=>reject(request.error);});
+        }catch(e){console.warn('[자동저장] 설정 복원 실패:',e);return null;}finally{if(db)db.close();}
+    }
+    async function mtPersistAutoBackupState(){
+        if(!mtAutoBackupDirectoryHandle)return;
+        let db=null;
+        try{
+            db=await mtOpenAutoBackupDb();
+            const tx=db.transaction(MT_AUTO_BACKUP_STORE,'readwrite');
+            tx.objectStore(MT_AUTO_BACKUP_STORE).put({directoryHandle:mtAutoBackupDirectoryHandle,nextVersion:mtAutoBackupNextVersion},MT_AUTO_BACKUP_STATE_KEY);
+            await new Promise((resolve,reject)=>{tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);});
+        }catch(e){console.warn('[자동저장] 폴더 설정 저장 실패:',e);}finally{if(db)db.close();}
+    }
+    async function mtHasAutoBackupPermission(handle,requestPermission=false){
+        if(!handle)return false;
+        const options={mode:'readwrite'};
+        try{
+            if(await handle.queryPermission(options)==='granted')return true;
+            if(requestPermission&&await handle.requestPermission(options)==='granted')return true;
+        }catch(_){}
+        return false;
+    }
+    async function mtBuildCompleteBackupData(){
+        if(document.getElementById('novelTab')?.classList.contains('active'))saveCurrentNovelInput();
+        await saveSlotsToDatabase();
+        await saveWordsToDatabase();
+        try{await mtPersistNormalSlotCache();}catch(_){}
+        try{await mtPersistTypedSlotStates();}catch(_){}
 
-            if (!globalFileHandle) {
-                const options = {
-                    suggestedName: 'my_foreign_lang_data_backup.json',
-                    types: [{ description: 'JSON Files', accept: { 'application/json': ['.json'] } }],
-                };
-                globalFileHandle = await window.showSaveFilePicker(options);
-            }
-
-            if (document.getElementById('novelTab').classList.contains('active')) saveCurrentNovelInput();
-            await saveSlotsToDatabase();
-            await saveWordsToDatabase();
-
-            const mtBackupData = {};
-            // PC 백업에 실제 저장소의 원본 JSON을 그대로 담아 복원 시 카드 수/내용/별표/세션을 100% 유지합니다.
-            for (let i = 1; i <= 11; i++) {
-                const valObj = mtGetNormalSlotSync(i);
-                if (valObj) mtBackupData[i] = JSON.stringify(valObj);
-            }
-
-            const starSess = localStorage.getItem('word_slot_star_session');
-            if (starSess) mtBackupData['star_session'] = starSess;
-            try {
-                mtBackupData['typing_unmask_stats'] = localStorage.getItem(MT_STATS_STORAGE_KEY) || JSON.stringify(mtGetStatsState());
-            } catch (_) {
-                mtBackupData['typing_unmask_stats'] = JSON.stringify(mtGetStatsState());
-            }
-            // 유형과 무관하게 모든 슬롯의 상태를 백업합니다.
-            // 이전에는 생성형만 담아 전자책 슬롯이 코드 업데이트 후 복원되지 않았습니다.
-            mtBackupData['slot_types'] = {};
-            mtBackupData['typed_slots'] = {};
-            // generator_*는 이전 백업 파일과의 호환을 위해 함께 유지합니다.
-            mtBackupData['generator_states'] = {};
-            mtBackupData['generator_types'] = {};
-            for(let i=1;i<=11;i++){
-                const slotType=mtGetSlotType(i);
-                if(slotType) mtBackupData['slot_types'][i]=slotType;
-                if(['ebook','self_generate','reference_generate'].includes(slotType)) mtBackupData['typed_slots'][i]=JSON.stringify(mtGetTypedState(i));
-                if(slotType==='self_generate'||slotType==='reference_generate'){
-                    mtBackupData['generator_types'][i]=slotType;
-                    mtBackupData['generator_states'][i]=mtBackupData['typed_slots'][i];
-                }
-            }
-
-            const dataToSave = {
-                slotsData: slotsData,
-                words: words,
-                novelFontSize: novelFontSize,
-                vocaFontSize: vocaFontSize,
-                boardDataList: boardDataList,
-                mtBackupData: mtBackupData, 
-                mtFontSettings: mtGetFontSettingsForBackup(),
-                lastSaved: new Date().toISOString()
-            };
-
-            const writable = await globalFileHandle.createWritable();
-            await writable.write(JSON.stringify(dataToSave, null, 2));
-            await writable.close();
-
-            const reminder = document.getElementById('saveReminder');
-            if (reminder) { reminder.classList.remove('is-visible'); reminder.style.removeProperty('display'); }
-
-            alert("내 PC 파일에 전체 데이터(게시판, 타이핑to언마스크 포함)가 성공적으로 덮어쓰기 저장되었습니다!");
-            if (typeof mtStartSaveReminderTimer === 'function') mtStartSaveReminderTimer(true);
-        } catch (err) {
-            if (err.name !== 'AbortError') { alert("저장 중 오류가 발생했습니다: " + err.message); }
+        const mtBackupData={};
+        for(let i=1;i<=11;i++){
+            const valObj=mtGetNormalSlotSync(i);
+            if(valObj)mtBackupData[i]=JSON.stringify(valObj);
         }
+        try{const starSess=localStorage.getItem('word_slot_star_session');if(starSess)mtBackupData.star_session=starSess;}catch(_){}
+        try{mtBackupData.typing_unmask_stats=localStorage.getItem(MT_STATS_STORAGE_KEY)||JSON.stringify(mtGetStatsState());}
+        catch(_){mtBackupData.typing_unmask_stats=JSON.stringify(mtGetStatsState());}
+        mtBackupData.slot_types={};
+        mtBackupData.typed_slots={};
+        mtBackupData.generator_states={};
+        mtBackupData.generator_types={};
+        for(let i=1;i<=11;i++){
+            const slotType=mtGetSlotType(i);
+            if(slotType)mtBackupData.slot_types[i]=slotType;
+            if(['ebook','self_generate','reference_generate'].includes(slotType))mtBackupData.typed_slots[i]=JSON.stringify(mtGetTypedState(i));
+            if(slotType==='self_generate'||slotType==='reference_generate'){
+                mtBackupData.generator_types[i]=slotType;
+                mtBackupData.generator_states[i]=mtBackupData.typed_slots[i];
+            }
+        }
+        return {slotsData,words,novelFontSize,vocaFontSize,boardDataList,mtBackupData,mtFontSettings:mtGetFontSettingsForBackup(),lastSaved:new Date().toISOString()};
+    }
+    async function mtRunRotatingAutoBackup(){
+        if(mtAutoBackupRunning||!mtAutoBackupDirectoryHandle)return false;
+        if(!await mtHasAutoBackupPermission(mtAutoBackupDirectoryHandle,false))return false;
+        mtAutoBackupRunning=true;
+        try{
+            const version=Math.min(3,Math.max(1,Number(mtAutoBackupNextVersion)||1));
+            const fileName=`my_foreign_lang_data_backup(v${version}).json`;
+            const dataToSave=await mtBuildCompleteBackupData();
+            const fileHandle=await mtAutoBackupDirectoryHandle.getFileHandle(fileName,{create:true});
+            const writable=await fileHandle.createWritable();
+            await writable.write(JSON.stringify(dataToSave,null,2));
+            await writable.close();
+            mtAutoBackupNextVersion=version>=3?1:version+1;
+            await mtPersistAutoBackupState();
+            const reminder=document.getElementById('saveReminder');
+            if(reminder)reminder.classList.remove('is-visible');
+            return true;
+        }catch(e){console.warn('[자동저장] 백업 실패:',e);return false;}finally{mtAutoBackupRunning=false;}
+    }
+    function mtScheduleNextAutoBackup(){
+        if(mtAutoBackupTimerId)clearTimeout(mtAutoBackupTimerId);
+        if(!mtAutoBackupDirectoryHandle)return;
+        mtAutoBackupTimerId=setTimeout(async()=>{
+            mtAutoBackupTimerId=null;
+            await mtRunRotatingAutoBackup();
+            mtScheduleNextAutoBackup();
+        },MT_AUTO_BACKUP_INTERVAL_MS);
+    }
+    async function mtInitAutoBackup(){
+        const saved=await mtReadAutoBackupState();
+        if(!saved?.directoryHandle)return;
+        mtAutoBackupDirectoryHandle=saved.directoryHandle;
+        mtAutoBackupNextVersion=Math.min(3,Math.max(1,Number(saved.nextVersion)||1));
+        if(await mtHasAutoBackupPermission(mtAutoBackupDirectoryHandle,false))mtScheduleNextAutoBackup();
+    }
+    async function saveToLocalPC(){
+        try{
+            if(!window.showDirectoryPicker)return alert('이 브라우저는 폴더 자동저장을 지원하지 않습니다. PC용 크롬 또는 엣지를 사용해 주세요.');
+            if(!mtAutoBackupDirectoryHandle||!await mtHasAutoBackupPermission(mtAutoBackupDirectoryHandle,true)){
+                mtAutoBackupDirectoryHandle=await window.showDirectoryPicker({mode:'readwrite'});
+                mtAutoBackupNextVersion=1;
+            }
+            if(!await mtHasAutoBackupPermission(mtAutoBackupDirectoryHandle,true))throw new Error('선택한 폴더의 쓰기 권한을 허용해 주세요.');
+            await mtPersistAutoBackupState();
+            await mtRunRotatingAutoBackup();
+            mtScheduleNextAutoBackup();
+        }catch(err){if(err?.name!=='AbortError')alert('자동저장 설정 중 오류가 발생했습니다: '+(err?.message||err));}
     }
 
     async function loadFromLocalPC() {
@@ -3907,25 +3960,20 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
             const reminder = document.getElementById('saveReminder');
             if (reminder) { reminder.classList.remove('is-visible'); reminder.style.removeProperty('display'); }
 
-            alert("전체 데이터(게시판, 타이핑to언마스크 포함)를 성공적으로 불러왔습니다! 이제 '덮어쓰기 저장'을 누르면 이 파일에 즉시 기록됩니다.");
+            alert("전체 데이터를 성공적으로 불러왔습니다.");
         } catch (err) {
             if (err.name !== 'AbortError') { alert("불러오기 중 오류가 발생했습니다: " + err.message); }
         }
     }
 
-    const MT_SAVE_REMINDER_INTERVAL_MS = 30 * 60 * 1000;
     let mtSaveReminderTimerId = null;
-    function mtStartSaveReminderTimer(reset=false) {
+    function mtStartSaveReminderTimer() {
         if (mtSaveReminderTimerId) { clearTimeout(mtSaveReminderTimerId); mtSaveReminderTimerId = null; }
         const reminder = document.getElementById('saveReminder');
         if (reminder) reminder.classList.remove('is-visible');
-        mtSaveReminderTimerId = setTimeout(() => {
-            const el = document.getElementById('saveReminder');
-            if (el) el.classList.add('is-visible');
-            mtSaveReminderTimerId = null;
-        }, MT_SAVE_REMINDER_INTERVAL_MS);
     }
     mtStartSaveReminderTimer(true);
+    setTimeout(()=>{mtInitAutoBackup().catch(e=>console.warn('[자동저장] 초기화 실패:',e));},0);
 
     /* ========================================== */
     /* [공통/영작] 상태 및 초기화 관리             */
@@ -7600,12 +7648,13 @@ ${JSON.stringify(finalPayload)}`;
         document.getElementById('mtEbookMainCol').innerHTML=buildOptions(false);
         document.getElementById('mtEbookSubCol').innerHTML=buildOptions(true);
         document.getElementById('mtEbookEngCol').innerHTML=buildOptions(false);
-        // 간단한 자동 추천: 한국어 비율이 높은 열=주/보조, 영어 비율이 높은 열=영어
+        // 영어 열은 내용으로 추천하되, 한국어 열의 기본 배치는 항상
+        // 주문장=1열, 보조문장=3열로 맞춥니다.
         const scores=Array.from({length:maxCols},(_,c)=>{let k=0,e=0; for(const r of rows.slice(0,30)){const v=String(r?.[c]??''); k+=(v.match(/[가-힣]/g)||[]).length; e+=(v.match(/[A-Za-z]/g)||[]).length;} return {c,k,e};});
         const ko=scores.filter(x=>x.k>0).sort((a,b)=>b.k-a.k).map(x=>x.c);
         const en=scores.filter(x=>x.e>0).sort((a,b)=>b.e-a.e).map(x=>x.c);
-        if(ko.length) document.getElementById('mtEbookMainCol').value=String(ko[0]);
-        document.getElementById('mtEbookSubCol').value=ko.length>1?String(ko[1]):'-1';
+        document.getElementById('mtEbookMainCol').value='0';
+        document.getElementById('mtEbookSubCol').value=maxCols>=3?'2':'-1';
         if(en.length) document.getElementById('mtEbookEngCol').value=String(en[0]);
         modal.style.display='flex';
     }
@@ -8887,6 +8936,11 @@ ${JSON.stringify(finalPayload)}`;
             const label = `열 ${col.index + 1} (${textSnippet})`;
             engSel.innerHTML += `<option value="${col.index}" ${i===0 ? 'selected' : ''}>${label}</option>`;
         });
+
+        // 일반형도 열 선택 창을 열 때 주문장=1열, 보조문장=3열을 우선합니다.
+        // 해당 열이 한국어 후보에 없을 때만 기존 감지 순서를 유지합니다.
+        if(korCols.some(col=>Number(col.index)===0)) mainSel.value='0';
+        if(korCols.some(col=>Number(col.index)===2)) subSel.value='2';
 
         document.getElementById('mtColumnSelectModal').style.display = 'flex';
     }
@@ -10914,7 +10968,7 @@ ${JSON.stringify(finalPayload)}`;
   (function syncAppVersionFromFileName(){
     // 파일을 다른 이름으로 저장하거나 브라우저가 경로를 변환해도, 기본 표시가
     // 사라지지 않게 한다. 정상 파일명에서는 아래 값이 자동으로 새 번호로 대체된다.
-    const fallbackVersion='v112';
+    const fallbackVersion='v113';
     let fileName='';
     try{fileName=decodeURIComponent(String(location.pathname||'').split('/').pop()||'');}
     catch(_){fileName=String(location.pathname||'').split('/').pop()||'';}
