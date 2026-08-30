@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v113</title>
+    <title>올인원 영작-단어장 시스템 · v114</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -2559,7 +2559,7 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v113</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v114</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -10968,7 +10968,7 @@ ${JSON.stringify(finalPayload)}`;
   (function syncAppVersionFromFileName(){
     // 파일을 다른 이름으로 저장하거나 브라우저가 경로를 변환해도, 기본 표시가
     // 사라지지 않게 한다. 정상 파일명에서는 아래 값이 자동으로 새 번호로 대체된다.
-    const fallbackVersion='v113';
+    const fallbackVersion='v114';
     let fileName='';
     try{fileName=decodeURIComponent(String(location.pathname||'').split('/').pop()||'');}
     catch(_){fileName=String(location.pathname||'').split('/').pop()||'';}
@@ -11318,5 +11318,55 @@ ${JSON.stringify(finalPayload)}`;
 .mt-slot.mt-type-reference_generate .mt-slot-type-tools {
   margin-left:auto !important;
   justify-content:flex-end !important;
+}
+</style>
+<style id="v114-fixed-slot-width">
+/* 창 폭과 무관하게 슬롯 카드 자체의 너비는 유지하고, 한 줄의 카드 개수만 바뀝니다. */
+#mtSlotsGrid.mt-slots-grid {
+  display:grid !important;
+  grid-template-columns:repeat(auto-fill, 300px) !important;
+  grid-auto-columns:300px !important;
+  justify-content:center !important;
+  align-items:start !important;
+  width:100% !important;
+  max-width:100% !important;
+  box-sizing:border-box !important;
+  overflow-x:auto !important;
+}
+#mtSlotsGrid.mt-slots-grid > .mt-slot {
+  width:300px !important;
+  min-width:300px !important;
+  max-width:300px !important;
+  box-sizing:border-box !important;
+  overflow:visible !important;
+}
+/* 이전 반응형 규칙의 overflow:hidden 때문에 삭제 버튼이 잘리던 문제를 해제합니다. */
+#mtSlotsGrid .mt-slot-actions-row,
+#mtSlotsGrid .mt-gen-actions {
+  display:flex !important;
+  width:100% !important;
+  max-width:100% !important;
+  align-items:center !important;
+  justify-content:flex-start !important;
+  flex-wrap:nowrap !important;
+  gap:2px !important;
+  overflow:visible !important;
+  white-space:nowrap !important;
+  box-sizing:border-box !important;
+}
+#mtSlotsGrid .mt-slot-actions-row > button,
+#mtSlotsGrid .mt-gen-actions > button {
+  flex:0 0 auto !important;
+  min-width:0 !important;
+  padding-left:5px !important;
+  padding-right:5px !important;
+  white-space:nowrap !important;
+}
+@media (max-width:340px) {
+  #mtSlotsGrid.mt-slots-grid {
+    justify-content:start !important;
+    padding-left:0 !important;
+    padding-right:0 !important;
+  }
 }
 </style>
