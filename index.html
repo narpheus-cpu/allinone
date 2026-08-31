@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v118</title>
+    <title>올인원 영작-단어장 시스템 · v119</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -1911,7 +1911,7 @@
   color:#000 !important;
 }
 </style>
-<script id="v118-round-quiz-native-speech-fix">
+<script id="v119-round-quiz-english-speech-fix">
 (function(){
   'use strict';
 
@@ -1934,6 +1934,28 @@
     if(configured)return configured;
     if(/[\u3400-\u9fff]/.test(value))return 'zh-CN';
     return 'en-US';
+  }
+
+  /* 항목1·항목2의 열 순서와 관계없이 영문이 들어 있는 쪽을 발음 대상으로 삼습니다. */
+  function chooseEnglishSpeechTarget(primaryText,secondaryText){
+    const candidates=[primaryText,secondaryText]
+      .map((value,index)=>({text:String(value||'').trim(),index}))
+      .filter(candidate=>candidate.text);
+    if(!candidates.length)return {text:'',isEnglish:false,index:-1};
+
+    const englishCandidates=candidates.map(candidate=>{
+      const englishCount=(candidate.text.match(/[A-Za-z]/g)||[]).length;
+      const visibleCount=(candidate.text.match(/[^\s\d\p{P}\p{S}]/gu)||[]).length || 1;
+      return {...candidate,englishCount,englishRatio:englishCount/visibleCount};
+    }).filter(candidate=>candidate.englishCount>0);
+
+    if(!englishCandidates.length)return {...candidates[0],isEnglish:false};
+    englishCandidates.sort((a,b)=>
+      (b.englishRatio-a.englishRatio) ||
+      (b.englishCount-a.englishCount) ||
+      (a.index-b.index)
+    );
+    return {...englishCandidates[0],isEnglish:true};
   }
 
   function chooseNativeVoice(voices,language){
@@ -1965,15 +1987,17 @@
     button.setAttribute('aria-label',isSpeaking?'원어 발음 재생 중':'원어 발음');
   }
 
-  window.speakAutoDetect=function(text){
-    const speechText=String(text||'').trim();
+  window.speakAutoDetect=function(primaryText,secondaryText){
+    const speechTarget=chooseEnglishSpeechTarget(primaryText,secondaryText);
+    const speechText=speechTarget.text;
     if(!speechText)return false;
 
-    const language=detectSpeechLanguage(speechText);
+    const language=speechTarget.isEnglish?'en-US':detectSpeechLanguage(speechText);
     const speechButton=document.getElementById('quizNativeSpeechBtn');
     if(speechButton){
       speechButton.dataset.speechStatus='requested';
       speechButton.dataset.speechLanguage=language;
+      speechButton.dataset.speechSource=speechTarget.index===1?'secondary':'primary';
     }
     const synth=window.speechSynthesis;
     const Utterance=window.SpeechSynthesisUtterance;
@@ -3145,7 +3169,7 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v118</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v119</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -11567,7 +11591,7 @@ ${JSON.stringify(finalPayload)}`;
   (function syncAppVersionFromFileName(){
     // 파일을 다른 이름으로 저장하거나 브라우저가 경로를 변환해도, 기본 표시가
     // 사라지지 않게 한다. 정상 파일명에서는 아래 값이 자동으로 새 번호로 대체된다.
-    const fallbackVersion='v118';
+    const fallbackVersion='v119';
     let fileName='';
     try{fileName=decodeURIComponent(String(location.pathname||'').split('/').pop()||'');}
     catch(_){fileName=String(location.pathname||'').split('/').pop()||'';}
