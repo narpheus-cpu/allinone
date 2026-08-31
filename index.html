@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v115</title>
+    <title>올인원 영작-단어장 시스템 · v116</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -1438,6 +1438,468 @@
             .mt-slot { min-height:118px; padding:10px; }
         }
 </style>
+<style id="v116-selected-and-draggable-slots">
+/* 마지막으로 연 슬롯: 기존 유형별 테두리를 가리지 않는 간결한 바깥 링 */
+#mtSlotsGrid .mt-slot.mt-last-selected-slot {
+  outline:2px solid #1f2937 !important;
+  outline-offset:2px !important;
+  box-shadow:0 4px 12px rgba(15,23,42,.13) !important;
+}
+#mtSlotsGrid .mt-slot.mt-slot-draggable {
+  position:relative !important;
+}
+#mtSlotsGrid .mt-slot.mt-slot-draggable > .mt-slot-title {
+  width:100% !important;
+  padding-right:28px !important;
+  box-sizing:border-box !important;
+}
+#mtSlotsGrid .mt-slot-drag-handle {
+  position:absolute !important;
+  top:8px !important;
+  right:8px !important;
+  z-index:4 !important;
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  width:23px !important;
+  height:25px !important;
+  min-width:23px !important;
+  padding:0 !important;
+  border:1px solid transparent !important;
+  border-radius:6px !important;
+  background:transparent !important;
+  color:#64748b !important;
+  font-size:15px !important;
+  line-height:1 !important;
+  letter-spacing:-4px !important;
+  cursor:grab !important;
+  opacity:.72 !important;
+  user-select:none !important;
+  touch-action:none !important;
+}
+#mtSlotsGrid .mt-slot-drag-handle:hover,
+#mtSlotsGrid .mt-slot-drag-handle:focus-visible {
+  color:#111827 !important;
+  background:#f1f5f9 !important;
+  border-color:#cbd5e1 !important;
+  opacity:1 !important;
+  outline:none !important;
+}
+#mtSlotsGrid .mt-slot-drag-handle:active { cursor:grabbing !important; }
+#mtSlotsGrid .mt-slot.mt-drag-source { opacity:.5 !important; }
+#mtSlotsGrid .mt-slot.mt-drop-target {
+  outline:2px dashed #111827 !important;
+  outline-offset:3px !important;
+  background-color:#f8fafc !important;
+}
+#mtSlotsGrid.mt-slot-reordering { pointer-events:none !important; cursor:wait !important; }
+</style>
+<script id="v116-slot-selection-and-reorder">
+(function(){
+  'use strict';
+
+  const LAST_SELECTED_KEY='mt_last_selected_slot_v116';
+  const SLOT_COUNT=11;
+  let dragSourceSlot=null;
+  let pointerDrag=null;
+  let reorderBusy=false;
+  let suppressSlotClickUntil=0;
+  const runningGeneratorSlots=new Set();
+
+  function cloneValue(value){
+    if(value===null || value===undefined) return value;
+    return JSON.parse(JSON.stringify(value));
+  }
+  function validDataSlot(value){
+    const n=Number(value);
+    return Number.isInteger(n) && n>=1 && n<=SLOT_COUNT ? n : null;
+  }
+  function readLastSelected(){
+    try{
+      const raw=String(localStorage.getItem(LAST_SELECTED_KEY)||'');
+      if(raw==='star') return 'star';
+      return validDataSlot(raw);
+    }catch(_){ return null; }
+  }
+  function rememberLastSelected(slot){
+    const safe=slot==='star' ? 'star' : validDataSlot(slot);
+    if(safe===null) return;
+    try{ localStorage.setItem(LAST_SELECTED_KEY,String(safe)); }catch(_){ }
+    document.querySelectorAll('#mtSlotsGrid .mt-slot').forEach(node=>{
+      const selected=String(node.dataset.slotIndex||'')===String(safe);
+      node.classList.toggle('mt-last-selected-slot',selected);
+      node.setAttribute('aria-current',selected?'true':'false');
+    });
+  }
+  function storageValue(store,key){
+    try{return store.getItem(key);}catch(_){return null;}
+  }
+  function setStorageValue(store,key,value){
+    try{if(value===null || value===undefined)store.removeItem(key);else store.setItem(key,value);}catch(_){ }
+  }
+  function apiStorageKeys(slot){
+    return [
+      `mt_slot_self_generate_api_key_${slot}`,
+      `mt_slot_reference_generate_api_key_${slot}`,
+      `mt_generator_slot_api_key_self_generate_${slot}`,
+      `mt_generator_slot_api_key_reference_generate_${slot}`
+    ];
+  }
+  function captureSlot(slot){
+    const explicitType=mtGetSlotType(slot);
+    const normal=mtGetNormalSlotSync(slot);
+    const type=explicitType || (normal?'normal':'');
+    const typed=['ebook','self_generate','reference_generate'].includes(type)
+      ? cloneValue(mtGetTypedState(slot)) : null;
+    const apiValues=apiStorageKeys(slot).map(key=>storageValue(localStorage,key));
+    const completionKey=MT_EBOOK_COMPLETION_RECORD_PREFIX+slot;
+    return {
+      oldSlot:slot,
+      type,
+      normal:normal?cloneValue(normal):null,
+      typed,
+      apiValues,
+      completionLocal:storageValue(localStorage,completionKey),
+      completionSession:storageValue(sessionStorage,completionKey),
+      hasPage:Object.prototype.hasOwnProperty.call(mtEbookPage,String(slot)),
+      page:mtEbookPage[String(slot)]
+    };
+  }
+  function clearSlot(slot){
+    try{mtDeleteNormalSlotSync(slot);}catch(_){ }
+    try{mtSetSlotType(slot,'');}catch(_){ }
+    try{delete mtSlotTypeMemory[String(slot)];}catch(_){ }
+    try{delete mtSlotStateCache[String(slot)];}catch(_){ }
+    setStorageValue(localStorage,MT_SLOT_TYPE_STORAGE_PREFIX+String(slot),null);
+    setStorageValue(localStorage,'mt_slot_state_'+String(slot),null);
+    apiStorageKeys(slot).forEach(key=>setStorageValue(localStorage,key,null));
+    const completionKey=MT_EBOOK_COMPLETION_RECORD_PREFIX+slot;
+    setStorageValue(localStorage,completionKey,null);
+    setStorageValue(sessionStorage,completionKey,null);
+    delete mtEbookPage[String(slot)];
+  }
+  function writeSlot(slot,snapshot){
+    const type=String(snapshot?.type||'');
+    if(type==='normal'){
+      if(snapshot.normal) mtSetNormalSlotSync(slot,cloneValue(snapshot.normal));
+      mtSetSlotType(slot,'normal');
+    }else if(['ebook','self_generate','reference_generate'].includes(type)){
+      mtSetSlotType(slot,type);
+      if(snapshot.typed){
+        const state=cloneValue(snapshot.typed);
+        state.type=type;
+        mtSaveTypedState(slot,state);
+      }
+    }else if(snapshot?.normal){
+      mtSetNormalSlotSync(slot,cloneValue(snapshot.normal));
+      mtSetSlotType(slot,'normal');
+    }
+    const apiValues=Array.isArray(snapshot?.apiValues)?snapshot.apiValues:[];
+    apiStorageKeys(slot).forEach((key,index)=>setStorageValue(localStorage,key,apiValues[index]??null));
+    const completionKey=MT_EBOOK_COMPLETION_RECORD_PREFIX+slot;
+    setStorageValue(localStorage,completionKey,snapshot?.completionLocal??null);
+    setStorageValue(sessionStorage,completionKey,snapshot?.completionSession??null);
+    if(snapshot?.hasPage) mtEbookPage[String(slot)]=snapshot.page;
+  }
+  function savePageMap(){
+    try{localStorage.setItem(MT_EBOOK_LAST_PAGE_STORAGE_KEY,JSON.stringify(mtEbookPage));}catch(_){ }
+  }
+  function stopGeneratorTimers(){
+    for(let slot=1;slot<=SLOT_COUNT;slot++){
+      try{if(mtGeneratorTimers[slot])clearTimeout(mtGeneratorTimers[slot]);delete mtGeneratorTimers[slot];}catch(_){ }
+    }
+  }
+  async function persistReorderedSlots(){
+    try{clearTimeout(mtNormalSlotSaveTimer);mtNormalSlotSaveTimer=null;}catch(_){ }
+    try{clearTimeout(mtTypedSlotStateSaveTimer);mtTypedSlotStateSaveTimer=null;}catch(_){ }
+    const jobs=[];
+    if(typeof mtNormalSlotCacheReady!=='undefined' && mtNormalSlotCacheReady) jobs.push(mtPersistNormalSlotCache());
+    jobs.push(mtPersistTypedSlotStates());
+    const results=await Promise.allSettled(jobs);
+    results.filter(result=>result.status==='rejected').forEach(result=>console.warn('[슬롯 이동] 영구 저장 일부 실패:',result.reason));
+  }
+  function buildMove(fromSlot,toSlot,snapshots){
+    const reordered=snapshots.slice();
+    const moved=reordered.splice(fromSlot-1,1)[0];
+    reordered.splice(toSlot-1,0,moved);
+    const indexMap={};
+    reordered.forEach((snapshot,index)=>{indexMap[Number(snapshot.oldSlot)]=index+1;});
+    return {reordered,indexMap};
+  }
+  async function remapGeneratorErrors(indexMap){
+    for(const type of ['self_generate','reference_generate']){
+      const key=mtGeneratorErrorKey(type);
+      const candidates=[];
+      try{const local=JSON.parse(localStorage.getItem(key)||'[]');if(Array.isArray(local))candidates.push(...local);}catch(_){ }
+      try{const memory=mtGeneratorErrorMemory.get(type);if(Array.isArray(memory))candidates.push(...memory);}catch(_){ }
+      if(typeof mtReadErrorLogsFromDedicatedDb==='function'){
+        try{const dbRows=await mtReadErrorLogsFromDedicatedDb(mtGeneratorErrorDbKey(type));if(Array.isArray(dbRows))candidates.push(...dbRows);}catch(_){ }
+      }
+      const unique=new Map();
+      candidates.forEach((entry,index)=>{
+        if(!entry || typeof entry!=='object')return;
+        const id=String(entry.id||`${entry.timestampKST||''}_${entry.slotIndex||''}_${entry.message||''}_${index}`);
+        if(!unique.has(id))unique.set(id,entry);
+      });
+      const remapped=Array.from(unique.values()).map(entry=>{
+        const old=validDataSlot(entry.slotIndex);
+        return old && indexMap[old] ? {...entry,slotIndex:indexMap[old]} : {...entry};
+      }).sort((a,b)=>String(b.id||'').localeCompare(String(a.id||''))).slice(0,100);
+      mtGeneratorErrorMemory.set(type,remapped);
+      try{localStorage.setItem(key,JSON.stringify(remapped));}catch(_){ }
+      if(typeof mtWriteErrorLogsToDedicatedDb==='function'){
+        try{await mtWriteErrorLogsToDedicatedDb(mtGeneratorErrorDbKey(type),remapped);}catch(e){console.warn('[슬롯 이동] 오류로그 위치 저장 실패:',e);}
+      }
+    }
+  }
+  function remapCooldowns(indexMap){
+    try{
+      const entries=Array.from(GEMINI_MODEL_COOLDOWN_UNTIL.entries());
+      GEMINI_MODEL_COOLDOWN_UNTIL.clear();
+      entries.forEach(([key,value])=>{
+        const parts=String(key).split('|');
+        const old=validDataSlot(parts[1]);
+        if(old && indexMap[old])parts[1]=String(indexMap[old]);
+        GEMINI_MODEL_COOLDOWN_UNTIL.set(parts.join('|'),value);
+      });
+    }catch(_){ }
+  }
+  function remapRuntimeIndexes(indexMap){
+    const mapped=value=>{
+      const old=validDataSlot(value);
+      return old && indexMap[old] ? indexMap[old] : value;
+    };
+    try{mtActiveSlotIndex=mapped(mtActiveSlotIndex);}catch(_){ }
+    try{mtEbookActiveSlot=mapped(mtEbookActiveSlot);}catch(_){ }
+    try{mtGeneratorListSlot=mapped(mtGeneratorListSlot);}catch(_){ }
+    try{if(mtEbookEditTarget?.slotIndex)mtEbookEditTarget.slotIndex=mapped(mtEbookEditTarget.slotIndex);}catch(_){ }
+    try{if(mtGeneratorEditSlot!=null)mtGeneratorEditSlot=mapped(mtGeneratorEditSlot);}catch(_){ }
+  }
+  async function reorderSlots(fromValue,toValue){
+    const fromSlot=validDataSlot(fromValue),toSlot=validDataSlot(toValue);
+    if(!fromSlot || !toSlot || fromSlot===toSlot || reorderBusy)return false;
+    if(runningGeneratorSlots.size){
+      alert('현재 문장을 생성 중인 슬롯이 있습니다. 생성 작업이 끝난 뒤 다시 이동해 주세요.');
+      return false;
+    }
+    reorderBusy=true;
+    suppressSlotClickUntil=Date.now()+500;
+    const grid=document.getElementById('mtSlotsGrid');
+    if(grid)grid.classList.add('mt-slot-reordering');
+    stopGeneratorTimers();
+    const original=Array.from({length:SLOT_COUNT},(_,index)=>captureSlot(index+1));
+    const {reordered,indexMap}=buildMove(fromSlot,toSlot,original);
+    try{
+      for(let slot=1;slot<=SLOT_COUNT;slot++)clearSlot(slot);
+      reordered.forEach((snapshot,index)=>writeSlot(index+1,snapshot));
+      savePageMap();
+      await persistReorderedSlots();
+      await remapGeneratorErrors(indexMap);
+      remapCooldowns(indexMap);
+      remapRuntimeIndexes(indexMap);
+      const previousSelected=readLastSelected();
+      const selected=previousSelected==='star'?'star':(validDataSlot(previousSelected)?indexMap[previousSelected]:toSlot);
+      try{localStorage.setItem(LAST_SELECTED_KEY,String(selected||toSlot));}catch(_){ }
+      mtInitSlots();
+      if(typeof mtRestoreGeneratorTimers==='function')mtRestoreGeneratorTimers();
+      return true;
+    }catch(error){
+      console.error('[슬롯 이동] 실패:',error);
+      try{
+        for(let slot=1;slot<=SLOT_COUNT;slot++)clearSlot(slot);
+        original.forEach((snapshot,index)=>writeSlot(index+1,snapshot));
+        savePageMap();
+        await persistReorderedSlots();
+      }catch(restoreError){console.error('[슬롯 이동] 원래 순서 복원 실패:',restoreError);}
+      mtInitSlots();
+      if(typeof mtRestoreGeneratorTimers==='function')mtRestoreGeneratorTimers();
+      alert('슬롯 위치를 저장하지 못해 원래 순서로 되돌렸습니다.');
+      return false;
+    }finally{
+      reorderBusy=false;
+      if(grid)grid.classList.remove('mt-slot-reordering');
+      clearDragMarks();
+    }
+  }
+  function clearDragMarks(){
+    dragSourceSlot=null;
+    document.querySelectorAll('#mtSlotsGrid .mt-slot').forEach(node=>node.classList.remove('mt-drag-source','mt-drop-target'));
+  }
+  function updateMouseDrag(event){
+    if(!pointerDrag || pointerDrag.mode!=='mouse' || reorderBusy)return;
+    const distance=Math.hypot(event.clientX-pointerDrag.startX,event.clientY-pointerDrag.startY);
+    if(!pointerDrag.moved && distance<5)return;
+    event.preventDefault();
+    pointerDrag.moved=true;
+    const sourceNode=document.querySelector(`#mtSlotsGrid > .mt-slot[data-slot-index="${pointerDrag.source}"]`);
+    if(sourceNode)sourceNode.classList.add('mt-drag-source');
+    const hit=document.elementFromPoint(event.clientX,event.clientY);
+    const targetNode=hit?.closest?.('#mtSlotsGrid > .mt-slot[data-slot-index]');
+    const targetSlot=validDataSlot(targetNode?.dataset?.slotIndex);
+    document.querySelectorAll('#mtSlotsGrid .mt-drop-target').forEach(other=>other.classList.remove('mt-drop-target'));
+    if(targetSlot && targetSlot!==pointerDrag.source){
+      pointerDrag.target=targetSlot;
+      targetNode.classList.add('mt-drop-target');
+    }else pointerDrag.target=null;
+  }
+  function finishMouseDrag(event){
+    if(!pointerDrag || pointerDrag.mode!=='mouse')return;
+    event.preventDefault();
+    const source=validDataSlot(pointerDrag.source);
+    const target=pointerDrag.moved?validDataSlot(pointerDrag.target):null;
+    pointerDrag=null;
+    suppressSlotClickUntil=Date.now()+500;
+    if(source && target && source!==target)reorderSlots(source,target);
+    else clearDragMarks();
+  }
+  function decorateDataSlot(node,slot){
+    if(!node || node.dataset.v116Decorated==='1')return;
+    node.dataset.v116Decorated='1';
+    node.dataset.slotIndex=String(slot);
+    node.classList.add('mt-slot-draggable');
+    const last=readLastSelected();
+    node.classList.toggle('mt-last-selected-slot',String(last)===String(slot));
+    node.setAttribute('aria-current',String(last)===String(slot)?'true':'false');
+
+    const originalClick=node.onclick;
+    node.onclick=function(event){
+      if(Date.now()<suppressSlotClickUntil)return;
+      rememberLastSelected(slot);
+      if(typeof originalClick==='function')return originalClick.call(this,event);
+    };
+
+    const handle=document.createElement('button');
+    handle.type='button';
+    handle.className='mt-slot-drag-handle';
+    // 브라우저 기본 HTML5 드래그 대신 포인터 이동을 추적합니다.
+    // 버튼·빈 슬롯의 기본 동작 차이와 무관하게 같은 방식으로 작동합니다.
+    handle.draggable=false;
+    handle.textContent='⋮⋮';
+    handle.title=`슬롯 ${slot} 위치 이동`;
+    handle.setAttribute('aria-label',`슬롯 ${slot} 위치 이동`);
+    handle.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();});
+    handle.addEventListener('pointerdown',event=>{
+      if(event.button!==0 || reorderBusy || runningGeneratorSlots.size)return;
+      event.preventDefault();
+      event.stopPropagation();
+      pointerDrag={pointerId:event.pointerId,source:slot,startX:event.clientX,startY:event.clientY,moved:false,target:null};
+      dragSourceSlot=slot;
+      try{handle.setPointerCapture(event.pointerId);}catch(_){ }
+    });
+    handle.addEventListener('mousedown',event=>{
+      if(event.button!==0 || reorderBusy || runningGeneratorSlots.size)return;
+      event.preventDefault();
+      event.stopPropagation();
+      pointerDrag={mode:'mouse',source:slot,startX:event.clientX,startY:event.clientY,moved:false,target:null};
+      dragSourceSlot=slot;
+    });
+    handle.addEventListener('pointermove',event=>{
+      if(!pointerDrag || pointerDrag.pointerId!==event.pointerId || pointerDrag.source!==slot)return;
+      const distance=Math.hypot(event.clientX-pointerDrag.startX,event.clientY-pointerDrag.startY);
+      if(!pointerDrag.moved && distance<5)return;
+      event.preventDefault();
+      event.stopPropagation();
+      pointerDrag.moved=true;
+      node.classList.add('mt-drag-source');
+      const hit=document.elementFromPoint(event.clientX,event.clientY);
+      const targetNode=hit?.closest?.('#mtSlotsGrid > .mt-slot[data-slot-index]');
+      const targetSlot=validDataSlot(targetNode?.dataset?.slotIndex);
+      document.querySelectorAll('#mtSlotsGrid .mt-drop-target').forEach(other=>other.classList.remove('mt-drop-target'));
+      if(targetSlot && targetSlot!==slot){
+        pointerDrag.target=targetSlot;
+        targetNode.classList.add('mt-drop-target');
+      }else pointerDrag.target=null;
+    });
+    const finishPointerDrag=event=>{
+      if(!pointerDrag || pointerDrag.pointerId!==event.pointerId || pointerDrag.source!==slot)return;
+      event.preventDefault();
+      event.stopPropagation();
+      const target=pointerDrag.moved?validDataSlot(pointerDrag.target):null;
+      try{handle.releasePointerCapture(event.pointerId);}catch(_){ }
+      pointerDrag=null;
+      suppressSlotClickUntil=Date.now()+500;
+      if(target && target!==slot)reorderSlots(slot,target);
+      else clearDragMarks();
+    };
+    handle.addEventListener('pointerup',finishPointerDrag);
+    handle.addEventListener('pointercancel',finishPointerDrag);
+    handle.addEventListener('dragstart',event=>{
+      event.stopPropagation();
+      if(reorderBusy || runningGeneratorSlots.size){event.preventDefault();return;}
+      dragSourceSlot=slot;
+      node.classList.add('mt-drag-source');
+      if(event.dataTransfer){event.dataTransfer.effectAllowed='move';event.dataTransfer.setData('text/plain',String(slot));}
+    });
+    handle.addEventListener('dragend',()=>clearDragMarks());
+    node.appendChild(handle);
+
+    node.addEventListener('dragover',event=>{
+      if(!dragSourceSlot || dragSourceSlot===slot || reorderBusy)return;
+      event.preventDefault();
+      if(event.dataTransfer)event.dataTransfer.dropEffect='move';
+      document.querySelectorAll('#mtSlotsGrid .mt-drop-target').forEach(other=>{if(other!==node)other.classList.remove('mt-drop-target');});
+      node.classList.add('mt-drop-target');
+    });
+    node.addEventListener('dragleave',event=>{
+      if(!event.relatedTarget || !node.contains(event.relatedTarget))node.classList.remove('mt-drop-target');
+    });
+    node.addEventListener('drop',event=>{
+      event.preventDefault();
+      event.stopPropagation();
+      const source=dragSourceSlot || validDataSlot(event.dataTransfer?.getData('text/plain'));
+      node.classList.remove('mt-drop-target');
+      if(source && source!==slot)reorderSlots(source,slot);
+      else clearDragMarks();
+    });
+  }
+  function decorateSlots(){
+    const grid=document.getElementById('mtSlotsGrid');
+    if(!grid)return;
+    const nodes=Array.from(grid.children).filter(node=>node.classList.contains('mt-slot'));
+    nodes.slice(0,SLOT_COUNT).forEach((node,index)=>decorateDataSlot(node,index+1));
+    const star=nodes.find(node=>node.classList.contains('mt-premium-slot'));
+    if(star && star.dataset.v116SelectedDecorated!=='1'){
+      star.dataset.v116SelectedDecorated='1';
+      star.dataset.slotIndex='star';
+      const last=readLastSelected();
+      star.classList.toggle('mt-last-selected-slot',last==='star');
+      star.setAttribute('aria-current',last==='star'?'true':'false');
+      const originalClick=star.onclick;
+      star.onclick=function(event){rememberLastSelected('star');if(typeof originalClick==='function')return originalClick.call(this,event);};
+    }
+  }
+
+  function installV116SlotFeatures(){
+    if(window.__mtV116SlotFeaturesInstalled)return;
+    // 이 스크립트는 호환 CSS 앞쪽에 놓여 있으므로, 본문 함수가 모두 선언된 뒤 설치합니다.
+    if(typeof mtInitSlots!=='function'){
+      setTimeout(installV116SlotFeatures,0);
+      return;
+    }
+    window.__mtV116SlotFeaturesInstalled=true;
+    if(typeof mtGeneratorRun==='function'){
+      const originalGeneratorRun=mtGeneratorRun;
+      mtGeneratorRun=async function(slotIndex){
+        const slot=validDataSlot(slotIndex);
+        if(slot)runningGeneratorSlots.add(slot);
+        try{return await originalGeneratorRun.apply(this,arguments);}
+        finally{if(slot)runningGeneratorSlots.delete(slot);}
+      };
+      window.mtGeneratorRun=mtGeneratorRun;
+    }
+    const originalInitSlots=mtInitSlots;
+    mtInitSlots=function(){const result=originalInitSlots.apply(this,arguments);decorateSlots();return result;};
+    window.mtInitSlots=mtInitSlots;
+    window.mtMoveSlotPosition=reorderSlots;
+    window.mtRememberLastSelectedSlot=rememberLastSelected;
+    document.addEventListener('mousemove',updateMouseDrag,true);
+    document.addEventListener('mouseup',finishMouseDrag,true);
+    decorateSlots();
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installV116SlotFeatures,{once:true});
+  else installV116SlotFeatures();
+})();
+</script>
 
 <!-- v75: 전자책 목록 영역과 최초 등록 방식 보완 -->
 <style id="v75-ebook-list-surface">
@@ -2559,7 +3021,7 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v115</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v116</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -4155,8 +4617,9 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
     const MT_ERROR_LOG_WRITE_TIMEOUT_MS = 5000;
 
     function mtOpenErrorLogDb() {
-        if (mtErrorLogDbPromise) return mtErrorLogDbPromise;
-        mtErrorLogDbPromise = new Promise((resolve, reject) => {
+        // 각 작업마다 독립 연결을 엽니다. 닫힌 연결을 캐시해 다음 슬롯 이동/로그 저장에서
+        // InvalidStateError가 발생하던 문제를 방지합니다.
+        return new Promise((resolve, reject) => {
             if (!window.indexedDB) { reject(new Error('IndexedDB unavailable')); return; }
             const req = indexedDB.open(MT_ERROR_LOG_DB_NAME, MT_ERROR_LOG_DB_VERSION);
             req.onupgradeneeded = e => {
@@ -4170,11 +4633,7 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
             };
             req.onerror = () => reject(req.error || new Error('오류 로그 DB 열기 실패'));
             req.onblocked = () => reject(new Error('오류 로그 DB 열기가 차단되었습니다.'));
-        }).catch(err => {
-            mtErrorLogDbPromise = null;
-            throw err;
         });
-        return mtErrorLogDbPromise;
     }
 
     function mtWithTimeout(promise, ms) {
@@ -10968,7 +11427,7 @@ ${JSON.stringify(finalPayload)}`;
   (function syncAppVersionFromFileName(){
     // 파일을 다른 이름으로 저장하거나 브라우저가 경로를 변환해도, 기본 표시가
     // 사라지지 않게 한다. 정상 파일명에서는 아래 값이 자동으로 새 번호로 대체된다.
-    const fallbackVersion='v115';
+    const fallbackVersion='v116';
     let fileName='';
     try{fileName=decodeURIComponent(String(location.pathname||'').split('/').pop()||'');}
     catch(_){fileName=String(location.pathname||'').split('/').pop()||'';}
