@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v117</title>
+    <title>올인원 영작-단어장 시스템 · v118</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -1900,6 +1900,130 @@
   else installV116SlotFeatures();
 })();
 </script>
+<style id="v118-round-quiz-black-theme">
+/* 라운드 퀴즈의 진행률 표시와 가려진 글자를 순수 검정으로 통일합니다. */
+#quizTab #progressBadge {
+  background:#000 !important;
+  border-color:#000 !important;
+  color:#fff !important;
+}
+#quizTab .quiz-mask-word .mask-layer {
+  color:#000 !important;
+}
+</style>
+<script id="v118-round-quiz-native-speech-fix">
+(function(){
+  'use strict';
+
+  const configuredLanguageMap={
+    English:'en-US',
+    Japanese:'ja-JP',
+    German:'de-DE',
+    French:'fr-FR',
+    Russian:'ru-RU'
+  };
+
+  function detectSpeechLanguage(text){
+    const value=String(text||'');
+    if(/[\u3040-\u30ff]/.test(value))return 'ja-JP';
+    if(/[\uac00-\ud7af]/.test(value))return 'ko-KR';
+    if(/[\u0400-\u04ff]/.test(value))return 'ru-RU';
+
+    const languageSelect=document.getElementById('targetLanguage');
+    const configured=languageSelect && configuredLanguageMap[languageSelect.value];
+    if(configured)return configured;
+    if(/[\u3400-\u9fff]/.test(value))return 'zh-CN';
+    return 'en-US';
+  }
+
+  function chooseNativeVoice(voices,language){
+    if(!Array.isArray(voices) || !voices.length)return null;
+    const exact=String(language||'').toLowerCase();
+    const base=exact.split('-')[0];
+    const candidates=voices.filter(voice=>{
+      const voiceLang=String(voice.lang||'').toLowerCase();
+      return voiceLang===exact || voiceLang.startsWith(base+'-') || voiceLang===base;
+    });
+    if(!candidates.length)return null;
+    return candidates.sort((a,b)=>{
+      const score=voice=>{
+        const name=String(voice.name||'').toLowerCase();
+        const voiceLang=String(voice.lang||'').toLowerCase();
+        let value=voiceLang===exact?10:0;
+        if(/natural|online|neural|google|microsoft/.test(name))value+=5;
+        if(voice.default)value+=2;
+        return value;
+      };
+      return score(b)-score(a);
+    })[0];
+  }
+
+  function setSpeechButtonState(isSpeaking){
+    const button=document.getElementById('quizNativeSpeechBtn');
+    if(!button)return;
+    button.classList.toggle('is-speaking',!!isSpeaking);
+    button.setAttribute('aria-label',isSpeaking?'원어 발음 재생 중':'원어 발음');
+  }
+
+  window.speakAutoDetect=function(text){
+    const speechText=String(text||'').trim();
+    if(!speechText)return false;
+
+    const language=detectSpeechLanguage(speechText);
+    const speechButton=document.getElementById('quizNativeSpeechBtn');
+    if(speechButton){
+      speechButton.dataset.speechStatus='requested';
+      speechButton.dataset.speechLanguage=language;
+    }
+    const synth=window.speechSynthesis;
+    const Utterance=window.SpeechSynthesisUtterance;
+    if(!synth || typeof Utterance!=='function'){
+      if(speechButton)speechButton.dataset.speechStatus='unsupported';
+      alert('이 브라우저에서는 음성 재생 기능을 사용할 수 없습니다.');
+      return false;
+    }
+
+    const voices=typeof synth.getVoices==='function'?synth.getVoices():[];
+    const nativeVoice=chooseNativeVoice(voices,language);
+
+    const play=function(useSelectedVoice){
+      const utterance=new Utterance(speechText);
+      utterance.lang=language;
+      utterance.rate=0.92;
+      utterance.pitch=1;
+      utterance.volume=1;
+      if(useSelectedVoice && nativeVoice)utterance.voice=nativeVoice;
+
+      utterance.onstart=function(){if(speechButton)speechButton.dataset.speechStatus='speaking';setSpeechButtonState(true);};
+      utterance.onend=function(){if(speechButton)speechButton.dataset.speechStatus='ended';setSpeechButtonState(false);};
+      utterance.onerror=function(event){
+        setSpeechButtonState(false);
+        const reason=String(event && event.error || '');
+        if(speechButton)speechButton.dataset.speechStatus=reason||'error';
+        if(useSelectedVoice && nativeVoice && reason!=='canceled' && reason!=='interrupted'){
+          window.setTimeout(function(){play(false);},40);
+        }else if(reason!=='canceled' && reason!=='interrupted'){
+          console.error('원어 발음 재생 오류:',reason||event);
+        }
+      };
+
+      synth.cancel();
+      if(synth.paused)synth.resume();
+      window.setTimeout(function(){
+        synth.speak(utterance);
+        window.setTimeout(function(){if(synth.paused)synth.resume();},80);
+      },30);
+    };
+
+    play(true);
+    return true;
+  };
+
+  if(window.speechSynthesis && typeof window.speechSynthesis.getVoices==='function'){
+    window.speechSynthesis.getVoices();
+  }
+})();
+</script>
 
 <!-- v75: 전자책 목록 영역과 최초 등록 방식 보완 -->
 <style id="v75-ebook-list-surface">
@@ -3021,7 +3145,7 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v117</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v118</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -3265,7 +3389,7 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
                 <div id="quizStats" style="font-size:13px; font-weight:600; color:#4b5563; margin-bottom:14px;"></div>
 
                 <div style="display:flex; justify-content:center; gap:8px; margin-bottom:15px; flex-wrap: wrap;">
-                    <button class="btn-primary" onclick="speakSmartQuiz()">원어 발음</button>
+                    <button id="quizNativeSpeechBtn" type="button" class="btn-primary" onclick="speakSmartQuiz()">원어 발음</button>
                     <button class="btn-ai" onclick="toggleQuizHint()">예문 보기</button>
                     <button class="btn-excel" onclick="showQuizAnswer()">정답 확인</button>
                 </div>
@@ -11443,7 +11567,7 @@ ${JSON.stringify(finalPayload)}`;
   (function syncAppVersionFromFileName(){
     // 파일을 다른 이름으로 저장하거나 브라우저가 경로를 변환해도, 기본 표시가
     // 사라지지 않게 한다. 정상 파일명에서는 아래 값이 자동으로 새 번호로 대체된다.
-    const fallbackVersion='v117';
+    const fallbackVersion='v118';
     let fileName='';
     try{fileName=decodeURIComponent(String(location.pathname||'').split('/').pop()||'');}
     catch(_){fileName=String(location.pathname||'').split('/').pop()||'';}
