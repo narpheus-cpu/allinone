@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v116</title>
+    <title>올인원 영작-단어장 시스템 · v117</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -3021,7 +3021,7 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v116</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v117</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -3683,9 +3683,25 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
                 <div><div style="display:flex;align-items:center;gap:6px;"><div class="mt-ebook-title" id="mtEbookViewerTitle">전자책</div><button type="button" class="mt-ebook-title-edit-btn" onclick="mtRenameEbookViewerTitle()" title="슬롯 제목 수정" aria-label="슬롯 제목 수정">✎</button></div><div class="mt-ebook-subtitle" id="mtEbookViewerSubtitle"></div></div>
                 <div style="display:flex;align-items:center;gap:6px;">
                     <button id="mtEbookEnglishToggleBtn" type="button" class="btn-excel" onclick="mtToggleEbookEnglishMode()">영어변환</button>
+                    <button id="mtEbookListOptionsBtn" type="button" class="btn-excel" aria-expanded="false" aria-controls="mtEbookListOptionsPanel" onclick="mtToggleEbookListOptions()">목록 옵션</button>
+                    <button class="btn-excel" onclick="mtCloseEbookViewer()">← 슬롯 목록</button>
+                </div>
+            </div>
+            <div id="mtEbookListOptionsPanel" class="mt-ebook-list-options-panel" aria-hidden="true">
+                <div class="mt-ebook-list-options-head">
+                    <div><div class="mt-ebook-list-options-title">목록 옵션</div><div class="mt-ebook-list-options-desc">글꼴·행 간격과 각 행 앞에 표시할 요소를 선택하세요.</div></div>
+                    <button type="button" class="btn-excel" onclick="mtToggleEbookListOptions(false)">닫기</button>
+                </div>
+                <div class="mt-ebook-list-options-appearance">
                     <label class="mt-ebook-font-control" title="목록 글꼴 크기"><span>글꼴</span><input class="mt-list-font-size-input" type="number" min="10" max="36" value="18" inputmode="numeric" oninput="var n=Math.max(10,Math.min(36,Number(this.value)||10));document.documentElement.style.setProperty('--mt-live-list-font-size',n+'px');document.querySelectorAll('#mtEbookList .mt-ebook-item-main').forEach(function(el){el.style.setProperty('font-size',n+'px','important')});if(window.mtListUiSave)window.mtListUiSave('font',n)"><span>px</span></label>
                     <label class="mt-ebook-font-control" title="목록 행의 상하 여백"><span>행 여백</span><input class="mt-list-row-padding-input" type="number" min="0" max="40" value="12" inputmode="numeric" oninput="var n=Number(this.value);if(Number.isFinite(n)){n=Math.max(0,Math.min(40,n));document.documentElement.style.setProperty('--mt-live-list-padding-y',n+'px');document.querySelectorAll('#mtEbookList .mt-ebook-item').forEach(function(el){el.style.setProperty('padding-top',n+'px','important');el.style.setProperty('padding-bottom',n+'px','important')});if(window.mtListUiSave)window.mtListUiSave('padding',n)}"><span>px</span></label>
-                    <button class="btn-excel" onclick="mtCloseEbookViewer()">← 슬롯 목록</button>
+                </div>
+                <div class="mt-ebook-list-options-grid">
+                    <label class="mt-ebook-list-option-row"><span>각 행 사이의 라인</span><input id="mtEbookOptionRowLines" class="mt-ebook-option-toggle" type="checkbox" checked onchange="mtSetEbookListOption('rowLines',this.checked)"></label>
+                    <label class="mt-ebook-list-option-row"><span>각 행 앞의 체크박스</span><input id="mtEbookOptionCheckboxes" class="mt-ebook-option-toggle" type="checkbox" checked onchange="mtSetEbookListOption('checkboxes',this.checked)"></label>
+                    <label class="mt-ebook-list-option-row"><span>각 행 앞의 삭제 버튼</span><input id="mtEbookOptionDeleteButtons" class="mt-ebook-option-toggle" type="checkbox" checked onchange="mtSetEbookListOption('deleteButtons',this.checked)"></label>
+                    <label class="mt-ebook-list-option-row"><span>각 행 앞의 편집 버튼</span><input id="mtEbookOptionEditButtons" class="mt-ebook-option-toggle" type="checkbox" checked onchange="mtSetEbookListOption('editButtons',this.checked)"></label>
+                    <label class="mt-ebook-list-option-row"><span>각 행 앞의 일련번호</span><input id="mtEbookOptionSerialNumbers" class="mt-ebook-option-toggle" type="checkbox" checked onchange="mtSetEbookListOption('serialNumbers',this.checked)"></label>
                 </div>
             </div>
             <div id="mtEbookListToolbar" class="mt-ebook-list-toolbar" style="display:none;">
@@ -11427,7 +11443,7 @@ ${JSON.stringify(finalPayload)}`;
   (function syncAppVersionFromFileName(){
     // 파일을 다른 이름으로 저장하거나 브라우저가 경로를 변환해도, 기본 표시가
     // 사라지지 않게 한다. 정상 파일명에서는 아래 값이 자동으로 새 번호로 대체된다.
-    const fallbackVersion='v116';
+    const fallbackVersion='v117';
     let fileName='';
     try{fileName=decodeURIComponent(String(location.pathname||'').split('/').pop()||'');}
     catch(_){fileName=String(location.pathname||'').split('/').pop()||'';}
@@ -11842,3 +11858,166 @@ ${JSON.stringify(finalPayload)}`;
   }
 }
 </style>
+<style id="v117-ebook-list-display-options">
+.mt-ebook-list-options-panel {
+  display:none;
+  margin:-8px 0 14px;
+  padding:13px 14px;
+  border:1px solid #dbe2ea;
+  border-radius:10px;
+  background:#f8fafc;
+  box-sizing:border-box;
+}
+.mt-ebook-list-options-panel.open { display:block; }
+.mt-ebook-list-options-head {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:11px;
+}
+.mt-ebook-list-options-title { color:#111827; font-size:12px; font-weight:800; }
+.mt-ebook-list-options-desc { margin-top:2px; color:#64748b; font-size:10px; line-height:1.4; }
+.mt-ebook-list-options-appearance {
+  display:flex;
+  align-items:center;
+  gap:7px;
+  margin-bottom:10px;
+  padding-bottom:10px;
+  border-bottom:1px solid #e2e8f0;
+  flex-wrap:wrap;
+}
+.mt-ebook-list-options-grid {
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+  gap:7px;
+}
+.mt-ebook-list-option-row {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  min-height:34px;
+  padding:6px 9px;
+  border:1px solid #e2e8f0;
+  border-radius:8px;
+  background:#fff;
+  color:#374151;
+  font-size:10px;
+  font-weight:700;
+  box-sizing:border-box;
+  cursor:pointer;
+}
+.mt-ebook-option-toggle {
+  appearance:none;
+  -webkit-appearance:none;
+  position:relative;
+  flex:0 0 auto;
+  width:34px;
+  height:19px;
+  margin:0;
+  border:1px solid #cbd5e1;
+  border-radius:999px;
+  background:#e2e8f0;
+  cursor:pointer;
+  transition:background .15s,border-color .15s;
+}
+.mt-ebook-option-toggle::after {
+  content:'';
+  position:absolute;
+  top:2px;
+  left:2px;
+  width:13px;
+  height:13px;
+  border-radius:50%;
+  background:#fff;
+  box-shadow:0 1px 3px rgba(15,23,42,.25);
+  transition:transform .15s;
+}
+.mt-ebook-option-toggle:checked { background:#111827; border-color:#111827; }
+.mt-ebook-option-toggle:checked::after { transform:translateX(15px); }
+.mt-ebook-option-toggle:focus-visible { outline:2px solid #64748b; outline-offset:2px; }
+#mtEbookListOptionsBtn.is-open {
+  background:#111827 !important;
+  border-color:#111827 !important;
+  color:#fff !important;
+}
+#mtEbookViewer.mt-hide-row-lines #mtEbookList .mt-ebook-item {
+  border-bottom-color:transparent !important;
+}
+#mtEbookViewer.mt-hide-checkboxes #mtEbookList .mt-ebook-item-select,
+#mtEbookViewer.mt-hide-checkboxes .mt-ebook-list-toolbar {
+  display:none !important;
+}
+#mtEbookViewer.mt-hide-delete-buttons #mtEbookList .mt-ebook-item-delete-btn {
+  display:none !important;
+}
+#mtEbookViewer.mt-hide-edit-buttons #mtEbookList .mt-ebook-item-edit-btn {
+  display:none !important;
+}
+#mtEbookViewer.mt-hide-serial-numbers #mtEbookList .mt-ebook-item-num {
+  display:none !important;
+}
+#mtEbookViewer.mt-hide-serial-numbers #mtEbookList .mt-ebook-item-sub {
+  margin-left:0 !important;
+}
+@media (max-width:700px) {
+  .mt-ebook-list-options-panel { margin-top:-4px; padding:11px; }
+  .mt-ebook-list-options-grid { grid-template-columns:1fr; }
+}
+</style>
+<script id="v117-ebook-list-display-options-script">
+(function(){
+  'use strict';
+  const STORAGE_KEY='mt_ebook_list_display_options_v117';
+  const defaults={rowLines:true,checkboxes:true,deleteButtons:true,editButtons:true,serialNumbers:true};
+  let state={...defaults};
+
+  function load(){
+    try{
+      const saved=JSON.parse(localStorage.getItem(STORAGE_KEY)||'null');
+      if(saved && typeof saved==='object')state={...defaults,...saved};
+    }catch(_){state={...defaults};}
+  }
+  function save(){
+    try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));}catch(_){ }
+  }
+  function apply(){
+    const viewer=document.getElementById('mtEbookViewer');
+    if(!viewer)return;
+    viewer.classList.toggle('mt-hide-row-lines',!state.rowLines);
+    viewer.classList.toggle('mt-hide-checkboxes',!state.checkboxes);
+    viewer.classList.toggle('mt-hide-delete-buttons',!state.deleteButtons);
+    viewer.classList.toggle('mt-hide-edit-buttons',!state.editButtons);
+    viewer.classList.toggle('mt-hide-serial-numbers',!state.serialNumbers);
+    const inputs={
+      rowLines:'mtEbookOptionRowLines',
+      checkboxes:'mtEbookOptionCheckboxes',
+      deleteButtons:'mtEbookOptionDeleteButtons',
+      editButtons:'mtEbookOptionEditButtons',
+      serialNumbers:'mtEbookOptionSerialNumbers'
+    };
+    Object.entries(inputs).forEach(([key,id])=>{const input=document.getElementById(id);if(input)input.checked=!!state[key];});
+  }
+  function togglePanel(force){
+    const panel=document.getElementById('mtEbookListOptionsPanel');
+    const button=document.getElementById('mtEbookListOptionsBtn');
+    if(!panel)return;
+    const open=typeof force==='boolean'?force:!panel.classList.contains('open');
+    panel.classList.toggle('open',open);
+    panel.setAttribute('aria-hidden',open?'false':'true');
+    if(button){button.classList.toggle('is-open',open);button.setAttribute('aria-expanded',open?'true':'false');}
+  }
+  window.mtToggleEbookListOptions=togglePanel;
+  window.mtSetEbookListOption=function(key,value){
+    if(!Object.prototype.hasOwnProperty.call(defaults,key))return;
+    state[key]=!!value;
+    save();
+    apply();
+  };
+  window.mtApplyEbookListOptions=apply;
+  load();
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',apply,{once:true});
+  else apply();
+})();
+</script>
