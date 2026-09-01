@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v120</title>
+    <title>올인원 영작-단어장 시스템 · v121</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -3169,7 +3169,7 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v120</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v121</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -9017,13 +9017,29 @@ ${JSON.stringify(finalPayload)}`;
     function mtCloseGeneratorErrorLog(){const m=document.getElementById('mtGeneratorErrorModal');if(m)m.style.display='none';}
     const MT_GENERATOR_SLOT_API_KEY_PREFIX = 'mt_generator_slot_api_key_';
     function mtGetGeneratorSlotApiKey(slotIndex,type){
+        const state=mtGetTypedState(Number(slotIndex));
+        const savedKeys=state?._generatorApiKeys;
+        // 슬롯 영구 저장본에 값이 있으면(명시적으로 비운 값도 포함) 이것을 우선 사용한다.
+        // localStorage 용량 초과로 개별 키 저장에 실패해도 IndexedDB 복원본에서 다시 표시된다.
+        if(savedKeys && Object.prototype.hasOwnProperty.call(savedKeys,String(type))){
+            return String(savedKeys[String(type)]||'').trim();
+        }
         const key=`${MT_GENERATOR_SLOT_API_KEY_PREFIX}${String(type)}_${Number(slotIndex)}`;
         try{return String(localStorage.getItem(key)||'').trim();}catch(_){return '';}
     }
-    function mtSetGeneratorSlotApiKey(slotIndex,type,value){
+    async function mtSetGeneratorSlotApiKey(slotIndex,type,value){
+        const slot=Number(slotIndex),typeKey=String(type);
         const key=`${MT_GENERATOR_SLOT_API_KEY_PREFIX}${String(type)}_${Number(slotIndex)}`;
         const v=String(value||'').trim();
-        try{ if(v) localStorage.setItem(key,v); else localStorage.removeItem(key); }catch(_){ }
+        // 빠른 호환용 저장은 유지하되, 용량 초과가 발생해도 값을 잃지 않도록
+        // 슬롯 상태에도 기록하여 IndexedDB에 영구 저장한다.
+        try{ if(v) localStorage.setItem(key,v); else localStorage.removeItem(key); }
+        catch(error){ console.warn('[생성 API] localStorage 저장 실패. 슬롯 영구 저장을 계속합니다.',error); }
+        const state=mtGetTypedState(slot);
+        state._generatorApiKeys={...(state._generatorApiKeys||{}),[typeKey]:v};
+        mtSaveTypedState(slot,state);
+        // 성공 알림보다 실제 영구 저장이 먼저 끝나도록 기다린다.
+        await mtPersistTypedSlotStates();
     }
     // 쿨다운은 모델·슬롯·유형·API 키 조합별로만 적용한다.
     function mtGetGeneratorModelCooldownKey(type,slotIndex,model,apiKey){
@@ -9297,7 +9313,7 @@ ${JSON.stringify(finalPayload)}`;
         document.getElementById('mtGeneratorPromptModal').dataset.slot=String(slotIndex);document.getElementById('mtGeneratorPromptModal').dataset.type=type;document.getElementById('mtGeneratorPromptModal').style.display='flex';
     }
     function mtCloseGeneratorPromptEditor(){document.getElementById('mtGeneratorPromptModal').style.display='none';}
-    function mtSaveGeneratorPromptDashboard(){
+    async function mtSaveGeneratorPromptDashboard(){
         const m=document.getElementById('mtGeneratorPromptModal'),type=String(m?.dataset.type||'');
         if(!['self_generate','reference_generate'].includes(type)) return alert('저장할 생성 유형을 찾지 못했습니다. 설정 창을 다시 열어 주세요.');
         try{
@@ -9307,7 +9323,7 @@ ${JSON.stringify(finalPayload)}`;
             cfg.delaySec=Math.max(0,Number(document.getElementById('mtGenDelay')?.value)||0);
             cfg.models=String(document.getElementById('mtGenModels')?.value||'').split(',').map(x=>x.trim()).filter(Boolean);
             mtSaveGenCfg(type,cfg);
-            mtSetGeneratorSlotApiKey(Number(m.dataset.slot),type,document.getElementById('mtGenSlotApiKey')?.value||'');
+            await mtSetGeneratorSlotApiKey(Number(m.dataset.slot),type,document.getElementById('mtGenSlotApiKey')?.value||'');
             if(type==='self_generate') mtSaveGenPrompt(type,'main',document.getElementById('mtGenPromptMain')?.value||'');
             else {
                 // 참조형은 두 프롬프트를 각각 저장해야 다음 생성부터 모두 반영됩니다.
@@ -11649,7 +11665,7 @@ ${JSON.stringify(finalPayload)}`;
   (function syncAppVersionFromFileName(){
     // 파일을 다른 이름으로 저장하거나 브라우저가 경로를 변환해도, 기본 표시가
     // 사라지지 않게 한다. 정상 파일명에서는 아래 값이 자동으로 새 번호로 대체된다.
-    const fallbackVersion='v120';
+    const fallbackVersion='v121';
     let fileName='';
     try{fileName=decodeURIComponent(String(location.pathname||'').split('/').pop()||'');}
     catch(_){fileName=String(location.pathname||'').split('/').pop()||'';}
