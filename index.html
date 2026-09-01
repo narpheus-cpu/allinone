@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v119</title>
+    <title>올인원 영작-단어장 시스템 · v120</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -3169,7 +3169,7 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v119</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v120</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -3544,7 +3544,7 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
             <div class="modal-card mt-type-modal-card" style="max-width:560px;">
                 <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
                     <div>
-                        <div style="font-size:16px;font-weight:800;color:#111827;">일반 입력 방법</div>
+                        <div id="mtNormalImportSourceTitle" style="font-size:16px;font-weight:800;color:#111827;">입력 방법</div>
                         <div id="mtNormalImportSourceSubtitle" style="font-size:11px;color:#64748b;margin-top:3px;">파일 또는 클립보드에서 문장을 가져오세요.</div>
                     </div>
                     <button class="btn-excel" type="button" onclick="mtCloseNormalImportSourceModal()">닫기</button>
@@ -3553,12 +3553,12 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
                     <button type="button" class="mt-type-option" onclick="mtNormalImportFromFile()">
                         <span class="mt-type-option-badge">FILE</span>
                         <div class="mt-type-option-title">파일 불러오기</div>
-                        <div class="mt-type-option-desc">Excel(.xlsx/.xls) 또는 탭으로 구분된 TXT 파일을 불러옵니다.</div>
+                        <div id="mtNormalImportFileDesc" class="mt-type-option-desc">Excel(.xlsx/.xls) 또는 탭으로 구분된 TXT 파일을 불러옵니다.</div>
                     </button>
                     <button type="button" class="mt-type-option" onclick="mtOpenNormalClipboardModal()">
                         <span class="mt-type-option-badge">PASTE</span>
                         <div class="mt-type-option-title">클립보드 붙여넣기</div>
-                        <div class="mt-type-option-desc">탭(\t)으로 열이 구분된 텍스트를 붙여넣어 바로 카드로 등록합니다.</div>
+                        <div id="mtNormalImportPasteDesc" class="mt-type-option-desc">탭(\t)으로 열이 구분된 텍스트를 붙여넣어 바로 카드로 등록합니다.</div>
                     </button>
                 </div>
             </div>
@@ -3596,8 +3596,8 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
             <div class="modal-card" style="width:min(760px,94vw);max-height:88vh;overflow:auto;text-align:left;">
                 <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
                     <div>
-                        <div style="font-size:16px;font-weight:800;color:#111827;">클립보드 텍스트 붙여넣기</div>
-                        <div style="font-size:11px;color:#64748b;margin-top:3px;">행은 줄바꿈, 열은 탭(\t)으로 구분된 내용을 붙여넣으세요.</div>
+                        <div id="mtNormalClipboardTitle" style="font-size:16px;font-weight:800;color:#111827;">클립보드 텍스트 붙여넣기</div>
+                        <div id="mtNormalClipboardSubtitle" style="font-size:11px;color:#64748b;margin-top:3px;">행은 줄바꿈, 열은 탭(\t)으로 구분된 내용을 붙여넣으세요.</div>
                     </div>
                     <button class="btn-excel" type="button" onclick="mtCloseNormalClipboardModal()">닫기</button>
                 </div>
@@ -6123,28 +6123,50 @@ Rules:
     let mtCardHadDirectTyping = false;
     let mtTempParsedData = null;
     let mtEbookTemp = null;
-    // 일반형과 전자책의 최초 등록에서 공통으로 쓰는 입력 출처 상태입니다.
+    // 일반형·전자책·자체형의 최초 등록에서 공통으로 쓰는 입력 출처 상태입니다.
     let mtInitialImportSlot = null;
     let mtInitialImportType = 'normal';
     function mtOpenNormalImportSourceModal(slot, type='normal'){
-        mtInitialImportSlot=Number(slot); mtInitialImportType=type==='ebook'?'ebook':'normal';
+        mtInitialImportSlot=Number(slot);
+        mtInitialImportType=['normal','ebook','self_generate'].includes(type)?type:'normal';
+        const isSelf=mtInitialImportType==='self_generate';
+        const title=document.getElementById('mtNormalImportSourceTitle');
         const sub=document.getElementById('mtNormalImportSourceSubtitle');
-        if(sub) sub.textContent=mtInitialImportType==='ebook'?'파일 또는 클립보드에서 전자책 문장을 가져오세요.':'파일 또는 클립보드에서 문장을 가져오세요.';
+        const fileDesc=document.getElementById('mtNormalImportFileDesc');
+        const pasteDesc=document.getElementById('mtNormalImportPasteDesc');
+        if(title) title.textContent=isSelf?'자체형 입력 방법':(mtInitialImportType==='ebook'?'전자책 입력 방법':'일반 입력 방법');
+        if(sub) sub.textContent=isSelf?'한국어 원문을 일반 TXT 파일 또는 줄바꿈 텍스트로 가져오세요. 첫 줄부터 내용으로 처리합니다.':(mtInitialImportType==='ebook'?'파일 또는 클립보드에서 전자책 문장을 가져오세요.':'파일 또는 클립보드에서 문장을 가져오세요.');
+        if(fileDesc) fileDesc.textContent=isSelf?'한 줄에 한국어 원문 하나가 들어 있는 일반 TXT 파일을 불러옵니다. 탭과 헤더는 필요하지 않습니다.':'Excel(.xlsx/.xls) 또는 탭으로 구분된 TXT 파일을 불러옵니다.';
+        if(pasteDesc) pasteDesc.textContent=isSelf?'한국어 원문을 한 줄에 하나씩 붙여넣습니다. 첫 줄도 헤더가 아닌 내용으로 등록됩니다.':'탭(\\t)으로 열이 구분된 텍스트를 붙여넣어 바로 카드로 등록합니다.';
         const modal=document.getElementById('mtNormalImportSourceModal'); if(modal) modal.style.display='flex';
     }
     function mtCloseNormalImportSourceModal(){const modal=document.getElementById('mtNormalImportSourceModal');if(modal)modal.style.display='none';}
     function mtNormalImportFromFile(){if(!Number.isInteger(mtInitialImportSlot))return;const slot=mtInitialImportSlot,type=mtInitialImportType;mtCloseNormalImportSourceModal();mtTriggerUpload(slot,type);}
-    function mtOpenNormalClipboardModal(){const source=document.getElementById('mtNormalImportSourceModal'),modal=document.getElementById('mtNormalClipboardModal'),ta=document.getElementById('mtNormalClipboardText'),name=document.getElementById('mtInitialSlotName');if(source)source.style.display='none';if(ta)ta.value='';if(name)name.value='';if(modal)modal.style.display='flex';setTimeout(()=>name?.focus(),0);}
+    function mtOpenNormalClipboardModal(){
+        const source=document.getElementById('mtNormalImportSourceModal'),modal=document.getElementById('mtNormalClipboardModal'),ta=document.getElementById('mtNormalClipboardText'),name=document.getElementById('mtInitialSlotName');
+        const isSelf=mtInitialImportType==='self_generate';
+        const title=document.getElementById('mtNormalClipboardTitle'),sub=document.getElementById('mtNormalClipboardSubtitle');
+        if(source)source.style.display='none';
+        if(title)title.textContent=isSelf?'자체형 한국어 원문 붙여넣기':'클립보드 텍스트 붙여넣기';
+        if(sub)sub.textContent=isSelf?'한국어 원문을 한 줄에 하나씩 입력하세요. 첫 줄부터 모두 번역 대상으로 등록됩니다.':'행은 줄바꿈, 열은 탭(\\t)으로 구분된 내용을 붙여넣으세요.';
+        if(ta){ta.value='';ta.placeholder=isSelf?'첫 번째 한국어 원문\n두 번째 한국어 원문\n세 번째 한국어 원문':'1열\\t2열\\t3열\n오빠!\\tOppa!\\t[오빠!]\n응?\\tYeah?\\t[응?]';}
+        if(name)name.value='';if(modal)modal.style.display='flex';setTimeout(()=>name?.focus(),0);
+    }
     function mtCloseNormalClipboardModal(){const modal=document.getElementById('mtNormalClipboardModal');if(modal)modal.style.display='none';}
     async function mtPasteFromSystemClipboard(){const ta=document.getElementById('mtNormalClipboardText');if(!ta)return;try{ta.value=await navigator.clipboard.readText();}catch(_){alert('브라우저에서 클립보드 읽기가 차단되었습니다. 텍스트를 직접 붙여넣어 주세요.');}}
-    function mtRegisterNormalClipboardText(){
+    async function mtRegisterNormalClipboardText(){
         const raw=String(document.getElementById('mtNormalClipboardText')?.value||'').replace(/^\uFEFF/,'').normalize('NFC').trim();
-        const rows=raw.split(/\r?\n/).filter(x=>x.trim()!=='').map(x=>x.split('\t'));
-        if(!rows.length)return alert('등록할 텍스트가 없습니다.');
+        if(!raw)return alert('등록할 텍스트가 없습니다.');
         if(!Number.isInteger(mtInitialImportSlot))return alert('등록할 슬롯을 찾지 못했습니다. 다시 시도해 주세요.');
         const slot=mtInitialImportSlot,type=mtInitialImportType;
-        const slotName=String(document.getElementById('mtInitialSlotName')?.value||'').trim() || `${type==='ebook'?'전자책':'일반'} 슬롯 ${slot}`;
+        const typeName=type==='ebook'?'전자책':(type==='self_generate'?'자체형':'일반');
+        const slotName=String(document.getElementById('mtInitialSlotName')?.value||'').trim() || `${typeName} 슬롯 ${slot}`;
         mtCloseNormalClipboardModal();
+        if(type==='self_generate'){
+            try{await mtRegisterSelfGenerateText(raw,slot,slotName);}catch(e){alert(`자체형 원문 등록 중 오류가 발생했습니다.\n${e?.message||e}`);}return;
+        }
+        const rows=raw.split(/\r?\n/).filter(x=>x.trim()!=='').map(x=>x.split('\t'));
+        if(!rows.length)return alert('등록할 텍스트가 없습니다.');
         if(type==='ebook'){
             const state=mtGetTypedState(slot);state.type='ebook';state.fileName=slotName;mtSetSlotType(slot,'ebook');mtSaveTypedState(slot,state);
             mtEbookTemp={slotIndex:slot,fileName:state.fileName,rows,sourceSheetName:'클립보드',addMode:false};mtOpenEbookColumnModal(rows);
@@ -8034,7 +8056,7 @@ ${JSON.stringify(finalPayload)}`;
     }
     function mtCloseConfiguredEmptySlotModal(){const modal=document.getElementById('mtConfiguredEmptySlotModal');if(modal)modal.style.display='none';mtConfiguredEmptySlot=null;mtPendingSlotType=null;}
     function mtRechooseConfiguredEmptySlotType(){if(mtConfiguredEmptySlot==null)return;const slot=mtConfiguredEmptySlot;mtCloseConfiguredEmptySlotModal();mtOpenSlotTypeModal(slot);}
-    function mtRegisterConfiguredEmptySlotFile(){if(mtConfiguredEmptySlot==null)return;const slot=mtConfiguredEmptySlot,type=mtPendingSlotType;mtCloseConfiguredEmptySlotModal();if(type==='normal'||type==='ebook'){mtOpenNormalImportSourceModal(slot,type);return;}if(type){mtTriggerUpload(slot,type);return;}mtOpenSlotTypeModal(slot);}
+    function mtRegisterConfiguredEmptySlotFile(){if(mtConfiguredEmptySlot==null)return;const slot=mtConfiguredEmptySlot,type=mtPendingSlotType;mtCloseConfiguredEmptySlotModal();if(type==='normal'||type==='ebook'||type==='self_generate'){mtOpenNormalImportSourceModal(slot,type);return;}if(type){mtTriggerUpload(slot,type);return;}mtOpenSlotTypeModal(slot);}
     function mtChooseSlotType(type){
         if(!['normal','ebook','self_generate','reference_generate'].includes(type))return;
         const slot=Number(mtPendingTypeSlot);if(!Number.isInteger(slot))return;
@@ -9141,6 +9163,38 @@ ${JSON.stringify(finalPayload)}`;
         const slot=Number(slotIndex),type=mtGetSlotType(slot); if(!['self_generate','reference_generate'].includes(type))return;
         const input=document.getElementById('mtFileUpload'); if(!input)return; input.dataset.mtGenAppend='1'; input.dataset.mtGenAppendSlot=String(slot); input.dataset.mtGenAppendType=type; mtActiveSlotIndex=slot; input.value=''; input.click();
     }
+    function mtSelfPlainRowsFromText(text){
+        // 헤더를 추정하거나 첫 행을 건너뛰지 않습니다. 줄바꿈 하나가 원문 카드 하나입니다.
+        return String(text||'').replace(/^\uFEFF/,'').normalize('NFC').split(/\r?\n/)
+            .map(line=>line.replace(/\t+/g,' ').trim()).filter(Boolean);
+    }
+    async function mtRegisterSelfGenerateText(text,slotIndex,fileName){
+        const slot=Number(slotIndex),sourceRows=mtSelfPlainRowsFromText(text);
+        if(!Number.isInteger(slot)||slot<1||slot>11)throw new Error('자체형 슬롯 번호가 올바르지 않습니다.');
+        if(!sourceRows.length)throw new Error('자체형에서 사용할 한국어 원문을 찾지 못했습니다.');
+        const state=mtGetTypedState(slot);
+        state.type='self_generate';
+        state.fileName=String(fileName||'').replace(/\.[^/.]+$/,'').trim()||`자체형 슬롯 ${slot}`;
+        state.sourceRows=sourceRows;
+        state.sourceRowsLock=sourceRows.slice();
+        state.outputRows=[];
+        state.starredSerials=[];
+        state.nextSourceIndex=0;
+        state.retryRows=[];
+        state.pattern={sourceKorCol:1,engCol:2,subKorCol:3,serialCol:4};
+        state.lastSession=null;
+        state.lastError='';
+        state.lastDiagnostic=null;
+        state.translationComplete=false;
+        state.translationCompletedAt=null;
+        state.nextRun=Date.now();
+        mtSetSlotType(slot,'self_generate');
+        mtSaveTypedState(slot,state);
+        await mtPersistTypedSlotStates();
+        mtInitSlots();
+        mtGeneratorRun(slot,true);
+        return sourceRows.length;
+    }
     async function mtRegisterGeneratorFile(file,slotIndex,type){
         const slot=Number(slotIndex); const ext=String(file.name||'').split('.').pop().toLowerCase();
         const state=mtGetTypedState(slot); state.type=type; state.fileName=String(file.name||'').replace(/\.[^/.]+$/,'').trim()||`슬롯 ${slot+1}`; state.outputRows=[];state.starredSerials=[];state.lastSession=null;state.lastError='';state.lastDiagnostic=null;
@@ -9418,6 +9472,10 @@ ${JSON.stringify(finalPayload)}`;
                     catch (_) { rawText = new TextDecoder('euc-kr').decode(uint8); }
                 }
                 rawText = rawText.replace(/^\uFEFF/, '').normalize('NFC');
+                if(selectedType==='self_generate'){
+                    await mtRegisterSelfGenerateText(rawText,Number(activeSlot),file.name);
+                    return;
+                }
                 const rows = rawText.split(/\r?\n/).filter(line => line.trim() !== '').map(line => line.split('\t'));
                 if (!rows.length) throw new Error('TXT 파일에 데이터가 없습니다.');
                 if (!rows.some(r => r.length > 1)) throw new Error('TXT 파일은 반드시 탭(\t)으로 열이 구분되어 있어야 합니다.');
@@ -9432,7 +9490,7 @@ ${JSON.stringify(finalPayload)}`;
                 return;
             }
             if(selectedType==='self_generate' || selectedType==='reference_generate'){
-                if(!['xlsx','xls'].includes(ext)) throw new Error(`${mtGeneratorFileLabel(selectedType)}은 .xlsx 또는 .xls 파일을 사용합니다.`);
+                if(!['xlsx','xls'].includes(ext)) throw new Error(selectedType==='self_generate'?'자체형은 .xlsx, .xls 또는 줄바꿈으로 구분된 일반 .txt 파일을 사용합니다.':'참조형은 .xlsx 또는 .xls 파일을 사용합니다.');
                 await mtRegisterGeneratorFile(uploadFile, Number(activeSlot), selectedType);
                 return;
             }
@@ -11591,7 +11649,7 @@ ${JSON.stringify(finalPayload)}`;
   (function syncAppVersionFromFileName(){
     // 파일을 다른 이름으로 저장하거나 브라우저가 경로를 변환해도, 기본 표시가
     // 사라지지 않게 한다. 정상 파일명에서는 아래 값이 자동으로 새 번호로 대체된다.
-    const fallbackVersion='v119';
+    const fallbackVersion='v120';
     let fileName='';
     try{fileName=decodeURIComponent(String(location.pathname||'').split('/').pop()||'');}
     catch(_){fileName=String(location.pathname||'').split('/').pop()||'';}
