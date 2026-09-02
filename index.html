@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v122</title>
+    <title>올인원 영작-단어장 시스템 · v123</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -3169,7 +3169,7 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v122</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v123</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -3183,7 +3183,8 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
             <button class="btn-excel" onclick="toggleApiKeyInput()">API 키 설정</button>
             <button class="btn-excel" onclick="toggleFontInput()">글꼴 링크</button>
             <button class="btn-excel file-open-btn" onclick="loadFromLocalPC()">PC 백업 열기</button>
-            <button class="file-sync-btn" onclick="saveToLocalPC()" title="최초 한 번 백업 폴더를 선택하면 20분마다 v1·v2·v3 순환 자동저장">전체 데이터 자동저장</button>
+            <button id="mtAutoBackupButton" class="btn-excel" onclick="mtConfigureAutoBackup()" title="20분마다 v1·v2·v3 파일을 순환 저장할 폴더를 설정합니다.">자동저장 설정</button>
+            <button id="mtBackupSaveButton" class="file-sync-btn" onclick="saveToLocalPC()" title="클릭할 때마다 현재 전체 데이터를 날짜가 붙은 JSON 파일로 즉시 내려받습니다.">전체 데이터 저장</button>
         </div>
     </div>
 
@@ -4388,8 +4389,23 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
     const MT_AUTO_BACKUP_STATE_KEY = 'rotationState';
     let mtAutoBackupDirectoryHandle = null;
     let mtAutoBackupNextVersion = 1;
+    let mtAutoBackupLastSavedAt = 0;
     let mtAutoBackupTimerId = null;
     let mtAutoBackupRunning = false;
+    let mtAutoBackupNeedsReconnect = false;
+
+    function mtSetAutoBackupButtonState(state,detail=''){
+        const button=document.getElementById('mtAutoBackupButton');
+        if(!button)return;
+        const reconnect=state==='reconnect';
+        button.textContent=reconnect?'자동저장 재연결':state==='active'?'자동저장: 켜짐':state==='unsupported'?'자동저장 미지원':'자동저장 설정';
+        button.disabled=state==='unsupported';
+        button.dataset.autoBackupState=String(state||'');
+        if(reconnect)button.title=`자동저장 폴더 권한이 끊겼습니다. 클릭하면 폴더를 다시 선택하고 20분 자동저장을 재개합니다.${detail?' '+detail:''}`;
+        else if(state==='active')button.title=`v1·v2·v3 순환 자동저장이 연결되어 있습니다.${detail?' '+detail:''}`;
+        else if(state==='unsupported')button.title='이 브라우저에서는 폴더 자동저장을 지원하지 않습니다. 옆의 전체 데이터 저장 버튼으로 수동 백업은 내려받을 수 있습니다.';
+        else button.title=`20분마다 v1·v2·v3 파일을 순환 저장할 폴더를 설정합니다.${detail?' '+detail:''}`;
+    }
 
     function mtOpenAutoBackupDb() {
         return new Promise((resolve,reject)=>{
@@ -4415,7 +4431,7 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
         try{
             db=await mtOpenAutoBackupDb();
             const tx=db.transaction(MT_AUTO_BACKUP_STORE,'readwrite');
-            tx.objectStore(MT_AUTO_BACKUP_STORE).put({directoryHandle:mtAutoBackupDirectoryHandle,nextVersion:mtAutoBackupNextVersion},MT_AUTO_BACKUP_STATE_KEY);
+            tx.objectStore(MT_AUTO_BACKUP_STORE).put({directoryHandle:mtAutoBackupDirectoryHandle,nextVersion:mtAutoBackupNextVersion,lastBackupAt:mtAutoBackupLastSavedAt},MT_AUTO_BACKUP_STATE_KEY);
             await new Promise((resolve,reject)=>{tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);});
         }catch(e){console.warn('[자동저장] 폴더 설정 저장 실패:',e);}finally{if(db)db.close();}
     }
@@ -4460,7 +4476,11 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
     }
     async function mtRunRotatingAutoBackup(){
         if(mtAutoBackupRunning||!mtAutoBackupDirectoryHandle)return false;
-        if(!await mtHasAutoBackupPermission(mtAutoBackupDirectoryHandle,false))return false;
+        if(!await mtHasAutoBackupPermission(mtAutoBackupDirectoryHandle,false)){
+            mtAutoBackupNeedsReconnect=true;
+            mtSetAutoBackupButtonState('reconnect');
+            return false;
+        }
         mtAutoBackupRunning=true;
         try{
             const version=Math.min(3,Math.max(1,Number(mtAutoBackupNextVersion)||1));
@@ -4471,41 +4491,118 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
             await writable.write(JSON.stringify(dataToSave,null,2));
             await writable.close();
             mtAutoBackupNextVersion=version>=3?1:version+1;
+            mtAutoBackupLastSavedAt=Date.now();
+            mtAutoBackupNeedsReconnect=false;
             await mtPersistAutoBackupState();
+            mtSetAutoBackupButtonState('active',`마지막 자동저장: ${new Date(mtAutoBackupLastSavedAt).toLocaleString('ko-KR')}`);
             const reminder=document.getElementById('saveReminder');
             if(reminder)reminder.classList.remove('is-visible');
             return true;
-        }catch(e){console.warn('[자동저장] 백업 실패:',e);return false;}finally{mtAutoBackupRunning=false;}
+        }catch(e){
+            console.warn('[자동저장] 백업 실패:',e);
+            mtSetAutoBackupButtonState('active',`최근 자동저장 실패: ${String(e?.message||e)}`);
+            return false;
+        }finally{mtAutoBackupRunning=false;}
     }
-    function mtScheduleNextAutoBackup(){
+    function mtScheduleNextAutoBackup(delayOverride=null){
         if(mtAutoBackupTimerId)clearTimeout(mtAutoBackupTimerId);
-        if(!mtAutoBackupDirectoryHandle)return;
+        mtAutoBackupTimerId=null;
+        if(!mtAutoBackupDirectoryHandle||mtAutoBackupNeedsReconnect)return;
+        const delay=Number.isFinite(Number(delayOverride))
+            ? Math.max(1000,Number(delayOverride))
+            : (mtAutoBackupLastSavedAt
+                ? Math.max(1000,(mtAutoBackupLastSavedAt+MT_AUTO_BACKUP_INTERVAL_MS)-Date.now())
+                : MT_AUTO_BACKUP_INTERVAL_MS);
         mtAutoBackupTimerId=setTimeout(async()=>{
             mtAutoBackupTimerId=null;
             await mtRunRotatingAutoBackup();
-            mtScheduleNextAutoBackup();
-        },MT_AUTO_BACKUP_INTERVAL_MS);
+            if(!mtAutoBackupNeedsReconnect)mtScheduleNextAutoBackup(MT_AUTO_BACKUP_INTERVAL_MS);
+        },delay);
     }
     async function mtInitAutoBackup(){
         const saved=await mtReadAutoBackupState();
-        if(!saved?.directoryHandle)return;
+        if(!saved?.directoryHandle){
+            mtSetAutoBackupButtonState(window.showDirectoryPicker?'idle':'unsupported');
+            return;
+        }
         mtAutoBackupDirectoryHandle=saved.directoryHandle;
         mtAutoBackupNextVersion=Math.min(3,Math.max(1,Number(saved.nextVersion)||1));
-        if(await mtHasAutoBackupPermission(mtAutoBackupDirectoryHandle,false))mtScheduleNextAutoBackup();
+        mtAutoBackupLastSavedAt=Math.max(0,Number(saved.lastBackupAt)||0);
+        if(!await mtHasAutoBackupPermission(mtAutoBackupDirectoryHandle,false)){
+            // 브라우저 재시작 뒤 권한이 'prompt'로 돌아오면 사용자 동작 없이 다시 요청할 수 없다.
+            // 과거처럼 조용히 멈추지 않고 버튼에서 재연결 필요 상태를 분명히 알린다.
+            mtAutoBackupNeedsReconnect=true;
+            mtSetAutoBackupButtonState('reconnect');
+            return;
+        }
+        mtAutoBackupNeedsReconnect=false;
+        mtSetAutoBackupButtonState('active',mtAutoBackupLastSavedAt?`마지막 자동저장: ${new Date(mtAutoBackupLastSavedAt).toLocaleString('ko-KR')}`:'');
+        const overdue=!mtAutoBackupLastSavedAt || Date.now()-mtAutoBackupLastSavedAt>=MT_AUTO_BACKUP_INTERVAL_MS;
+        if(overdue){await mtRunRotatingAutoBackup();if(!mtAutoBackupNeedsReconnect)mtScheduleNextAutoBackup(MT_AUTO_BACKUP_INTERVAL_MS);}
+        else mtScheduleNextAutoBackup();
+    }
+    function mtManualBackupFileName(){
+        const d=new Date(),pad=n=>String(n).padStart(2,'0');
+        return `my_foreign_lang_data_backup(manual_${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}).json`;
+    }
+    async function mtDownloadManualBackup(){
+        const dataToSave=await mtBuildCompleteBackupData();
+        const blob=new Blob([JSON.stringify(dataToSave,null,2)],{type:'application/json;charset=utf-8'});
+        const url=URL.createObjectURL(blob),link=document.createElement('a');
+        link.href=url;link.download=mtManualBackupFileName();link.style.display='none';
+        document.body.appendChild(link);link.click();link.remove();
+        setTimeout(()=>URL.revokeObjectURL(url),1000);
+        return link.download;
+    }
+    async function mtRecoverAutoBackupOnResume(){
+        if(document.visibilityState==='hidden'||mtAutoBackupRunning||!mtAutoBackupDirectoryHandle)return;
+        if(!await mtHasAutoBackupPermission(mtAutoBackupDirectoryHandle,false)){
+            mtAutoBackupNeedsReconnect=true;
+            if(mtAutoBackupTimerId)clearTimeout(mtAutoBackupTimerId);
+            mtAutoBackupTimerId=null;
+            mtSetAutoBackupButtonState('reconnect');
+            return;
+        }
+        mtAutoBackupNeedsReconnect=false;
+        const overdue=!mtAutoBackupLastSavedAt || Date.now()-mtAutoBackupLastSavedAt>=MT_AUTO_BACKUP_INTERVAL_MS;
+        if(overdue){
+            if(mtAutoBackupTimerId)clearTimeout(mtAutoBackupTimerId);
+            mtAutoBackupTimerId=null;
+            await mtRunRotatingAutoBackup();
+            if(!mtAutoBackupNeedsReconnect)mtScheduleNextAutoBackup(MT_AUTO_BACKUP_INTERVAL_MS);
+        }else mtScheduleNextAutoBackup();
+    }
+    async function mtConfigureAutoBackup(){
+        try{
+            if(!window.showDirectoryPicker){mtSetAutoBackupButtonState('unsupported');return;}
+            // 폴더 선택은 반드시 이 버튼의 사용자 클릭 직후 실행합니다.
+            if(!mtAutoBackupDirectoryHandle||mtAutoBackupNeedsReconnect){
+                const handle=await window.showDirectoryPicker({mode:'readwrite'});
+                const changed=handle!==mtAutoBackupDirectoryHandle;
+                mtAutoBackupDirectoryHandle=handle;
+                if(changed){mtAutoBackupNextVersion=1;mtAutoBackupLastSavedAt=0;}
+            }else if(typeof mtAutoBackupDirectoryHandle.requestPermission==='function'){
+                const status=await mtAutoBackupDirectoryHandle.requestPermission({mode:'readwrite'});
+                if(status!=='granted')throw new Error('선택한 폴더의 쓰기 권한을 허용해 주세요.');
+            }
+            if(!mtAutoBackupDirectoryHandle||!await mtHasAutoBackupPermission(mtAutoBackupDirectoryHandle,false)){
+                mtAutoBackupNeedsReconnect=true;mtSetAutoBackupButtonState('reconnect');return;
+            }
+            mtAutoBackupNeedsReconnect=false;
+            await mtPersistAutoBackupState();
+            await mtRecoverAutoBackupOnResume();
+            if(!mtAutoBackupTimerId&&!mtAutoBackupNeedsReconnect)mtScheduleNextAutoBackup();
+        }catch(err){
+            if(err?.name!=='AbortError')alert('자동저장 폴더를 연결하지 못했습니다: '+(err?.message||err));
+        }
     }
     async function saveToLocalPC(){
-        try{
-            if(!window.showDirectoryPicker)return alert('이 브라우저는 폴더 자동저장을 지원하지 않습니다. PC용 크롬 또는 엣지를 사용해 주세요.');
-            if(!mtAutoBackupDirectoryHandle||!await mtHasAutoBackupPermission(mtAutoBackupDirectoryHandle,true)){
-                mtAutoBackupDirectoryHandle=await window.showDirectoryPicker({mode:'readwrite'});
-                mtAutoBackupNextVersion=1;
-            }
-            if(!await mtHasAutoBackupPermission(mtAutoBackupDirectoryHandle,true))throw new Error('선택한 폴더의 쓰기 권한을 허용해 주세요.');
-            await mtPersistAutoBackupState();
-            await mtRunRotatingAutoBackup();
-            mtScheduleNextAutoBackup();
-        }catch(err){if(err?.name!=='AbortError')alert('자동저장 설정 중 오류가 발생했습니다: '+(err?.message||err));}
+        // 자동저장 설정과 관계없이 버튼을 누를 때마다 독립적인 수동 파일을 내려받습니다.
+        try{await mtDownloadManualBackup();}
+        catch(err){alert('수동 백업 파일을 만들지 못했습니다: '+(err?.message||err));}
     }
+    window.addEventListener('focus',()=>{mtRecoverAutoBackupOnResume().catch(e=>console.warn('[자동저장] 화면 복귀 확인 실패:',e));});
+    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')mtRecoverAutoBackupOnResume().catch(e=>console.warn('[자동저장] 화면 복귀 확인 실패:',e));});
 
     async function loadFromLocalPC() {
         try {
@@ -4599,7 +4696,9 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
         if (reminder) reminder.classList.remove('is-visible');
     }
     mtStartSaveReminderTimer(true);
-    setTimeout(()=>{mtInitAutoBackup().catch(e=>console.warn('[자동저장] 초기화 실패:',e));},0);
+    // 자동저장은 아래 initApp에서 모든 슬롯·게시판 데이터 복원이 끝난 뒤 시작합니다.
+    // 복원 전에 만료 백업을 즉시 실행해 빈 데이터가 저장되는 경쟁 상태를 막습니다.
+    mtSetAutoBackupButtonState(window.showDirectoryPicker?'idle':'unsupported');
 
     /* ========================================== */
     /* [공통/영작] 상태 및 초기화 관리             */
@@ -11566,6 +11665,8 @@ ${String(primaryResult?.text||'')}`;
             if (typeof mtInitSlots === 'function') mtInitSlots();
             // 기존 localStorage 슬롯도 첫 실행 즉시 영구 사본을 만들어 다음 새로고침부터 보호합니다.
             mtQueueTypedSlotStatePersistence();
+            // 전체 데이터 복원이 완료된 뒤 자동저장 권한과 놓친 20분 주기를 복구합니다.
+            if (typeof mtInitAutoBackup === 'function') await mtInitAutoBackup();
         } catch (error) {
             // 초기화 중 한 모듈이 실패해도 다른 기능까지 중단하지 않습니다.
             console.error('앱 초기화 중 일부 기능 오류:', error);
@@ -11745,7 +11846,7 @@ ${String(primaryResult?.text||'')}`;
   (function syncAppVersionFromFileName(){
     // 파일을 다른 이름으로 저장하거나 브라우저가 경로를 변환해도, 기본 표시가
     // 사라지지 않게 한다. 정상 파일명에서는 아래 값이 자동으로 새 번호로 대체된다.
-    const fallbackVersion='v122';
+    const fallbackVersion='v123';
     let fileName='';
     try{fileName=decodeURIComponent(String(location.pathname||'').split('/').pop()||'');}
     catch(_){fileName=String(location.pathname||'').split('/').pop()||'';}
