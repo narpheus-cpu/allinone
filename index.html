@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v121</title>
+    <title>올인원 영작-단어장 시스템 · v122</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -3169,7 +3169,7 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v121</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v122</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -9232,6 +9232,78 @@ ${JSON.stringify(finalPayload)}`;
         mtInitSlots();
         mtGeneratorRun(slot,true);
     }
+    function mtParseSelfGeneratedRows(text){
+        const rows=[],invalid=[];
+        const lines=String(text||'').replace(/\r/g,'').split('\n').map(x=>x.trim()).filter(Boolean);
+        lines.forEach((originalLine,index)=>{
+            // 모델이 일시적으로 코드블록이나 Markdown 표를 사용하더라도 내용만 안전하게 읽습니다.
+            if(/^```(?:text|txt|markdown|md)?\s*$/i.test(originalLine) || /^```\s*$/.test(originalLine))return;
+            let line=originalLine.replace(/^\s*(?:\d+[.)]|[-*])\s+(?=[^|]*\|)/,'').trim();
+            if(line.startsWith('|'))line=line.slice(1).trim();
+            if(line.endsWith('|'))line=line.slice(0,-1).trim();
+            const cols=line.split('|').map(x=>x.trim());
+            const isHeader=/^(?:한국어\s*원문|원문|1열)$/i.test(cols[0]||'') && /^(?:영어\s*문장|영어|2열)$/i.test(cols[1]||'');
+            const isDivider=cols.length>=3 && cols.slice(0,3).every(x=>/^:?-{3,}:?$/.test(x));
+            if(isHeader||isDivider)return;
+            if(cols.length<3 || !cols[0] || !cols[1] || !cols[2]){
+                invalid.push({lineNumber:index+1,text:originalLine});
+                return;
+            }
+            rows.push([cols[0],cols[1],cols.slice(2).join(' | ')]);
+        });
+        return {rows,invalid};
+    }
+    function mtParseSelfRepairJson(text){
+        const parsed=mtRefParseJson(text);
+        if(!Array.isArray(parsed)||!parsed.length)throw new Error('자동 복구 응답에 저장할 문장이 없습니다.');
+        return parsed.map((item,index)=>{
+            const korean=String(item?.korean||'').trim();
+            const english=String(item?.english||'').trim();
+            let literal=String(item?.literal||'').trim();
+            if(!korean||!english||!literal)throw new Error(`자동 복구 응답 ${index+1}행에 빈 항목이 있습니다.`);
+            if(!literal.startsWith('['))literal='['+literal;
+            if(!literal.endsWith(']'))literal=literal+']';
+            return [korean,english,literal];
+        });
+    }
+    async function mtRepairSelfGeneratedRows(slotIndex,sourceText,primaryResult,invalid){
+        const repairPrompt=`아래 [한국어 원문 목록]과 [형식이 흔들린 1차 응답]을 비교하여, 학습 카드로 저장할 수 있는 JSON 배열로 복구하세요.
+
+[절대 규칙]
+1. 원문에 없는 내용을 추가하지 말고 모든 원문의 뜻을 빠짐없이 반영하세요.
+2. 원문 한 행을 자연스럽게 여러 카드로 나누는 것은 허용합니다.
+3. 각 배열 항목은 korean, english, literal 문자열을 반드시 모두 포함하세요.
+4. korean은 해당 카드의 한국어 원문, english는 자연스러운 A2 수준 영어, literal은 영어 어순에 대응하는 [청크 / 청크] 형태의 한국어입니다.
+5. JSON 이외의 설명, Markdown, 코드블록은 출력하지 마세요.
+
+[한국어 원문 목록]
+${sourceText}
+
+[형식이 흔들린 1차 응답]
+${String(primaryResult?.text||'')}`;
+        const schema={type:'ARRAY',items:{type:'OBJECT',properties:{korean:{type:'STRING'},english:{type:'STRING'},literal:{type:'STRING'}},required:['korean','english','literal']}};
+        let repairResult=null;
+        try{
+            repairResult=await mtGenFetchText('self_generate',repairPrompt,slotIndex,0,schema,'자체형 형식 자동복구');
+            return {rows:mtParseSelfRepairJson(repairResult.text),repairResult};
+        }catch(repairError){
+            const error=new Error(`자체형 응답 형식 자동 복구에 실패했습니다: ${repairError?.message||repairError}`);
+            error.mtGeneratorExtra={
+                model:String(repairResult?.model||primaryResult?.model||''),
+                phase:'자체형 형식 자동복구',
+                response:{
+                    invalidLines:invalid,
+                    primaryModel:primaryResult?.model||'',
+                    primaryText:String(primaryResult?.text||''),
+                    primaryResponse:primaryResult?.data??null,
+                    repairModel:repairResult?.model||'',
+                    repairText:String(repairResult?.text||''),
+                    repairResponse:repairResult?.data??null
+                }
+            };
+            throw error;
+        }
+    }
     async function mtGeneratorSelfBatch(slotIndex){
         const st=mtGetTypedState(slotIndex),cfg=mtGetGenCfg('self_generate'); const start=Number(st.nextSourceIndex||0); const end=Math.min(start+cfg.batchSize,st.sourceRows.length); const batch=st.sourceRows.slice(start,end);
         if(!batch.length)return false;
@@ -9241,19 +9313,22 @@ ${JSON.stringify(finalPayload)}`;
             `\n\n[한국어 원문 목록]\n${sourceText}`+
             `\n\n[추가 출력 규칙]\n- 각 결과 행은 한국어 원문 | 영어문장 | 직독직해 형식으로만 작성하세요.\n- 한 원문을 자연스럽게 나누어야 한다면 여러 결과 행으로 작성해도 됩니다. 불필요하게 행 수를 맞추지 마세요.\n- 모든 원문의 뜻이 빠짐없이 결과에 반영되어야 하며, 각 행의 한국어 원문 칸도 비워 두지 마세요.\n- 번호, [입력 n], 헤더, 설명, 빈 줄을 절대 출력하지 마세요.`;
         const res=await mtGenFetchText('self_generate',prompt,slotIndex,0.1,null,'자체형 일괄생성');
-        const lines=String(res.text||'').trim().split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
-        if(!lines.length) throw new Error('자체형 일괄 응답에 저장할 행이 없습니다.');
+        const parsed=mtParseSelfGeneratedRows(res.text);
+        if(!parsed.rows.length && !parsed.invalid.length) throw new Error('자체형 일괄 응답에 저장할 행이 없습니다.');
+        // 평소의 파이프 응답은 그대로 사용하고, 오늘처럼 일부 행의 형식만 흔들린 경우에만
+        // 원문과 1차 응답을 함께 보내 구조화 JSON으로 한 차례 자동 복구합니다.
+        let generatedRows=parsed.rows;
+        if(parsed.invalid.length){
+            const repaired=await mtRepairSelfGeneratedRows(slotIndex,sourceText,res,parsed.invalid);
+            generatedRows=repaired.rows;
+        }
         // 입력 행 수와 결과 행 수는 일부러 같게 강제하지 않는다. 한 원문이 둘 이상의
         // 자연스러운 카드로 나뉘어도 모두 보존한다.
         const serialStart=(st.outputRows||[]).reduce((max,row)=>{
             const n=Number(String(row?.[(st.pattern?.serialCol||4)-1]??'').trim());
             return Number.isFinite(n)?Math.max(max,Math.floor(n)):max;
         },0)+1;
-        const results=lines.map((line,i)=>{
-            const cols=line.split('|').map(x=>x.trim());
-            if(cols.length<3 || !cols[0] || !cols[1] || !cols[2]) throw new Error(`자체형 일괄 응답 ${i+1}행 형식이 올바르지 않습니다.`);
-            return [cols[0],cols[1],cols.slice(2).join(' | '),String(serialStart+i)];
-        });
+        const results=generatedRows.map((cols,i)=>[cols[0],cols[1],cols[2],String(serialStart+i)]);
         const todayKey=mtGetKoreaDateKey();
         const daily=st.selfDailyGenerated&&typeof st.selfDailyGenerated==='object'?{...st.selfDailyGenerated}:{};
         daily[todayKey]=Math.max(0,Number(daily[todayKey]||0))+results.length;
@@ -9296,7 +9371,12 @@ ${JSON.stringify(finalPayload)}`;
                 await mtGeneratorSelfBatch(slotIndex);
                 const fresh=mtGetTypedState(slotIndex); if(Number(fresh.nextSourceIndex||0)>=fresh.sourceRows.length){fresh.translationComplete=true;fresh.translationCompletedAt=Date.now();fresh.nextRun=null;mtSaveTypedState(slotIndex,fresh);mtInitSlots();return;}
             } else await mtGeneratorReferenceBatch(slotIndex);
-        }catch(e){st.lastError=String(e?.message||e);mtSaveTypedState(slotIndex,st);mtGeneratorRecordError(type,slotIndex,e,{phase:'typed-run'});mtInitSlots();}
+        }catch(e){
+            st.lastError=String(e?.message||e);mtSaveTypedState(slotIndex,st);
+            const diagnostic=e?.mtGeneratorExtra&&typeof e.mtGeneratorExtra==='object'?e.mtGeneratorExtra:{};
+            mtGeneratorRecordError(type,slotIndex,e,{phase:'typed-run',...diagnostic});
+            mtInitSlots();
+        }
         const cfg=mtGetGenCfg(type); const next=Date.now()+cfg.intervalMin*60*1000; const cur=mtGetTypedState(slotIndex);cur.nextRun=next;mtSaveTypedState(slotIndex,cur);mtGeneratorTimers[slotIndex]=setTimeout(()=>mtGeneratorRun(slotIndex,false),Math.max(1000,next-Date.now()));
     }
     function mtRescheduleGeneratorSlots(type){for(let i=1;i<=11;i++){if(mtGetSlotType(i)===type){const st=mtGetTypedState(i);st.nextRun=Date.now()+mtGetGenCfg(type).intervalMin*60*1000;mtSaveTypedState(i,st);if(mtGeneratorTimers[i])clearTimeout(mtGeneratorTimers[i]);mtGeneratorTimers[i]=setTimeout(()=>mtGeneratorRun(i,false),Math.max(1000,st.nextRun-Date.now()));}}}
@@ -11665,7 +11745,7 @@ ${JSON.stringify(finalPayload)}`;
   (function syncAppVersionFromFileName(){
     // 파일을 다른 이름으로 저장하거나 브라우저가 경로를 변환해도, 기본 표시가
     // 사라지지 않게 한다. 정상 파일명에서는 아래 값이 자동으로 새 번호로 대체된다.
-    const fallbackVersion='v121';
+    const fallbackVersion='v122';
     let fileName='';
     try{fileName=decodeURIComponent(String(location.pathname||'').split('/').pop()||'');}
     catch(_){fileName=String(location.pathname||'').split('/').pop()||'';}
