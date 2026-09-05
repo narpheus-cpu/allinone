@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v123</title>
+    <title>올인원 영작-단어장 시스템 · v122</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -1616,7 +1616,7 @@
     if(typeof mtNormalSlotCacheReady!=='undefined' && mtNormalSlotCacheReady) jobs.push(mtPersistNormalSlotCache());
     jobs.push(mtPersistTypedSlotStates());
     const results=await Promise.allSettled(jobs);
-    results.filter(result=>result.status==='rejected').forEach(result=>console.warn('[슬롯 이동] 영구 저장 일부 실패:',result.reason));
+    const failed=results.find(result=>result.status==='rejected');if(failed)throw failed.reason;
   }
   function buildMove(fromSlot,toSlot,snapshots){
     const reordered=snapshots.slice();
@@ -2059,122 +2059,7 @@
 #mtEbookViewer #mtEbookList { max-width:none !important; min-height:calc(100vh - 320px); }
 #mtEbookViewer .mt-ebook-pagination { background:#fff !important; }
 </style>
-<script id="v75-ebook-persistence-and-paste">
-(function () {
-  'use strict';
-
-  function rowsFromText(text) {
-    return String(text || '').replace(/^\uFEFF/, '').normalize('NFC')
-      .split(/\r?\n/).filter(line => line.trim() !== '').map(line => line.split('\t'));
-  }
-  function ebookKey(row, index, pattern) {
-    const p = pattern || {};
-    const eng = String(row?.[(p.engCol || 1) - 1] ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
-    const kor = String(row?.[(p.mainKorCol || 2) - 1] ?? '').trim().replace(/\s+/g, ' ');
-    const serial = String(row?.[(p.serialCol || 4) - 1] ?? (index + 1)).trim();
-    return serial + '|' + eng + '|' + kor;
-  }
-  function normalizeEbookReadState(state) {
-    if (!state || state.type !== 'ebook' || !Array.isArray(state.outputRows)) return state;
-    const rows = state.outputRows, p = state.pattern || {};
-    const keySet = new Set(Array.isArray(state.ebookReadKeys) ? state.ebookReadKeys.map(String) : []);
-    (state.ebookReadIndexes || []).map(Number).filter(Number.isInteger).forEach(i => {
-      if (rows[i]) keySet.add(ebookKey(rows[i], i, p));
-    });
-    state.ebookReadKeys = Array.from(keySet);
-    const indexes = rows.map((row, i) => keySet.has(ebookKey(row, i, p)) ? i : -1).filter(i => i >= 0);
-    state.ebookReadIndexes = Array.from(new Set(indexes)).sort((a, b) => a - b);
-    return state;
-  }
-
-  // 완료 문장은 문장 내용 기반 키도 함께 저장합니다. 행 순서나 저장소 복원 순서가 달라져도 회색 상태가 사라지지 않습니다.
-  const originalSave = window.mtSaveTypedState;
-  if (typeof originalSave === 'function') {
-    window.mtSaveTypedState = function (slot, state) {
-      return originalSave.call(this, slot, normalizeEbookReadState(state));
-    };
-  }
-  const originalGetWords = window.mtGetEbookWords;
-  if (typeof originalGetWords === 'function') {
-    window.mtGetEbookWords = function (slot) {
-      const state = window.mtGetTypedState(slot);
-      normalizeEbookReadState(state);
-      return originalGetWords.call(this, slot);
-    };
-  }
-
-  let initialImportSlot = null;
-  let initialImportType = 'normal';
-  window.mtOpenNormalImportSourceModal = function (slot, type) {
-    initialImportSlot = Number(slot);
-    initialImportType = type === 'ebook' ? 'ebook' : 'normal';
-    const modal = document.getElementById('mtNormalImportSourceModal');
-    const subtitle = document.getElementById('mtNormalImportSourceSubtitle');
-    if (subtitle) subtitle.textContent = initialImportType === 'ebook'
-      ? '파일 또는 클립보드에서 전자책 문장을 가져오세요.'
-      : '파일 또는 클립보드에서 문장을 가져오세요.';
-    if (modal) modal.style.display = 'flex';
-  };
-  window.mtCloseNormalImportSourceModal = function () {
-    const modal = document.getElementById('mtNormalImportSourceModal');
-    if (modal) modal.style.display = 'none';
-  };
-  window.mtNormalImportFromFile = function () {
-    if (!Number.isInteger(initialImportSlot)) return;
-    const slot = initialImportSlot, type = initialImportType;
-    window.mtCloseNormalImportSourceModal();
-    window.mtTriggerUpload(slot, type);
-  };
-  window.mtOpenNormalClipboardModal = function () {
-    const source = document.getElementById('mtNormalImportSourceModal');
-    const modal = document.getElementById('mtNormalClipboardModal');
-    const text = document.getElementById('mtNormalClipboardText');
-    if (source) source.style.display = 'none';
-    if (text) { text.value = ''; setTimeout(() => text.focus(), 0); }
-    if (modal) modal.style.display = 'flex';
-  };
-  window.mtCloseNormalClipboardModal = function () {
-    const modal = document.getElementById('mtNormalClipboardModal');
-    if (modal) modal.style.display = 'none';
-  };
-  window.mtPasteFromSystemClipboard = async function () {
-    const text = document.getElementById('mtNormalClipboardText');
-    if (!text) return;
-    try { text.value = await navigator.clipboard.readText(); }
-    catch (_) { alert('브라우저에서 클립보드 읽기가 차단되었습니다. 텍스트를 직접 붙여넣어 주세요.'); }
-  };
-  window.mtRegisterNormalClipboardText = function () {
-    const text = document.getElementById('mtNormalClipboardText');
-    const rows = rowsFromText(text?.value);
-    if (!rows.length) return alert('등록할 텍스트가 없습니다.');
-    if (!Number.isInteger(initialImportSlot)) return alert('등록할 슬롯을 찾지 못했습니다. 다시 시도해 주세요.');
-    const slot = initialImportSlot, type = initialImportType;
-    window.mtCloseNormalClipboardModal();
-    if (type === 'ebook') {
-      const state = window.mtGetTypedState(slot);
-      state.type = 'ebook';
-      state.fileName = state.fileName || `붙여넣기 전자책 ${slot}`;
-      window.mtSetSlotType(slot, 'ebook');
-      window.mtSaveTypedState(slot, state);
-      window.mtEbookTemp = { slotIndex: slot, fileName: state.fileName, rows, sourceSheetName: '클립보드', addMode: false };
-      window.mtOpenEbookColumnModal(rows);
-    } else {
-      window.mtRegisterNormalRows(rows, slot, `붙여넣기 일반 ${slot}`, 'clipboard');
-    }
-  };
-
-  // 빈 전자책 슬롯도 일반형과 똑같이 파일 또는 붙여넣기 중 선택할 수 있습니다.
-  window.mtRegisterConfiguredEmptySlotFile = function () {
-    if (window.mtConfiguredEmptySlot == null) return;
-    const slot = Number(window.mtConfiguredEmptySlot);
-    const type = window.mtPendingSlotType;
-    window.mtCloseConfiguredEmptySlotModal();
-    if (type === 'normal' || type === 'ebook') return window.mtOpenNormalImportSourceModal(slot, type);
-    if (type) return window.mtTriggerUpload(slot, type);
-    window.mtOpenSlotTypeModal(slot);
-  };
-})();
-</script>
+<!-- v122: obsolete pre-initialization duplicate removed. -->
 <style id="benchmarkDesignOverride">
 /* =========================================================
    BENCHMARK DESIGN OVERRIDE
@@ -3042,7 +2927,6 @@ body { background: var(--bench-v2-bg) !important; }
             .mt-slot-actions-row .mt-slot-meta-badge { padding:3px 6px !important; font-size:9px !important; }
         }
 </style>
-</style>
 <style id="v31OneLineActions">
 .mt-slot-actions-row{display:flex!important;align-items:center!important;flex-wrap:nowrap!important;gap:2px!important;white-space:nowrap!important;overflow:hidden!important}
 .mt-slot-actions-row>*{flex:0 0 auto!important;margin:0!important;min-width:0!important}
@@ -3050,15 +2934,7 @@ body { background: var(--bench-v2-bg) !important; }
 .mt-slot-actions-row>.mt-slot-meta-badge{padding:3px 6px!important;white-space:nowrap!important}
 @media(max-width:768px){.mt-slot-actions-row{gap:1px!important}.mt-slot-actions-row>button{padding:3px 4px!important;font-size:8px!important}}
 </style>
-<style id="noSlotHoverMotionV52">
-/* 슬롯 hover 시 카드가 꿈틀거리거나 이동하는 애니메이션 제거 */
-    transform: none !important;
-    transition: none !important;
-}
-
-<style id="mtNoSlotHoverMotionV53">
-</style>
-</style>
+<!-- v122: malformed inactive hover styles removed. -->
 
 <style id="mtGeneratorV59Style">
 .mt-gen-actions{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;margin-top:8px}
@@ -3169,7 +3045,7 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
 <div class="container">
     <!-- 상단 헤더 및 파일 백업/저장 버튼 레이아웃 -->
     <div class="header-container">
-        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v123</small></h1>
+        <h1 id="appHomeTitle" role="button" tabindex="0" title="메인화면으로 이동" style="cursor:pointer;">올인원 영작-단어장 시스템 <small>v122</small></h1>
         <div class="header-buttons">
             <div id="saveReminder" class="save-reminder">데이터 백업(덮어쓰기 저장)을 잊지 마세요!</div>
 
@@ -3182,9 +3058,10 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
             <!-- 글꼴 링크 & API 설정 토글 버튼 -->
             <button class="btn-excel" onclick="toggleApiKeyInput()">API 키 설정</button>
             <button class="btn-excel" onclick="toggleFontInput()">글꼴 링크</button>
-            <button class="btn-excel file-open-btn" onclick="loadFromLocalPC()">PC 백업 열기</button>
-            <button id="mtAutoBackupButton" class="btn-excel" onclick="mtConfigureAutoBackup()" title="20분마다 v1·v2·v3 파일을 순환 저장할 폴더를 설정합니다.">자동저장 설정</button>
-            <button id="mtBackupSaveButton" class="file-sync-btn" onclick="saveToLocalPC()" title="클릭할 때마다 현재 전체 데이터를 날짜가 붙은 JSON 파일로 즉시 내려받습니다.">전체 데이터 저장</button>
+            <button class="btn-excel file-open-btn" onclick="loadFromLocalPC()" title="백업에 포함된 영역을 전체 복원합니다">PC 백업 열기</button>
+            <button class="btn-excel" onclick="mtDownloadBackup()" title="API 키를 제외한 전체 데이터와 설정을 다운로드합니다">백업 다운로드</button>
+            <button class="btn-excel" onclick="mtDownloadPreviousRestoreBackup()">복원 직전 백업</button>
+            <button class="file-sync-btn" onclick="saveToLocalPC()" title="최초 한 번 백업 폴더를 선택하면 20분마다 v1·v2·v3 순환 자동저장">전체 데이터 자동저장</button>
         </div>
     </div>
 
@@ -4212,6 +4089,350 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
 </div>
 
 <script>
+    // v122: storage errors remain observable to callers; UI reports failed writes.
+    const mtStorageFailures = new Map();
+    let mtAppWriteChain = Promise.resolve();
+    let mtNormalWriteChain = Promise.resolve();
+    let mtRestoreInProgress = false;
+    let mtAppReady = false;
+
+    function mtCloneData(value) {
+        return typeof structuredClone === 'function' ? structuredClone(value) : JSON.parse(JSON.stringify(value));
+    }
+    function mtShowStorageStatus() {
+        if (!document.body) return;
+        let box = document.getElementById('mtStorageStatus');
+        if (!box) {
+            box = document.createElement('div'); box.id = 'mtStorageStatus';
+            box.setAttribute('role', 'alert');
+            Object.assign(box.style, {position:'fixed',bottom:'16px',right:'16px',zIndex:'100000',maxWidth:'440px',padding:'14px',border:'1px solid #dc2626',borderRadius:'10px',background:'#fff',color:'#991b1b',boxShadow:'0 4px 20px #0002',fontSize:'13px'});
+            document.body.appendChild(box);
+        }
+        box.replaceChildren(); box.hidden = !mtStorageFailures.size;
+        if (box.hidden) return;
+        const message = document.createElement('div');
+        message.textContent = `${Array.from(mtStorageFailures.keys()).join(', ')} 저장에 실패했습니다. 이 창을 닫기 전에 저장을 재시도하거나 백업을 다운로드해 주세요.`;
+        const retry = document.createElement('button'); retry.textContent = '저장 재시도'; retry.className = 'btn-primary';
+        retry.style.marginTop = '8px'; retry.onclick = () => mtRetryAllStorage();
+        const download = document.createElement('button'); download.textContent = '현재 데이터 백업'; download.className = 'btn-excel';
+        download.style.marginLeft = '6px'; download.onclick = () => mtDownloadBackup();
+        box.append(message, retry, download);
+    }
+    function mtReportStorageFailure(area, error) {
+        mtStorageFailures.set(area, String(error?.message || error));
+        console.error(`[${area}] 저장 실패:`, error); mtShowStorageStatus();
+    }
+    function mtStorageSucceeded(area) {
+        if (mtStorageFailures.delete(area)) mtShowStorageStatus();
+    }
+    function mtObserveStorageJob(job, area) {
+        // Attach a rejection handler even when a UI event does not await the job.
+        // Return the ORIGINAL promise so migrations/restores still receive failure.
+        job.then(() => mtStorageSucceeded(area), error => mtReportStorageFailure(area, error));
+        return job;
+    }
+    function mtWriteAppRecord(storeName, key, value, area) {
+        let snapshot;
+        try { snapshot = mtCloneData(value); }
+        catch (error) { return mtObserveStorageJob(Promise.reject(error), area); }
+        const job = mtAppWriteChain.catch(() => {}).then(async () => {
+            let db;
+            try {
+                db = await initDB();
+                const tx = db.transaction(storeName, 'readwrite');
+                const done = waitForTransaction(tx);
+                try { tx.objectStore(storeName).put(snapshot, key); }
+                catch (error) { tx.abort(); await done.catch(() => {}); throw error; }
+                await done;
+            } finally { if (db) db.close(); }
+        });
+        mtAppWriteChain = job.catch(() => {});
+        return mtObserveStorageJob(job, area);
+    }
+
+
+
+    async function mtRetryAllStorage() {
+        if (mtRestoreInProgress) return;
+        await Promise.allSettled([saveSlotsToDatabase(), saveWordsToDatabase(), saveToDatabase(),
+            mtObserveStorageJob(mtPersistNormalSlotCache(), '일반 슬롯'),
+            mtObserveStorageJob(mtPersistTypedSlotStates(), '유형 슬롯')]);
+    }
+
+
+
+    // v122: versioned backups, credential exclusion, validated atomic restores.
+    const MT_BACKUP_UI_CACHE_KEY = '__mt_backup_ui_v122__';
+    const MT_BACKUP_PREF_KEYS = ['prompt_practice','prompt_mt','prompt_board','mySystemCustomFontUrl',
+        'communityFontSize','word_slot_naver_english_conversation_pattern','mt_ebook_popup_settings_v1',
+        'mt_live_list_font_px','mt_live_list_padding_px','mt_ebook_list_display_options_v117','mtMaskMode','mt_last_selected_slot_v116'];
+    function mtWithoutCredentials(value) {
+        return JSON.parse(JSON.stringify(value, (key, item) =>
+            /^(?:_generatorApiKeys|api_?keys?|gemini_api_key|mt_(?:generator_)?slot_.*api_key.*)$/i.test(key) ? undefined : item));
+    }
+    function mtReadBackupPreferences() {
+        const prefs = {};
+        for (const key of MT_BACKUP_PREF_KEYS) {
+            try { prefs[key] = localStorage.getItem(key); } catch (_) { prefs[key] = null; }
+        }
+        return prefs;
+    }
+    function mtEffectiveGeneratorSettings() {
+        const settings = {prompts:{}, configs:{}};
+        for (const type of ['self_generate','reference_generate']) {
+            settings.configs[type] = mtCloneData(mtGetGenCfg(type));
+            for (const key of (type === 'self_generate' ? ['main'] : ['dialogue','literal']))
+                settings.prompts[mtGeneratorSettingsId(type,key)] = mtGetGenPrompt(type,key);
+        }
+        return settings;
+    }
+
+    function mtDownloadJson(data, name) {
+        const url = URL.createObjectURL(new Blob([JSON.stringify(data,null,2)], {type:'application/json;charset=utf-8'}));
+        const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+    async function mtDownloadBackup() {
+        try { mtDownloadJson(await mtBuildCompleteBackupData(), `language_backup_v122_${new Date().toISOString().replace(/[:.]/g,'-')}.json`); }
+        catch (error) { alert(`백업을 만들지 못했습니다: ${error.message}`); }
+    }
+    function mtBackupObject(value, label) {
+        let object = value;
+        if (typeof object === 'string') {
+            try { object = JSON.parse(object); } catch (_) { throw new Error(`${label}의 JSON 형식이 올바르지 않습니다.`); }
+        }
+        if (!object || typeof object !== 'object' || Array.isArray(object)) throw new Error(`${label}의 데이터 구조가 올바르지 않습니다.`);
+        return mtWithoutCredentials(object);
+    }
+    function mtPrepareBackupRestore(input, currentBackup) {
+        const parsed = mtBackupObject(input, '백업');
+        if (parsed.schemaVersion != null && (!Number.isInteger(parsed.schemaVersion) || parsed.schemaVersion > 2 || parsed.schemaVersion < 1))
+            throw new Error('이 파일의 백업 버전을 지원하지 않습니다.');
+        if (!['slotsData','words','boardDataList','mtBackupData'].some(key => Object.prototype.hasOwnProperty.call(parsed,key)))
+            throw new Error('이 프로그램의 백업 파일이 아닙니다.');
+        const data = mtCloneData(currentBackup);
+        for (const field of ['slotsData','words','boardDataList']) {
+            if (!Object.prototype.hasOwnProperty.call(parsed,field)) continue;
+            if (!Array.isArray(parsed[field]) || parsed[field].some(item => !item || typeof item !== 'object' || Array.isArray(item)))
+                throw new Error(`${field}에 올바르지 않은 항목이 있습니다.`);
+            data[field] = parsed[field];
+        }
+        data.slotsData = normalizeSlotsData(data.slotsData);
+        const wordIds = new Set();
+        data.words = data.words.map((word,i) => {
+            if (word.english == null || word.meaning == null) throw new Error(`단어장 ${i+1}번의 단어 또는 뜻이 없습니다.`);
+            let id = Number(word.id);
+            if (!Number.isSafeInteger(id) || wordIds.has(id)) { id = Date.now()+i; while (wordIds.has(id)) id++; }
+            wordIds.add(id);
+            return {...word,id,english:String(word.english),meaning:String(word.meaning),hint:String(word.hint??''),isEditing:false};
+        });
+        if (Object.prototype.hasOwnProperty.call(parsed,'mtBackupData')) {
+            const incoming = mtBackupObject(parsed.mtBackupData,'학습 슬롯 백업');
+            const prior = data.mtBackupData;
+            data.mtBackupData = {...incoming,slot_types:{},typed_slots:{},
+                generator_settings:incoming.generator_settings ?? prior.generator_settings,
+                typing_unmask_stats:incoming.typing_unmask_stats ?? prior.typing_unmask_stats,
+                preferences:incoming.preferences ?? prior.preferences,
+                ebook_pages:incoming.ebook_pages ?? {},star_session:incoming.star_session ?? null};
+            const target = data.mtBackupData;
+            const types = incoming.slot_types ?? incoming.generator_types ?? {};
+            const typed = incoming.typed_slots ?? incoming.generator_states ?? {};
+            mtBackupObject(types,'슬롯 유형'); mtBackupObject(typed,'유형별 슬롯');
+            for (const key of Object.keys(types)) {
+                if (!/^([1-9]|10|11)$/.test(key) || !['normal','ebook','self_generate','reference_generate'].includes(types[key]))
+                    throw new Error(`슬롯 유형 ${key}가 올바르지 않습니다.`);
+            }
+            for (let i = 1; i <= 11; i++) {
+                const type = types[i] || (incoming[i] ? 'normal' : '');
+                if (!type) continue;
+                target.slot_types[i] = type;
+                if (type === 'normal') {
+                    if (!incoming[i]) throw new Error(`일반 슬롯 ${i}의 본문 데이터가 없습니다.`);
+                    let normal = incoming[i];
+                    if (typeof normal === 'string') { try { normal = JSON.parse(normal); } catch (_) { throw new Error(`일반 슬롯 ${i}을 읽을 수 없습니다.`); } }
+                    normal = mtNormalizeNormalSlotForStorage(normal,i);
+                    if (!normal || !Array.isArray(normal.words) || normal.words.some(w=>!w || typeof w!=='object')) throw new Error(`일반 슬롯 ${i}의 카드 목록이 올바르지 않습니다.`);
+                    target[i] = JSON.stringify(mtWithoutCredentials(normal));
+                } else {
+                    if (!typed[i]) throw new Error(`슬롯 ${i}의 본문 데이터가 없습니다.`);
+                    const state = mtBackupObject(typed[i],`슬롯 ${i}`);
+                    for (const field of ['outputRows','sourceRows','topics','refQueue','starredSerials','ebookReadIndexes'])
+                        if (state[field] != null && !Array.isArray(state[field])) throw new Error(`슬롯 ${i}의 ${field} 목록이 올바르지 않습니다.`);
+                    if ((state.outputRows||[]).some(row=>!Array.isArray(row))) throw new Error(`슬롯 ${i}의 출력 행이 올바르지 않습니다.`);
+                    if (type === 'self_generate' && !Array.isArray(state.sourceRows)) throw new Error(`자체형 슬롯 ${i}의 원문이 없습니다.`);
+                    if (type === 'reference_generate' && (!Array.isArray(state.topics) || state.topics.some(t=>!t || typeof t.text!=='string')))
+                        throw new Error(`참조형 슬롯 ${i}의 주제 목록이 올바르지 않습니다.`);
+                    state.type = type; state.outputRows ||= []; state.starredSerials ||= [];
+                    target.typed_slots[i] = JSON.stringify(state);
+                    delete target[i];
+                }
+            }
+        }
+        for (const key of ['novelFontSize','vocaFontSize']) {
+            if (parsed[key] != null && !Number.isFinite(Number(parsed[key]))) throw new Error('글자 크기 설정이 올바르지 않습니다.');
+            if (parsed[key] != null) data[key] = Math.max(8,Math.min(72,Number(parsed[key])));
+        }
+        if (parsed.mtFontSettings) data.mtFontSettings = mtNormalizeFontSettings(mtBackupObject(parsed.mtFontSettings,'글자 설정'));
+        const backup = data.mtBackupData;
+        const settings = mtBackupObject(backup.generator_settings,'생성 설정');
+        settings.prompts = mtBackupObject(settings.prompts || {},'생성 프롬프트');
+        settings.configs = mtBackupObject(settings.configs || {},'생성 옵션');
+        if (Object.values(settings.prompts).some(v=>typeof v!=='string')) throw new Error('생성 프롬프트는 문자열이어야 합니다.');
+        for (const type of ['self_generate','reference_generate']) {
+            if (settings.configs[type]) settings.configs[type] = mtApplyGenCfg(mtGetGenCfg(type), mtBackupObject(settings.configs[type],'생성 옵션'));
+        }
+        backup.generator_settings = settings;
+        backup.preferences = mtBackupObject(backup.preferences || {},'화면 설정');
+        backup.ebook_pages = mtBackupObject(backup.ebook_pages || {},'읽던 페이지');
+        backup.typing_unmask_stats = JSON.stringify(mtNormalizeStatsState(mtBackupObject(backup.typing_unmask_stats,'학습 통계')));
+        if (backup.star_session != null) backup.star_session = JSON.stringify(mtBackupObject(backup.star_session,'별표 학습 세션'));
+        return data;
+    }
+    function mtShowBackupPreview(data, fileName) {
+        return new Promise(resolve => {
+            const dialog = document.createElement('dialog');
+            Object.assign(dialog.style,{maxWidth:'440px',width:'calc(100% - 48px)',border:'1px solid #d1d5db',borderRadius:'12px',padding:'24px'});
+            const title = document.createElement('h3'); title.textContent = '백업 전체 복원';
+            const detail = document.createElement('p');
+            detail.textContent = `${fileName}\n학습 슬롯 ${Object.keys(data.mtBackupData.slot_types).length}개 · 단어 ${data.words.length}개 · 게시판 ${data.boardDataList.length}개`;
+            detail.style.whiteSpace = 'pre-line';
+            const note = document.createElement('p'); note.textContent = '백업에 포함된 영역을 교체합니다. 빈 슬롯도 백업 당시 상태로 돌아갑니다. 슬롯별 API 키는 복원 후 다시 입력해 주세요. 현재 상태는 복원 직전 백업으로 보관합니다.';
+            const cancel = document.createElement('button'); cancel.textContent = '취소'; cancel.className = 'btn-excel';
+            const accept = document.createElement('button'); accept.textContent = '전체 복원'; accept.className = 'btn-primary'; accept.style.marginLeft = '8px';
+            const done = value => { dialog.close(); dialog.remove(); resolve(value); };
+            cancel.onclick = () => done(false); accept.onclick = () => done(true);
+            dialog.addEventListener('cancel',event=>{event.preventDefault();done(false);});
+            dialog.append(title,detail,note,cancel,accept); document.body.appendChild(dialog); dialog.showModal(); cancel.focus();
+        });
+    }
+    async function mtCommitBackupRestore(data, previousBackup) {
+        const normal = Object.create(null), states = {}, types = {...data.mtBackupData.slot_types}, now = Date.now();
+        for (let i = 1; i <= 11; i++) {
+            if (types[i] === 'normal') normal[i] = JSON.parse(data.mtBackupData[i]);
+            else if (types[i]) { states[i] = JSON.parse(data.mtBackupData.typed_slots[i]); states[i]._mtSavedAt = now; }
+        }
+        const settings = data.mtBackupData.generator_settings, stats = JSON.parse(data.mtBackupData.typing_unmask_stats);
+        states[MT_GENERATOR_SETTINGS_CACHE_KEY] = {kind:'generator-settings',...mtCloneData(settings),_mtSavedAt:now};
+        states[MT_STATS_CACHE_KEY] = {kind:'success-card-stats',state:stats,_mtSavedAt:now};
+        states[MT_BACKUP_UI_CACHE_KEY] = {kind:'backup-ui',preferences:data.mtBackupData.preferences,ebookPages:data.mtBackupData.ebook_pages,
+            starSession:data.mtBackupData.star_session,fontSettings:data.mtFontSettings,novelFontSize:data.novelFontSize,vocaFontSize:data.vocaFontSize,_mtSavedAt:now};
+        const snapshot = {types,states,savedAt:now,fullRestoreAt:now};
+        let db;
+        try {
+            db = await initDB();
+            const tx = db.transaction([STORE_NAME,SLOT_STORE_NAME,VOCA_STORE_NAME,MT_NORMAL_SLOT_STORE_NAME,MT_TYPED_SLOT_STORE_NAME],'readwrite');
+            const done = waitForTransaction(tx);
+            try {
+                tx.objectStore(STORE_NAME).put(data.boardDataList,'communityBoardsData');
+                tx.objectStore(SLOT_STORE_NAME).put(data.slotsData,SLOT_DATA_KEY);
+                tx.objectStore(VOCA_STORE_NAME).put(data.words,VOCA_DATA_KEY);
+                const normalStore = tx.objectStore(MT_NORMAL_SLOT_STORE_NAME);
+                for (let i=1;i<=11;i++) { if(normal[i])normalStore.put(normal[i],mtNormalSlotDbKey(i));else normalStore.delete(mtNormalSlotDbKey(i)); }
+                normalStore.delete(MT_NORMAL_SLOT_LEGACY_DATA_KEY);
+                const typedStore = tx.objectStore(MT_TYPED_SLOT_STORE_NAME);
+                typedStore.put(snapshot,MT_TYPED_SLOT_DATA_KEY);
+                typedStore.put(previousBackup,'preRestoreBackupV122');
+            } catch (error) { tx.abort(); await done.catch(()=>{}); throw error; }
+            await done;
+        } finally { if (db) db.close(); }
+        // Runtime data changes only AFTER the entire transaction commits.
+        slotsData=data.slotsData;words=data.words;boardDataList=data.boardDataList;
+        mtNormalSlotCache=normal;mtNormalSlotCacheReady=true;mtNormalSlotPendingWrites.clear();
+        for(const key of Object.keys(mtSlotStateCache))delete mtSlotStateCache[key];Object.assign(mtSlotStateCache,states);
+        for(const key of Object.keys(mtSlotTypeMemory))delete mtSlotTypeMemory[key];Object.assign(mtSlotTypeMemory,types);
+        mtTypedSlotStateHydrated=true;
+        mtGeneratorSettingsCache.prompts=mtCloneData(settings.prompts);mtGeneratorSettingsCache.configs=mtCloneData(settings.configs);mtStatsStateMemory=stats;
+        mtMirrorRestoredSnapshot(snapshot);
+        mtActiveSlotIndex=null;mtEbookActiveSlot=null;mtEbookTypingActive=false;
+        return snapshot;
+    }
+    function mtMirrorRestoredSnapshot(snapshot) {
+        // The IndexedDB snapshot stays authoritative if a localStorage mirror fails.
+        let mirrorFailed=false;
+        const remove=key=>{try{localStorage.removeItem(key);}catch(_){mirrorFailed=true;}};
+        const set=(key,value)=>{try{if(value==null)localStorage.removeItem(key);else localStorage.setItem(key,String(value));}catch(_){mirrorFailed=true;}};
+        for(let i=1;i<=11;i++) {
+            for(const key of ['word_slot_'+i,'mt_slot_state_'+i,MT_SLOT_TYPE_STORAGE_PREFIX+i,MT_EBOOK_COMPLETION_RECORD_PREFIX+i,
+                'mt_slot_self_generate_api_key_'+i,'mt_slot_reference_generate_api_key_'+i,
+                'mt_generator_slot_api_key_self_generate_'+i,'mt_generator_slot_api_key_reference_generate_'+i])remove(key);
+            try{sessionStorage.removeItem(MT_EBOOK_COMPLETION_RECORD_PREFIX+i);}catch(_){}
+            if(snapshot.types[i])set(MT_SLOT_TYPE_STORAGE_PREFIX+i,snapshot.types[i]);
+        }
+        for(const key of ['myNovelPracticeMultiSlots','myScoreVocaWords','communityBoards'])remove(key);
+        const ui=snapshot.states[MT_BACKUP_UI_CACHE_KEY];
+        if(ui) {
+            for(const key of MT_BACKUP_PREF_KEYS)if(Object.prototype.hasOwnProperty.call(ui.preferences||{},key))set(key,ui.preferences[key]);
+            set('word_slot_star_session',ui.starSession);
+            for(const key of Object.keys(mtEbookPage))delete mtEbookPage[key];Object.assign(mtEbookPage,ui.ebookPages||{});
+            set(MT_EBOOK_LAST_PAGE_STORAGE_KEY,JSON.stringify(mtEbookPage));
+            novelFontSize=ui.novelFontSize;vocaFontSize=ui.vocaFontSize;
+            set('myNovelFontSize',novelFontSize);set('myVocaFontSize',vocaFontSize);
+            try{mtSetFontSettings(ui.fontSettings||{});}catch(_){mirrorFailed=true;}
+            try{mtApplyFontSettings();applyFontSettings();}catch(_){}
+        }
+        set(MT_STATS_STORAGE_KEY,JSON.stringify(mtStatsStateMemory));
+        if(!mirrorFailed)set('mt_full_restore_applied_v122',snapshot.fullRestoreAt);
+    }
+    async function mtRestorePreparedBackup(data, previousBackup) {
+        if(mtRestoreInProgress)throw new Error('다른 복원이 진행 중입니다.');
+        mtRestoreInProgress=true;
+        try {
+            await mtStopAllGeneratorJobs();
+            clearTimeout(slotSaveTimer);clearTimeout(mtNormalSlotSaveTimer);clearTimeout(mtTypedSlotStateSaveTimer);
+            await Promise.allSettled([mtAppWriteChain,mtNormalWriteChain,mtTypedSlotStateWriteChain]);
+            return await mtCommitBackupRestore(data,previousBackup);
+        } finally {mtRestoreInProgress=false;}
+    }
+    async function mtDownloadPreviousRestoreBackup() {
+        let db;
+        try {
+            db=await initDB();const request=db.transaction(MT_TYPED_SLOT_STORE_NAME,'readonly').objectStore(MT_TYPED_SLOT_STORE_NAME).get('preRestoreBackupV122');
+            const data=await new Promise((resolve,reject)=>{request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
+            if(!data)throw new Error('아직 복원 직전 백업이 없습니다.');
+            mtDownloadJson(data,'language_before_restore_v122.json');
+        } catch(error){alert(error.message);}finally{if(db)db.close();}
+    }
+
+
+    // v122: one cancellable job per slot; successful work survives partial failure.
+    const mtGeneratorJobs = new Map();
+    function mtGeneratorAbortError() { const error=new Error('생성 작업이 취소되었습니다.');error.name='AbortError';return error; }
+    function mtGeneratorSleep(ms,signal) {
+        return new Promise((resolve,reject)=>{
+            if(signal?.aborted){reject(mtGeneratorAbortError());return;}
+            const finish=()=>{signal?.removeEventListener('abort',abort);resolve();};
+            const timer=setTimeout(finish,Math.max(0,ms));
+            const abort=()=>{clearTimeout(timer);signal?.removeEventListener('abort',abort);reject(mtGeneratorAbortError());};
+            signal?.addEventListener('abort',abort,{once:true});
+        });
+    }
+    function mtAssertGeneratorState(slot,state,signal) {
+        if(signal?.aborted || mtRestoreInProgress || mtGetSlotType(slot)!==state.type || mtGetTypedState(slot)!==state)
+            throw mtGeneratorAbortError();
+    }
+    function mtCancelGeneratorJob(slotIndex) {
+        const slot=Number(slotIndex),job=mtGeneratorJobs.get(slot);
+        if(mtGeneratorTimers[slot])clearTimeout(mtGeneratorTimers[slot]);delete mtGeneratorTimers[slot];
+        if(job){job.controller.abort();return job.promise;}
+        return Promise.resolve();
+    }
+    async function mtStopAllGeneratorJobs() {
+        for(const timer of Object.values(mtGeneratorTimers))clearTimeout(timer);
+        for(const key of Object.keys(mtGeneratorTimers))delete mtGeneratorTimers[key];
+        const jobs=Array.from(mtGeneratorJobs.values());jobs.forEach(job=>job.controller.abort());
+        await Promise.allSettled(jobs.map(job=>job.promise));
+    }
+
+
+
+
+
+
+
+
+
+
+
     
         /* ========================================== */
     /* [신규 기능] AI 도움 프롬프트 통합 템플릿 관리   */
@@ -4389,23 +4610,8 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
     const MT_AUTO_BACKUP_STATE_KEY = 'rotationState';
     let mtAutoBackupDirectoryHandle = null;
     let mtAutoBackupNextVersion = 1;
-    let mtAutoBackupLastSavedAt = 0;
     let mtAutoBackupTimerId = null;
     let mtAutoBackupRunning = false;
-    let mtAutoBackupNeedsReconnect = false;
-
-    function mtSetAutoBackupButtonState(state,detail=''){
-        const button=document.getElementById('mtAutoBackupButton');
-        if(!button)return;
-        const reconnect=state==='reconnect';
-        button.textContent=reconnect?'자동저장 재연결':state==='active'?'자동저장: 켜짐':state==='unsupported'?'자동저장 미지원':'자동저장 설정';
-        button.disabled=state==='unsupported';
-        button.dataset.autoBackupState=String(state||'');
-        if(reconnect)button.title=`자동저장 폴더 권한이 끊겼습니다. 클릭하면 폴더를 다시 선택하고 20분 자동저장을 재개합니다.${detail?' '+detail:''}`;
-        else if(state==='active')button.title=`v1·v2·v3 순환 자동저장이 연결되어 있습니다.${detail?' '+detail:''}`;
-        else if(state==='unsupported')button.title='이 브라우저에서는 폴더 자동저장을 지원하지 않습니다. 옆의 전체 데이터 저장 버튼으로 수동 백업은 내려받을 수 있습니다.';
-        else button.title=`20분마다 v1·v2·v3 파일을 순환 저장할 폴더를 설정합니다.${detail?' '+detail:''}`;
-    }
 
     function mtOpenAutoBackupDb() {
         return new Promise((resolve,reject)=>{
@@ -4431,7 +4637,7 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
         try{
             db=await mtOpenAutoBackupDb();
             const tx=db.transaction(MT_AUTO_BACKUP_STORE,'readwrite');
-            tx.objectStore(MT_AUTO_BACKUP_STORE).put({directoryHandle:mtAutoBackupDirectoryHandle,nextVersion:mtAutoBackupNextVersion,lastBackupAt:mtAutoBackupLastSavedAt},MT_AUTO_BACKUP_STATE_KEY);
+            tx.objectStore(MT_AUTO_BACKUP_STORE).put({directoryHandle:mtAutoBackupDirectoryHandle,nextVersion:mtAutoBackupNextVersion},MT_AUTO_BACKUP_STATE_KEY);
             await new Promise((resolve,reject)=>{tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);});
         }catch(e){console.warn('[자동저장] 폴더 설정 저장 실패:',e);}finally{if(db)db.close();}
     }
@@ -4444,43 +4650,34 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
         }catch(_){}
         return false;
     }
-    async function mtBuildCompleteBackupData(){
-        if(document.getElementById('novelTab')?.classList.contains('active'))saveCurrentNovelInput();
-        await saveSlotsToDatabase();
-        await saveWordsToDatabase();
-        try{await mtPersistNormalSlotCache();}catch(_){}
-        try{await mtPersistTypedSlotStates();}catch(_){}
-
-        const mtBackupData={};
-        for(let i=1;i<=11;i++){
-            const valObj=mtGetNormalSlotSync(i);
-            if(valObj)mtBackupData[i]=JSON.stringify(valObj);
-        }
-        try{const starSess=localStorage.getItem('word_slot_star_session');if(starSess)mtBackupData.star_session=starSess;}catch(_){}
-        try{mtBackupData.typing_unmask_stats=localStorage.getItem(MT_STATS_STORAGE_KEY)||JSON.stringify(mtGetStatsState());}
-        catch(_){mtBackupData.typing_unmask_stats=JSON.stringify(mtGetStatsState());}
-        mtBackupData.slot_types={};
-        mtBackupData.typed_slots={};
-        mtBackupData.generator_states={};
-        mtBackupData.generator_types={};
-        for(let i=1;i<=11;i++){
-            const slotType=mtGetSlotType(i);
-            if(slotType)mtBackupData.slot_types[i]=slotType;
-            if(['ebook','self_generate','reference_generate'].includes(slotType))mtBackupData.typed_slots[i]=JSON.stringify(mtGetTypedState(i));
-            if(slotType==='self_generate'||slotType==='reference_generate'){
-                mtBackupData.generator_types[i]=slotType;
-                mtBackupData.generator_states[i]=mtBackupData.typed_slots[i];
+    async function mtBuildCompleteBackupData() {
+        if (!mtAppReady) throw new Error('데이터를 불러오는 중입니다. 초기화가 끝난 뒤 다시 백업해 주세요.');
+        if (mtRestoreInProgress) throw new Error('복원이 끝난 뒤 백업해 주세요.');
+        if (document.getElementById('novelTab')?.classList.contains('active')) saveCurrentNovelInput();
+        // Backups read a memory snapshot, so a failed database write does not block rescue.
+        const mtBackupData = {slot_types:{},typed_slots:{},generator_types:{},generator_states:{},
+            generator_settings:mtEffectiveGeneratorSettings(),typing_unmask_stats:JSON.stringify(mtGetStatsState()),
+            ebook_pages:mtCloneData(mtEbookPage),preferences:mtReadBackupPreferences()};
+        try { mtBackupData.star_session = localStorage.getItem('word_slot_star_session'); } catch (_) { mtBackupData.star_session = null; }
+        for (let i = 1; i <= 11; i++) {
+            const normal = mtGetNormalSlotSync(i), type = mtGetSlotType(i);
+            if (normal) mtBackupData[i] = JSON.stringify(mtWithoutCredentials(normal));
+            if (type) mtBackupData.slot_types[i] = type;
+            if (['ebook','self_generate','reference_generate'].includes(type)) {
+                mtBackupData.typed_slots[i] = JSON.stringify(mtWithoutCredentials(mtGetTypedState(i)));
+                if (type !== 'ebook') {
+                    mtBackupData.generator_types[i] = type;
+                    mtBackupData.generator_states[i] = mtBackupData.typed_slots[i];
+                }
             }
         }
-        return {slotsData,words,novelFontSize,vocaFontSize,boardDataList,mtBackupData,mtFontSettings:mtGetFontSettingsForBackup(),lastSaved:new Date().toISOString()};
+        return mtWithoutCredentials({format:'all-in-one-language-backup',schemaVersion:2,appVersion:'v122',
+            slotsData,words,novelFontSize,vocaFontSize,boardDataList,mtBackupData,
+            mtFontSettings:mtGetFontSettingsForBackup(),lastSaved:new Date().toISOString()});
     }
     async function mtRunRotatingAutoBackup(){
         if(mtAutoBackupRunning||!mtAutoBackupDirectoryHandle)return false;
-        if(!await mtHasAutoBackupPermission(mtAutoBackupDirectoryHandle,false)){
-            mtAutoBackupNeedsReconnect=true;
-            mtSetAutoBackupButtonState('reconnect');
-            return false;
-        }
+        if(!await mtHasAutoBackupPermission(mtAutoBackupDirectoryHandle,false))return false;
         mtAutoBackupRunning=true;
         try{
             const version=Math.min(3,Math.max(1,Number(mtAutoBackupNextVersion)||1));
@@ -4490,203 +4687,65 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
             const writable=await fileHandle.createWritable();
             await writable.write(JSON.stringify(dataToSave,null,2));
             await writable.close();
+            mtStorageSucceeded('PC 백업');
             mtAutoBackupNextVersion=version>=3?1:version+1;
-            mtAutoBackupLastSavedAt=Date.now();
-            mtAutoBackupNeedsReconnect=false;
             await mtPersistAutoBackupState();
-            mtSetAutoBackupButtonState('active',`마지막 자동저장: ${new Date(mtAutoBackupLastSavedAt).toLocaleString('ko-KR')}`);
             const reminder=document.getElementById('saveReminder');
             if(reminder)reminder.classList.remove('is-visible');
             return true;
-        }catch(e){
-            console.warn('[자동저장] 백업 실패:',e);
-            mtSetAutoBackupButtonState('active',`최근 자동저장 실패: ${String(e?.message||e)}`);
-            return false;
-        }finally{mtAutoBackupRunning=false;}
+        }catch(e){mtReportStorageFailure('PC 백업',e);return false;}finally{mtAutoBackupRunning=false;}
     }
-    function mtScheduleNextAutoBackup(delayOverride=null){
+    function mtScheduleNextAutoBackup(){
         if(mtAutoBackupTimerId)clearTimeout(mtAutoBackupTimerId);
-        mtAutoBackupTimerId=null;
-        if(!mtAutoBackupDirectoryHandle||mtAutoBackupNeedsReconnect)return;
-        const delay=Number.isFinite(Number(delayOverride))
-            ? Math.max(1000,Number(delayOverride))
-            : (mtAutoBackupLastSavedAt
-                ? Math.max(1000,(mtAutoBackupLastSavedAt+MT_AUTO_BACKUP_INTERVAL_MS)-Date.now())
-                : MT_AUTO_BACKUP_INTERVAL_MS);
+        if(!mtAutoBackupDirectoryHandle)return;
         mtAutoBackupTimerId=setTimeout(async()=>{
             mtAutoBackupTimerId=null;
-            await mtRunRotatingAutoBackup();
-            if(!mtAutoBackupNeedsReconnect)mtScheduleNextAutoBackup(MT_AUTO_BACKUP_INTERVAL_MS);
-        },delay);
+            if(!await mtRunRotatingAutoBackup())throw new Error('백업 파일을 저장하지 못했습니다. 폴더 권한과 저장 공간을 확인해 주세요.');
+            mtScheduleNextAutoBackup();
+        },MT_AUTO_BACKUP_INTERVAL_MS);
     }
     async function mtInitAutoBackup(){
         const saved=await mtReadAutoBackupState();
-        if(!saved?.directoryHandle){
-            mtSetAutoBackupButtonState(window.showDirectoryPicker?'idle':'unsupported');
-            return;
-        }
+        if(!saved?.directoryHandle)return;
         mtAutoBackupDirectoryHandle=saved.directoryHandle;
         mtAutoBackupNextVersion=Math.min(3,Math.max(1,Number(saved.nextVersion)||1));
-        mtAutoBackupLastSavedAt=Math.max(0,Number(saved.lastBackupAt)||0);
-        if(!await mtHasAutoBackupPermission(mtAutoBackupDirectoryHandle,false)){
-            // 브라우저 재시작 뒤 권한이 'prompt'로 돌아오면 사용자 동작 없이 다시 요청할 수 없다.
-            // 과거처럼 조용히 멈추지 않고 버튼에서 재연결 필요 상태를 분명히 알린다.
-            mtAutoBackupNeedsReconnect=true;
-            mtSetAutoBackupButtonState('reconnect');
-            return;
-        }
-        mtAutoBackupNeedsReconnect=false;
-        mtSetAutoBackupButtonState('active',mtAutoBackupLastSavedAt?`마지막 자동저장: ${new Date(mtAutoBackupLastSavedAt).toLocaleString('ko-KR')}`:'');
-        const overdue=!mtAutoBackupLastSavedAt || Date.now()-mtAutoBackupLastSavedAt>=MT_AUTO_BACKUP_INTERVAL_MS;
-        if(overdue){await mtRunRotatingAutoBackup();if(!mtAutoBackupNeedsReconnect)mtScheduleNextAutoBackup(MT_AUTO_BACKUP_INTERVAL_MS);}
-        else mtScheduleNextAutoBackup();
-    }
-    function mtManualBackupFileName(){
-        const d=new Date(),pad=n=>String(n).padStart(2,'0');
-        return `my_foreign_lang_data_backup(manual_${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}).json`;
-    }
-    async function mtDownloadManualBackup(){
-        const dataToSave=await mtBuildCompleteBackupData();
-        const blob=new Blob([JSON.stringify(dataToSave,null,2)],{type:'application/json;charset=utf-8'});
-        const url=URL.createObjectURL(blob),link=document.createElement('a');
-        link.href=url;link.download=mtManualBackupFileName();link.style.display='none';
-        document.body.appendChild(link);link.click();link.remove();
-        setTimeout(()=>URL.revokeObjectURL(url),1000);
-        return link.download;
-    }
-    async function mtRecoverAutoBackupOnResume(){
-        if(document.visibilityState==='hidden'||mtAutoBackupRunning||!mtAutoBackupDirectoryHandle)return;
-        if(!await mtHasAutoBackupPermission(mtAutoBackupDirectoryHandle,false)){
-            mtAutoBackupNeedsReconnect=true;
-            if(mtAutoBackupTimerId)clearTimeout(mtAutoBackupTimerId);
-            mtAutoBackupTimerId=null;
-            mtSetAutoBackupButtonState('reconnect');
-            return;
-        }
-        mtAutoBackupNeedsReconnect=false;
-        const overdue=!mtAutoBackupLastSavedAt || Date.now()-mtAutoBackupLastSavedAt>=MT_AUTO_BACKUP_INTERVAL_MS;
-        if(overdue){
-            if(mtAutoBackupTimerId)clearTimeout(mtAutoBackupTimerId);
-            mtAutoBackupTimerId=null;
-            await mtRunRotatingAutoBackup();
-            if(!mtAutoBackupNeedsReconnect)mtScheduleNextAutoBackup(MT_AUTO_BACKUP_INTERVAL_MS);
-        }else mtScheduleNextAutoBackup();
-    }
-    async function mtConfigureAutoBackup(){
-        try{
-            if(!window.showDirectoryPicker){mtSetAutoBackupButtonState('unsupported');return;}
-            // 폴더 선택은 반드시 이 버튼의 사용자 클릭 직후 실행합니다.
-            if(!mtAutoBackupDirectoryHandle||mtAutoBackupNeedsReconnect){
-                const handle=await window.showDirectoryPicker({mode:'readwrite'});
-                const changed=handle!==mtAutoBackupDirectoryHandle;
-                mtAutoBackupDirectoryHandle=handle;
-                if(changed){mtAutoBackupNextVersion=1;mtAutoBackupLastSavedAt=0;}
-            }else if(typeof mtAutoBackupDirectoryHandle.requestPermission==='function'){
-                const status=await mtAutoBackupDirectoryHandle.requestPermission({mode:'readwrite'});
-                if(status!=='granted')throw new Error('선택한 폴더의 쓰기 권한을 허용해 주세요.');
-            }
-            if(!mtAutoBackupDirectoryHandle||!await mtHasAutoBackupPermission(mtAutoBackupDirectoryHandle,false)){
-                mtAutoBackupNeedsReconnect=true;mtSetAutoBackupButtonState('reconnect');return;
-            }
-            mtAutoBackupNeedsReconnect=false;
-            await mtPersistAutoBackupState();
-            await mtRecoverAutoBackupOnResume();
-            if(!mtAutoBackupTimerId&&!mtAutoBackupNeedsReconnect)mtScheduleNextAutoBackup();
-        }catch(err){
-            if(err?.name!=='AbortError')alert('자동저장 폴더를 연결하지 못했습니다: '+(err?.message||err));
-        }
+        if(await mtHasAutoBackupPermission(mtAutoBackupDirectoryHandle,false))mtScheduleNextAutoBackup();
     }
     async function saveToLocalPC(){
-        // 자동저장 설정과 관계없이 버튼을 누를 때마다 독립적인 수동 파일을 내려받습니다.
-        try{await mtDownloadManualBackup();}
-        catch(err){alert('수동 백업 파일을 만들지 못했습니다: '+(err?.message||err));}
+        try{
+            if(!window.showDirectoryPicker)return mtDownloadBackup();
+            if(!mtAutoBackupDirectoryHandle||!await mtHasAutoBackupPermission(mtAutoBackupDirectoryHandle,true)){
+                mtAutoBackupDirectoryHandle=await window.showDirectoryPicker({mode:'readwrite'});
+                mtAutoBackupNextVersion=1;
+            }
+            if(!await mtHasAutoBackupPermission(mtAutoBackupDirectoryHandle,true))throw new Error('선택한 폴더의 쓰기 권한을 허용해 주세요.');
+            await mtPersistAutoBackupState();
+            await mtRunRotatingAutoBackup();
+            mtScheduleNextAutoBackup();
+        }catch(err){if(err?.name!=='AbortError')alert('자동저장 설정 중 오류가 발생했습니다: '+(err?.message||err));}
     }
-    window.addEventListener('focus',()=>{mtRecoverAutoBackupOnResume().catch(e=>console.warn('[자동저장] 화면 복귀 확인 실패:',e));});
-    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')mtRecoverAutoBackupOnResume().catch(e=>console.warn('[자동저장] 화면 복귀 확인 실패:',e));});
 
     async function loadFromLocalPC() {
+        let busy;
         try {
-            if (!window.showOpenFilePicker) return alert("이 브라우저는 지원하지 않습니다.");
-            const [fileHandle] = await window.showOpenFilePicker({ types: [{ description: 'JSON Files', accept: { 'application/json': ['.json'] } }] });
-
-            globalFileHandle = fileHandle; 
-            const file = await fileHandle.getFile();
-            const contents = await file.text();
-            const parsed = JSON.parse(contents);
-
-            if (parsed.slotsData) slotsData = parsed.slotsData;
-            if (parsed.words) words = parsed.words;
-
-            if (parsed.boardDataList) {
-                boardDataList = parsed.boardDataList;
-                await saveToDatabase();
-                renderBoardList();
-            }
-
-            if (parsed.mtBackupData) {
-                // 기존 생성 상태가 새로 불러온 typed 데이터를 덮어쓰지 못하게 합니다.
-
-                await mtInitNormalSlotCache();
-                for(let i = 1; i <= 11; i++) {
-                    if(parsed.mtBackupData[i]) {
-                        try { mtSetNormalSlotSync(i, JSON.parse(parsed.mtBackupData[i])); } catch (_) {}
-                    } else {
-                        mtDeleteNormalSlotSync(i);
-                    }
-                }
-                try { await mtPersistNormalSlotCache(); } catch (e) { console.warn('[백업 복원] 일반 슬롯 IndexedDB 저장 실패:', e); }
-
-                if (Object.prototype.hasOwnProperty.call(parsed.mtBackupData, '11')) {
-                    if (parsed.mtBackupData['11']) localStorage.setItem('word_slot_11', parsed.mtBackupData['11']);
-                    else localStorage.removeItem('word_slot_11');
-                }
-                if(parsed.mtBackupData['star_session']) {
-                    localStorage.setItem('word_slot_star_session', parsed.mtBackupData['star_session']);
-                }
-                if (Object.prototype.hasOwnProperty.call(parsed.mtBackupData, 'typing_unmask_stats')) {
-                    const statsText = parsed.mtBackupData['typing_unmask_stats'];
-                    try { localStorage.setItem(MT_STATS_STORAGE_KEY, statsText); } catch (_) {}
-                    try {
-                        mtStatsStateMemory = mtNormalizeStatsState(JSON.parse(statsText));
-                        mtPersistStatsToTypedStore();
-                    } catch (_) {}
-                }
-                // v71 형식: 전자책을 포함한 모든 유형별 상태를 원본 그대로 복원합니다.
-                if(parsed.mtBackupData.slot_types){
-                    for(const [k,v] of Object.entries(parsed.mtBackupData.slot_types)){
-                        const slot=Number(k);
-                        if(slot>=1 && slot<=11 && ['normal','ebook','self_generate','reference_generate'].includes(v)) {
-                            mtSetSlotType(slot,v);
-                            if(parsed.mtBackupData.typed_slots?.[k]){ try { mtSaveTypedState(slot,JSON.parse(parsed.mtBackupData.typed_slots[k])); } catch(_) {} }
-                        }
-                    }
-                } else if(parsed.mtBackupData.generator_types) {
-                    // 구 백업 형식도 계속 복원합니다.
-                    for(const [k,v] of Object.entries(parsed.mtBackupData.generator_types)){ const slot=Number(k); if(['self_generate','reference_generate'].includes(v)){ mtSetSlotType(slot,v); if(parsed.mtBackupData.generator_states?.[k]){ try{ mtSaveTypedState(slot,JSON.parse(parsed.mtBackupData.generator_states[k])); }catch(_){} } } }
-                }
-            }
-            if (parsed.mtFontSettings) {
-                mtSetFontSettings(parsed.mtFontSettings);
-                mtApplyFontSettings();
-            }
-
-            saveAllSlotsToStorage(true);
-            saveAndRenderWords();
-            renderAllSlotsUI();
-            switchSlot(activeSlotIndex, false);
-
-            if (typeof mtInitSlots === 'function') mtInitSlots();
-            if (typeof mtRestoreGeneratorTimers === 'function') mtRestoreGeneratorTimers();
-            mtRenderDailyStats();
-            setInterval(() => { try { mtRenderDailyStats(); } catch (_) {} }, 5 * 60 * 1000);
-
-            const reminder = document.getElementById('saveReminder');
-            if (reminder) { reminder.classList.remove('is-visible'); reminder.style.removeProperty('display'); }
-
-            alert("전체 데이터를 성공적으로 불러왔습니다.");
-        } catch (err) {
-            if (err.name !== 'AbortError') { alert("불러오기 중 오류가 발생했습니다: " + err.message); }
-        }
+            if(!mtAppReady)throw new Error('초기 데이터 로딩이 끝난 뒤 다시 시도해 주세요.');
+            const input=document.createElement('input');input.type='file';input.accept='.json,application/json';
+            const file=await new Promise(resolve=>{input.onchange=()=>resolve(input.files?.[0]||null);input.addEventListener('cancel',()=>resolve(null),{once:true});input.click();});
+            if(!file)return;
+            const previous=await mtBuildCompleteBackupData();
+            const prepared=mtPrepareBackupRestore(JSON.parse(await file.text()),previous);
+            if(!await mtShowBackupPreview(prepared,file.name))return;
+            busy=document.createElement('dialog');busy.textContent='백업을 복원하고 있습니다. 잠시 기다려 주세요.';
+            busy.addEventListener('cancel',event=>event.preventDefault());document.body.appendChild(busy);busy.showModal();
+            // Take the rollback copy at confirmation time, including the latest AI results.
+            const latest=await mtBuildCompleteBackupData();
+            await mtRestorePreparedBackup(prepared,latest);
+            alert('전체 복원을 완료했습니다. 화면을 새로 불러옵니다. 슬롯별 API 키는 다시 입력해 주세요.');
+            location.reload();
+        } catch(error) {
+            if(error?.name!=='AbortError')alert(`백업을 복원하지 못했습니다. 기존 데이터를 유지합니다.\n${error?.message||error}`);
+            mtRestoreGeneratorTimers();
+        } finally {if(busy){busy.close();busy.remove();}}
     }
 
     let mtSaveReminderTimerId = null;
@@ -4696,9 +4755,7 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
         if (reminder) reminder.classList.remove('is-visible');
     }
     mtStartSaveReminderTimer(true);
-    // 자동저장은 아래 initApp에서 모든 슬롯·게시판 데이터 복원이 끝난 뒤 시작합니다.
-    // 복원 전에 만료 백업을 즉시 실행해 빈 데이터가 저장되는 경쟁 상태를 막습니다.
-    mtSetAutoBackupButtonState(window.showDirectoryPicker?'idle':'unsupported');
+    setTimeout(()=>{mtInitAutoBackup().catch(e=>console.warn('[자동저장] 초기화 실패:',e));},0);
 
     /* ========================================== */
     /* [공통/영작] 상태 및 초기화 관리             */
@@ -5953,85 +6010,64 @@ Rules:
         if(s < 0) return 'MINUS'; if(s === 0) return 'ZERO'; if(s <= 2) return 'LOW'; if(s <= 4) return 'MID'; return 'MAX';
     }
     function renderWords(targetPage = currentPage) {
-        const listEl = document.getElementById('wordList');
-        const countEl = document.getElementById('totalWordCount');
-        const filter = document.getElementById('listFilter').value;
-        const sortOrder = document.getElementById('sortOrder').value;
-        const searchQuery = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
-
-        listEl.innerHTML = '';
-        if(countEl) countEl.innerText = words.length;
-
-        let filtered = words.filter(w => {
-            const matchesFilter = filter === 'ALL' || getGroup(w) === filter;
-            if(!matchesFilter) return false;
-            if(!searchQuery) return true;
-            return w.english.toLowerCase().includes(searchQuery) || w.meaning.toLowerCase().includes(searchQuery) || (w.hint||'').toLowerCase().includes(searchQuery);
-        });
-
-        filtered.sort((a, b) => {
+        const listEl=document.getElementById('wordList'),countEl=document.getElementById('totalWordCount');
+        const filter=document.getElementById('listFilter').value,sortOrder=document.getElementById('sortOrder').value;
+        const search=(document.getElementById('searchInput')?.value||'').trim().toLowerCase();
+        listEl.replaceChildren();if(countEl)countEl.textContent=String(words.length);
+        const text=value=>String(value??'');
+        const filtered=words.filter(word=>(filter==='ALL'||getGroup(word)===filter) && (!search ||
+            [word.english,word.meaning,word.hint].some(value=>text(value).toLowerCase().includes(search))));
+        filtered.sort((a,b)=>{
             switch(sortOrder) {
-                case 'CREATED_DESC': return (b.createdAt || 0) - (a.createdAt || 0);
-                case 'CREATED_ASC': return (a.createdAt || 0) - (b.createdAt || 0);
-                case 'LAST_QUERIED_DESC': return (b.lastQueriedAt || 0) - (a.lastQueriedAt || 0);
-                case 'LAST_QUERIED_ASC': return (a.lastQueriedAt || 0) - (b.lastQueriedAt || 0);
-                case 'ABC_ASC': return a.english.localeCompare(b.english, 'en', { sensitivity: 'base' });
-                case 'ABC_DESC': return b.english.localeCompare(a.english, 'en', { sensitivity: 'base' });
-                case 'SCORE_ASC': return (a.score || 0) - (b.score || 0);
-                case 'SCORE_DESC': return (b.score || 0) - (a.score || 0);
-                default: return 0;
+                case 'CREATED_DESC':return (b.createdAt||0)-(a.createdAt||0);
+                case 'CREATED_ASC':return (a.createdAt||0)-(b.createdAt||0);
+                case 'LAST_QUERIED_DESC':return (b.lastQueriedAt||0)-(a.lastQueriedAt||0);
+                case 'LAST_QUERIED_ASC':return (a.lastQueriedAt||0)-(b.lastQueriedAt||0);
+                case 'ABC_ASC':return text(a.english).localeCompare(text(b.english),'en',{sensitivity:'base'});
+                case 'ABC_DESC':return text(b.english).localeCompare(text(a.english),'en',{sensitivity:'base'});
+                case 'SCORE_ASC':return (a.score||0)-(b.score||0);
+                case 'SCORE_DESC':return (b.score||0)-(a.score||0);
+                default:return 0;
             }
         });
-
-        if (filtered.length === 0) {
-            listEl.innerHTML = '<p style="text-align:center; color:#9ca3af; padding:20px; font-size:13px;">표시할 단어가 없습니다.</p>';
-            document.getElementById('paginationContainer').style.display = 'none'; return;
+        const pagination=document.getElementById('paginationContainer');
+        if(!filtered.length) {
+            const empty=document.createElement('p');empty.textContent='표시할 단어가 없습니다.';
+            Object.assign(empty.style,{textAlign:'center',color:'#9ca3af',padding:'20px',fontSize:'13px'});
+            listEl.appendChild(empty);pagination.style.display='none';return;
         }
-
-        const totalPages = Math.ceil(filtered.length / itemsPerPage);
-        currentPage = Math.max(1, Math.min(targetPage, totalPages));
-        const start = (currentPage - 1) * itemsPerPage;
-        const pageWords = filtered.slice(start, start + itemsPerPage);
-
-        const fragment = document.createDocumentFragment();
-        pageWords.forEach(w => {
-            const li = document.createElement('li'); li.className = 'word-item';
-            const isHidden = hideAll ? 'hidden' : '';
-            const safeEng = w.english.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-            const safeMean = w.meaning.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-
-            if (w.isEditing) {
-                li.innerHTML = `
-                    <div class="edit-group">
-                        <div class="edit-row"><input type="text" id="editEng_${w.id}" value="${w.english}" placeholder="항목1" style="width: 50%;"><input type="text" id="editMean_${w.id}" value="${w.meaning}" placeholder="항목2" style="width: 50%;"></div>
-                        <input type="text" id="editHint_${w.id}" value="${w.hint || ''}" placeholder="예문 (선택)" style="width: 100%;">
-                    </div>
-                    <div style="display:flex; gap:4px; align-items:center;">
-                        <button class="btn-primary" style="font-size:11px; padding:4px 8px;" onclick="saveEditWord(${w.id})">저장</button>
-                        <button class="btn-excel" style="font-size:11px; padding:4px 8px;" onclick="cancelEditWord(${w.id})">취소</button>
-                    </div>`;
+        const totalPages=Math.ceil(filtered.length/itemsPerPage);currentPage=Math.max(1,Math.min(Number(targetPage)||1,totalPages));
+        const pageWords=filtered.slice((currentPage-1)*itemsPerPage,currentPage*itemsPerPage);
+        const fragment=document.createDocumentFragment();
+        const element=(tag,className,value)=>{const el=document.createElement(tag);if(className)el.className=className;if(value!=null)el.textContent=text(value);return el;};
+        const button=(label,className,action)=>{const el=element('button',className,label);el.type='button';Object.assign(el.style,{fontSize:'11px',padding:'4px 8px'});el.addEventListener('click',action);return el;};
+        pageWords.forEach(word=>{
+            const li=element('li','word-item');
+            if(word.isEditing) {
+                const group=element('div','edit-group'),row=element('div','edit-row');
+                const input=(prefix,value,placeholder)=>{const field=element('input');field.type='text';field.id=`${prefix}_${word.id}`;field.value=text(value);field.placeholder=placeholder;field.setAttribute('aria-label',placeholder);return field;};
+                const eng=input('editEng',word.english,'항목1'),meaning=input('editMean',word.meaning,'항목2');eng.style.width='50%';meaning.style.width='50%';
+                row.append(eng,meaning);const hint=input('editHint',word.hint,'예문 (선택)');hint.style.width='100%';group.append(row,hint);
+                const actions=element('div');Object.assign(actions.style,{display:'flex',gap:'4px',alignItems:'center'});
+                actions.append(button('저장','btn-primary',()=>saveEditWord(word.id)),button('취소','btn-excel',()=>cancelEditWord(word.id)));
+                li.append(group,actions);
             } else {
-                li.innerHTML = `
-                    <input type="checkbox" ${w.selected ? 'checked' : ''} onchange="toggleWordSelect(${w.id})">
-                    <div class="word-info">
-                        <div class="word-row"><button class="btn-excel" style="padding:2px 6px;" onclick="speakAutoDetect('${safeEng}', '${safeMean}')" title="발음 듣기">발음</button><span class="word-main">${w.english}</span><span class="word-sub ${isHidden}" onclick="this.classList.toggle('hidden')">${w.meaning}</span></div>
-                        ${w.hint ? `<div class="word-hint-text">예문: ${w.hint}</div>` : ''}
-                    </div>
-                    <span class="badge badge-low">${w.score || 0}점</span>
-                    <button class="btn-excel" style="font-size:11px; padding:3px 8px;" onclick="startEditWord(${w.id})">수정</button>
-                `;
+                const checkbox=element('input');checkbox.type='checkbox';checkbox.checked=!!word.selected;checkbox.setAttribute('aria-label',`${text(word.english)} 선택`);
+                checkbox.addEventListener('change',()=>toggleWordSelect(word.id));
+                const info=element('div','word-info'),row=element('div','word-row');
+                const speech=button('발음','btn-excel',()=>speakAutoDetect(text(word.english),text(word.meaning)));speech.title='발음 듣기';speech.style.padding='2px 6px';
+                const english=element('span','word-main',word.english),meaning=element('span','word-sub',word.meaning);
+                meaning.classList.toggle('hidden',!!hideAll);meaning.addEventListener('click',()=>meaning.classList.toggle('hidden'));
+                row.append(speech,english,meaning);info.appendChild(row);
+                if(word.hint)info.appendChild(element('div','word-hint-text',`예문: ${text(word.hint)}`));
+                li.append(checkbox,info,element('span','badge badge-low',`${Number(word.score)||0}점`),button('수정','btn-excel',()=>startEditWord(word.id)));
             }
             fragment.appendChild(li);
         });
-        listEl.appendChild(fragment);
-
-        const pageContainer = document.getElementById('paginationContainer');
-        pageContainer.style.display = 'flex';
-        document.getElementById('pageDirectInput').value = currentPage;
-        document.getElementById('pageDirectInput').max = totalPages;
-        document.getElementById('totalPagesSpan').innerText = `/ ${totalPages} 페이지`;
-        document.getElementById('prevPageBtn').disabled = (currentPage === 1);
-        document.getElementById('nextPageBtn').disabled = (currentPage === totalPages);
+        listEl.appendChild(fragment);pagination.style.display='flex';
+        document.getElementById('pageDirectInput').value=currentPage;document.getElementById('pageDirectInput').max=totalPages;
+        document.getElementById('totalPagesSpan').textContent=`/ ${totalPages} 페이지`;
+        document.getElementById('prevPageBtn').disabled=currentPage===1;document.getElementById('nextPageBtn').disabled=currentPage===totalPages;
     }
     function startEditWord(id) { words.forEach(w => w.isEditing = (w.id === id)); renderWords(); }
     function cancelEditWord(id) { const target = words.find(w => w.id === id); if(target) target.isEditing = false; renderWords(); }
@@ -6756,7 +6792,7 @@ Rules:
 
     function mtIsNormalTypeSlot(slotIndex) {
         const n = Number(slotIndex);
-        if (!Number.isInteger(n) || n < 1 || n > 8) return false;
+        if (!Number.isInteger(n) || n < 1 || n > 11) return false;
         const type = typeof mtGetSlotType === 'function' ? mtGetSlotType(n) : '';
         return !type || type === 'normal';
     }
@@ -6776,7 +6812,7 @@ Rules:
 
             const [legacy, ...perSlot] = await Promise.all([
                 readKey(MT_NORMAL_SLOT_LEGACY_DATA_KEY),
-                ...Array.from({length: 8}, (_, i) => readKey(mtNormalSlotDbKey(i + 1)))
+                ...Array.from({length: 11}, (_, i) => readKey(mtNormalSlotDbKey(i + 1)))
             ]);
             const loaded = Object.create(null);
 
@@ -6856,26 +6892,34 @@ Rules:
         }, 0);
     }
 
-    async function mtPersistNormalSlotCache() {
-        let db = null;
+    function mtPersistNormalSlotCache() {
         const pending = new Set(mtNormalSlotPendingWrites);
         if (!pending.size) for (let i = 1; i <= 11; i++) pending.add(String(i));
+        const snapshots = new Map();
         try {
-            db = await initDB();
-            const tx = db.transaction(MT_NORMAL_SLOT_STORE_NAME, 'readwrite');
-            const store = tx.objectStore(MT_NORMAL_SLOT_STORE_NAME);
-            for (const key of pending) {
-                const data = mtNormalSlotCache[key];
-                if (data) store.put(mtNormalizeNormalSlotForStorage(data, Number(key)), mtNormalSlotDbKey(Number(key)));
-                else store.delete(mtNormalSlotDbKey(Number(key)));
-            }
-            // 구버전 통합 레코드는 새 구조로 완전히 이전했으므로 제거합니다.
-            store.delete(MT_NORMAL_SLOT_LEGACY_DATA_KEY);
-            await waitForTransaction(tx);
-            pending.forEach(key => mtNormalSlotPendingWrites.delete(key));
-        } finally {
-            if (db) db.close();
-        }
+            for (const key of pending) snapshots.set(key, mtNormalSlotCache[key] ? mtCloneData(mtNormalizeNormalSlotForStorage(mtNormalSlotCache[key], Number(key))) : null);
+        } catch (error) { return mtObserveStorageJob(Promise.reject(error), '일반 슬롯'); }
+        // New changes can mark these slots dirty while this snapshot is being written.
+        pending.forEach(key => mtNormalSlotPendingWrites.delete(key));
+        const job = mtNormalWriteChain.catch(() => {}).then(async () => {
+            let db;
+            try {
+                db = await initDB();
+                const tx = db.transaction(MT_NORMAL_SLOT_STORE_NAME, 'readwrite');
+                const done = waitForTransaction(tx), store = tx.objectStore(MT_NORMAL_SLOT_STORE_NAME);
+                try {
+                    for (const [key, data] of snapshots) {
+                        if (data) store.put(data, mtNormalSlotDbKey(Number(key)));
+                        else store.delete(mtNormalSlotDbKey(Number(key)));
+                    }
+                    store.delete(MT_NORMAL_SLOT_LEGACY_DATA_KEY);
+                } catch (error) { tx.abort(); await done.catch(() => {}); throw error; }
+                await done;
+            } catch (error) { pending.forEach(key => mtNormalSlotPendingWrites.add(key)); throw error; }
+            finally { if (db) db.close(); }
+        });
+        mtNormalWriteChain = job.catch(() => {});
+        return mtObserveStorageJob(job, '일반 슬롯');
     }
 
     function mtSetNormalSlotSync(slotIndex, data) {
@@ -7133,7 +7177,10 @@ Rules:
 
         let parsed = null;
         const numericSlot = Number(slotIndex);
-        if (Number.isInteger(numericSlot) && numericSlot >= 1 && numericSlot <= 8 && mtIsNormalTypeSlot(numericSlot)) {
+        const typedType=mtGetSlotType(numericSlot);
+        if(['self_generate','reference_generate'].includes(typedType))return mtExportGeneratorSlot(e,numericSlot);
+        if(typedType==='ebook'){const st=mtGetTypedState(numericSlot);parsed={name:st.fileName,words:mtGetEbookWords(numericSlot)};}
+        else if (Number.isInteger(numericSlot) && numericSlot >= 1 && numericSlot <= 11 && mtIsNormalTypeSlot(numericSlot)) {
             parsed = mtGetNormalSlotSync(numericSlot);
             if (!parsed) {
                 alert('내보낼 저장 데이터가 없습니다.');
@@ -7486,11 +7533,11 @@ Rules:
                 else {
                     div.className=`mt-slot has-data mt-slot-unified mt-type-${type}`;
                     const sourceTotal=type==='self_generate'&&Array.isArray(st.sourceRows)?st.sourceRows.length:0;
-                    const sourceDone=type==='self_generate'?Math.min(sourceTotal,Math.max(0,Number(st.nextSourceIndex||0))):0;
+                    const sourceDone=type==='self_generate'?Math.min(sourceTotal,Math.max(0,Number(st.nextSourceIndex||0))+(st.selfCompletedAhead||[]).length):0;
                     const translationComplete=type==='self_generate'&&sourceTotal>0&&sourceDone>=sourceTotal;
                     const completionStatus=translationComplete?`<div class="mt-generator-complete-row"><span aria-hidden="true">✓</span><span>번역 완료 · 원문 ${sourceDone}/${sourceTotal}</span></div>`:'';
                     const todayKey=mtGetKoreaDateKey();
-                    const selfTodayGenerated=type==='self_generate'?Math.max(0,Number(st.selfDailyGenerated?.[todayKey]||0)):0;
+                    const selfTodayGenerated=type==='self_generate'?Math.max(0,Number(st.selfDailyProcessedSources?.[todayKey]??Math.min(sourceTotal,Number(st.selfDailyGenerated?.[todayKey]||0)))):0;
                     const selfDailyPct=sourceTotal?Math.min(100,Math.round((selfTodayGenerated/sourceTotal)*100)):0;
                     const todayGenerated=type==='reference_generate'?Math.max(0,Number(st.referenceDailyGenerated?.[todayKey]||0)):0;
                     const referenceTotal=type==='reference_generate'?Math.max(rows.length,todayGenerated,Number(st.referenceTotalGeneratedCount||0)):0;
@@ -7529,6 +7576,7 @@ Rules:
         const slot=Number(slotIndex); if(!Number.isInteger(slot)||slot<1||slot>11)return;
         const label=`[슬롯 ${slot}]`;
         if(!confirm(`${label}의 모든 데이터를 삭제하시겠습니까?`))return;
+        mtCancelGeneratorJob(slot);
         try{
             if(mtGeneratorTimers[slot]){clearTimeout(mtGeneratorTimers[slot]);delete mtGeneratorTimers[slot];}
         }catch(_){ }
@@ -7822,9 +7870,7 @@ Rules:
         });
     }
 
-    function mtChunkCount(str) {
-        return (String(str || '').match(/\[[^\[\]]+\]/g) || []).length;
-    }
+
 
     function mtIsEnglishChunkList(str) {
         const text = String(str || '').trim();
@@ -8042,16 +8088,15 @@ ${JSON.stringify(finalPayload)}`;
     }
 
     function mtGetSlotType(slotIndex) {
-        const key = MT_SLOT_TYPE_STORAGE_PREFIX + String(slotIndex);
-        const raw = localStorage.getItem(key) || '';
-        const type = ['normal','ebook','self_generate','reference_generate'].includes(raw) ? raw : (mtSlotTypeMemory[String(slotIndex)] || '');
-        return ['normal','ebook','self_generate','reference_generate'].includes(type) ? type : '';
+        const key=String(slotIndex);
+        if(Object.prototype.hasOwnProperty.call(mtSlotTypeMemory,key))return mtSlotTypeMemory[key]||'';
+        if(mtTypedSlotStateHydrated)return '';
+        try{const raw=localStorage.getItem(MT_SLOT_TYPE_STORAGE_PREFIX+key);return ['normal','ebook','self_generate','reference_generate'].includes(raw)?raw:'';}catch(_){return '';}
     }
-    function mtSetSlotType(slotIndex, type) {
-        const key = MT_SLOT_TYPE_STORAGE_PREFIX + String(slotIndex);
-        const safe = ['normal','ebook','self_generate','reference_generate'].includes(type) ? type : '';
-        if (!safe) { delete mtSlotTypeMemory[String(slotIndex)]; localStorage.removeItem(key); }
-        else { mtSlotTypeMemory[String(slotIndex)] = safe; localStorage.setItem(key, safe); }
+    function mtSetSlotType(slotIndex,type) {
+        const key=String(slotIndex),safe=['normal','ebook','self_generate','reference_generate'].includes(type)?type:'';
+        mtSlotTypeMemory[key]=safe;
+        try{if(safe)localStorage.setItem(MT_SLOT_TYPE_STORAGE_PREFIX+key,safe);else localStorage.removeItem(MT_SLOT_TYPE_STORAGE_PREFIX+key);}catch(_){}
         mtQueueTypedSlotStatePersistence();
     }
     function mtGetSlotTypeLabel(type) {
@@ -8081,7 +8126,7 @@ ${JSON.stringify(finalPayload)}`;
     let mtTypedSlotStateWriteChain = Promise.resolve();
     function mtQueueTypedSlotStatePersistence(){
         clearTimeout(mtTypedSlotStateSaveTimer);
-        mtTypedSlotStateSaveTimer=setTimeout(()=>{ mtPersistTypedSlotStates().catch(e=>console.warn('[유형 슬롯] 영구 저장 실패:',e)); },0);
+        mtTypedSlotStateSaveTimer=setTimeout(()=>{ mtObserveStorageJob(mtPersistTypedSlotStates(),'유형 슬롯'); },80);
     }
     async function mtPersistTypedSlotStates(){
         const types={}; for(let i=1;i<=11;i++){const type=mtGetSlotType(i);if(type)types[i]=type;}
@@ -8104,38 +8149,37 @@ ${JSON.stringify(finalPayload)}`;
         };
         const queued=mtTypedSlotStateWriteChain.catch(()=>{}).then(write);
         mtTypedSlotStateWriteChain=queued.catch(()=>{});
-        return queued;
+        return mtObserveStorageJob(queued,'유형 슬롯');
     }
-    async function mtInitTypedSlotStateCache(){
+    async function mtInitTypedSlotStateCache() {
         if(mtTypedSlotStateHydrated)return;
-        let db=null;
+        let db,saved;
         try{
-            db=await initDB();
-            const tx=db.transaction(MT_TYPED_SLOT_STORE_NAME,'readonly');
-            const request=tx.objectStore(MT_TYPED_SLOT_STORE_NAME).get(MT_TYPED_SLOT_DATA_KEY);
-            const saved=await new Promise((resolve,reject)=>{request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
-            if(saved && typeof saved==='object'){
-                for(const [key,type] of Object.entries(saved.types||{})) if(['normal','ebook','self_generate','reference_generate'].includes(type)){
-                    mtSlotTypeMemory[String(key)]=type; try{localStorage.setItem(MT_SLOT_TYPE_STORAGE_PREFIX+String(key),type);}catch(_){}
-                }
-                for(const [key,state] of Object.entries(saved.states||{})){
-                    if(!state || typeof state!=='object')continue;
-                    let localState=null;
-                    try{const raw=localStorage.getItem('mt_slot_state_'+key);if(raw)localState=JSON.parse(raw);}catch(_){}
-                    const savedHasData=!!(String(state.fileName||'').trim() || state.outputRows?.length || state.sourceRows?.length || state.topics?.length);
-                    const localHasData=!!(String(localState?.fileName||'').trim() || localState?.outputRows?.length || localState?.sourceRows?.length || localState?.topics?.length);
-                    const savedAt=Number(state._mtSavedAt||0);
-                    const localSavedAt=Number(localState?._mtSavedAt||0);
-                    // 대용량 전자책에서는 localStorage가 이전 전체 상태를 그대로 남길 수 있다.
-                    // 이때 최신 IndexedDB 저장본을 오래된 localStorage가 덮어쓰지 않게 한다.
-                    const indexedDbIsNewer=!!savedAt && (!localSavedAt || savedAt>localSavedAt);
-                    if(!localState || indexedDbIsNewer || (savedHasData && !localHasData)){
-                        mtSlotStateCache[String(key)]=state;try{localStorage.setItem('mt_slot_state_'+key,JSON.stringify(state));}catch(_){}
-                    } else mtSlotStateCache[String(key)]=localState;
-                }
+            db=await initDB();const request=db.transaction(MT_TYPED_SLOT_STORE_NAME,'readonly').objectStore(MT_TYPED_SLOT_STORE_NAME).get(MT_TYPED_SLOT_DATA_KEY);
+            saved=await new Promise((resolve,reject)=>{request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
+            if(saved?.fullRestoreAt){
+                let applied='';try{applied=localStorage.getItem('mt_full_restore_applied_v122')||'';}catch(_){}
+                if(String(saved.fullRestoreAt)!==applied){mtStatsStateMemory=saved.states?.[MT_STATS_CACHE_KEY]?.state||{version:1,daily:{}};mtMirrorRestoredSnapshot(saved);}
             }
-        } catch(e){ console.warn('[유형 슬롯] 영구 복원 실패:',e); }
-        finally { if(db)db.close(); mtTypedSlotStateHydrated=true; }
+            const types={};
+            if(saved && typeof saved==='object')Object.assign(types,saved.types||{});
+            else for(let i=1;i<=11;i++){try{const type=localStorage.getItem(MT_SLOT_TYPE_STORAGE_PREFIX+i);if(['normal','ebook','self_generate','reference_generate'].includes(type))types[i]=type;}catch(_){}}
+            for(const key of Object.keys(mtSlotTypeMemory))delete mtSlotTypeMemory[key];
+            for(const [key,type] of Object.entries(types))if(['normal','ebook','self_generate','reference_generate'].includes(type)){
+                mtSlotTypeMemory[key]=type;try{localStorage.setItem(MT_SLOT_TYPE_STORAGE_PREFIX+key,type);}catch(_){}
+            }
+            const keys=new Set([...Object.keys(saved?.states||{}),...Object.keys(types)]);
+            for(const key of keys){
+                const state=saved?.states?.[key];let localState=null;
+                if(/^\d+$/.test(key)){try{const raw=localStorage.getItem('mt_slot_state_'+key);if(raw)localState=JSON.parse(raw);}catch(_){}}
+                if(state && typeof state==='object'){
+                    const useLocal=localState && !saved.fullRestoreAt && Number(localState._mtSavedAt||0)>Number(state._mtSavedAt||0);
+                    mtSlotStateCache[key]=useLocal?localState:state;
+                }else if(localState)mtSlotStateCache[key]=localState;
+            }
+            mtTypedSlotStateHydrated=true;
+        }catch(error){mtReportStorageFailure('유형 슬롯 불러오기',error);throw error;}
+        finally{if(db)db.close();}
     }
     
     
@@ -8213,6 +8257,7 @@ ${JSON.stringify(finalPayload)}`;
         const m=document.getElementById('mtTypeChangeModal'),slot=Number(m?.dataset.slotIndex),current=String(m?.dataset.currentType||'');
         if(!Number.isInteger(slot)||!['normal','ebook','self_generate','reference_generate'].includes(targetType))return;
         if(current===targetType){mtCloseTypeChangeModal();return;}
+        mtCancelGeneratorJob(slot);
         try{
             const normal=mtGetNormalSlotSync(slot); const old=mtGetTypedState(slot);
             if(targetType==='normal'){
@@ -9043,7 +9088,7 @@ ${JSON.stringify(finalPayload)}`;
         if(Number.isFinite(+source.intervalMin))target.intervalMin=Math.max(1,Math.min(1440,+source.intervalMin));
         if(Number.isFinite(+source.batchSize))target.batchSize=Math.max(1,Math.min(24,Math.floor(+source.batchSize)));
         if(Number.isFinite(+source.delaySec))target.delaySec=Math.max(0,Math.min(600,+source.delaySec));
-        if(Array.isArray(source.models)&&source.models.length)target.models=source.models.map(String).map(s=>s.trim()).filter(Boolean);
+        if(Array.isArray(source.models)){const models=source.models.map(String).map(s=>s.trim()).filter(Boolean);if(models.length)target.models=[...new Set(models)];}
         return target;
     }
     function mtGetGenCfg(type){
@@ -9144,57 +9189,69 @@ ${JSON.stringify(finalPayload)}`;
     function mtGetGeneratorModelCooldownKey(type,slotIndex,model,apiKey){
         return `${String(type)}|${Number(slotIndex)}|${String(model)}|${String(apiKey)}`;
     }
-    async function mtGenFetchText(type,prompt,slotIndex,temperature=0.1,responseSchema=null,phase='생성'){
-        const key=String(mtGetGeneratorSlotApiKey(slotIndex,type) || localStorage.getItem('gemini_api_key') || '').trim();
-        if(!key){const e=new Error('Gemini API Key를 먼저 입력해 주세요.');mtGeneratorRecordError(type,slotIndex,e,{phase,kind:'configuration'});throw e;}
-        const cfg=mtGetGenCfg(type); let last=null; let attempt=0;
-        while(attempt<15){
-            let madeRequest=false;
-            let earliestCooldownUntil=Infinity;
-            for(const model of cfg.models){
-                if(attempt>=15) break;
+    async function mtGenFetchText(type,prompt,slotIndex,temperature=0.1,responseSchema=null,phase='생성') {
+        let globalKey='';try{globalKey=localStorage.getItem('gemini_api_key')||'';}catch(_){}
+        const key=String(mtGetGeneratorSlotApiKey(slotIndex,type)||globalKey).trim();
+        if(!key){const error=new Error('Gemini API Key를 먼저 입력해 주세요.');error.retryable=false;throw error;}
+        const cfg=mtGetGenCfg(type),signal=mtGeneratorJobs.get(Number(slotIndex))?.controller.signal;
+        const models=[...new Set(cfg.models.map(String).map(s=>s.trim()).filter(Boolean))];
+        if(!models.length)throw new Error('사용할 생성 모델을 한 개 이상 설정해 주세요.');
+        const unavailable=new Set(),deadline=Date.now()+5*60*1000;
+        let attempt=0,lastError;
+        while(attempt<8 && Date.now()<deadline) {
+            if(signal?.aborted)throw mtGeneratorAbortError();
+            const available=models.filter(model=>!unavailable.has(model));
+            if(!available.length)throw lastError||new Error('사용 가능한 모델이 없습니다. 모델 설정을 확인해 주세요.');
+            let requested=false,earliest=Infinity;
+            for(const model of available) {
+                if(attempt>=8 || Date.now()>=deadline)break;
                 const cooldownKey=mtGetGeneratorModelCooldownKey(type,slotIndex,model,key);
-                const cooldownUntil=Number(GEMINI_MODEL_COOLDOWN_UNTIL.get(cooldownKey)||0);
-                if(cooldownUntil>Date.now()){
-                    earliestCooldownUntil=Math.min(earliestCooldownUntil,cooldownUntil);
-                    continue;
-                }
-                if(cooldownUntil) GEMINI_MODEL_COOLDOWN_UNTIL.delete(cooldownKey);
-                madeRequest=true;
-                attempt++;
-                const controller=typeof AbortController!=='undefined'?new AbortController():null;
-                const timeoutId=setTimeout(()=>controller?.abort(),90000);
-                try{
+                const until=Number(GEMINI_MODEL_COOLDOWN_UNTIL.get(cooldownKey)||0);
+                if(until>Date.now()){earliest=Math.min(earliest,until);continue;}
+                if(signal?.aborted)throw mtGeneratorAbortError();
+                requested=true;attempt++;
+                const controller=new AbortController(),abort=()=>controller.abort();
+                signal?.addEventListener('abort',abort,{once:true});
+                const timeout=setTimeout(abort,Math.min(90000,Math.max(1,deadline-Date.now())));
+                try {
                     const body={contents:[{parts:[{text:String(prompt)}]}],generationConfig:{temperature}};
                     if(responseSchema){body.generationConfig.responseMimeType='application/json';body.generationConfig.responseSchema=responseSchema;}
-                    const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:controller?.signal});
-                    const data=await res.json().catch(()=>({}));
-                    if(res.ok){const text=data?.candidates?.[0]?.content?.parts?.[0]?.text;if(!text)throw new Error(`응답 형식 오류 (finishReason=${data?.candidates?.[0]?.finishReason||'UNKNOWN'})`);return {text,model,data};}
-                    const msg=data?.error?.message||`HTTP ${res.status}`; last=new Error(msg);
-                    mtGeneratorRecordError(type,slotIndex,last,{model,httpStatus:res.status,phase,response:data,kind:res.status===429?'quota':'http-error'});
-                    if(res.status===429){
-                        const m=msg.match(/retry in\s+([\d.]+)s/i); const sec=m?Math.ceil(parseFloat(m[1]))+2:3;
-                        // 429는 특정 모델의 쿼터일 수 있으므로, 해당 모델만 잠시 제외한다.
-                        GEMINI_MODEL_COOLDOWN_UNTIL.set(cooldownKey,Date.now()+(sec*1000));
-                        earliestCooldownUntil=Math.min(earliestCooldownUntil,Date.now()+(sec*1000));
-                        mtGeneratorRecordError(type,slotIndex,new Error(`API 쿼터/속도 제한: [${model}]을 ${sec}초 동안 제외하고 다음 모델을 시도합니다.`),{model,httpStatus:429,phase,response:data,kind:'cooldown',retryAfterSec:sec});
-                        continue;
+                    const response=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+                        {method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify(body),signal:controller.signal});
+                    const data=await response.json().catch(()=>({}));
+                    if(signal?.aborted)throw mtGeneratorAbortError();
+                    if(response.ok) {
+                        const candidate=data?.candidates?.[0];
+                        const text=(candidate?.content?.parts||[]).filter(part=>!part.thought).map(part=>part.text||'').join('');
+                        if(candidate?.finishReason==='MAX_TOKENS') {const error=new Error('AI 출력이 길이 제한으로 잘렸습니다. 한 번에 생성할 원문 수를 줄여 주세요.');error.retryable=false;throw error;}
+                        if(!text.trim())throw new Error(`AI 응답이 비어 있습니다 (${candidate?.finishReason||'UNKNOWN'}).`);
+                        return {text,model,data};
                     }
-                }catch(e){
-                    last=e;
-                    const timedOut=controller?.signal?.aborted || e?.name==='AbortError';
-                    mtGeneratorRecordError(type,slotIndex,e,{model,phase,kind:timedOut?'timeout':'network-error'});
-                }finally{clearTimeout(timeoutId);}
+                    const error=new Error(String(data?.error?.message||`HTTP ${response.status}`));
+                    error.httpStatus=response.status;
+                    if([400,401,403].includes(response.status) || (response.status>=400 && response.status<500 && ![404,408,429].includes(response.status)))error.retryable=false;
+                    if(response.status===404)unavailable.add(model);
+                    if(response.status===429) {
+                        const header=response.headers.get('retry-after');
+                        const match=error.message.match(/retry in\s+([\d.]+)s/i);
+                        const seconds=header && Number.isFinite(Number(header))?Number(header):(match?Number(match[1]):10);
+                        const until=Date.now()+Math.max(1000,seconds*1000+1000);
+                        GEMINI_MODEL_COOLDOWN_UNTIL.set(cooldownKey,until);earliest=Math.min(earliest,until);
+                    }
+                    throw error;
+                } catch(error) {
+                    if(signal?.aborted)throw mtGeneratorAbortError();
+                    lastError=error;
+                    mtGeneratorRecordError(type,slotIndex,error,{model,phase,httpStatus:error.httpStatus,kind:controller.signal.aborted?'timeout':'generation-error'});
+                    if(error.retryable===false)throw error;
+                } finally {clearTimeout(timeout);signal?.removeEventListener('abort',abort);}
             }
-            // 모든 모델이 쿨다운인 경우에만 가장 먼저 끝나는 쿨다운까지 대기한다.
-            // 이 대기는 재시도 횟수에 포함하지 않는다.
-            if(!madeRequest && Number.isFinite(earliestCooldownUntil)){
-                await new Promise(r=>setTimeout(r,Math.max(1000,earliestCooldownUntil-Date.now()+100)));
-                continue;
-            }
-            if(attempt<15) await new Promise(r=>setTimeout(r,2000));
+            const remaining=deadline-Date.now();
+            if(remaining<=0 || attempt>=8)break;
+            const wait=!requested && Number.isFinite(earliest)?Math.max(1000,earliest-Date.now()):Math.min(30000,1000*2**Math.min(attempt,5));
+            await mtGeneratorSleep(Math.min(wait,remaining),signal);
         }
-        throw last||new Error('Gemini 생성 실패');
+        throw lastError||new Error('생성 요청의 최대 대기 시간을 초과했습니다.');
     }
     function mtGeneratorRowsToWords(slotIndex){
         const st=mtGetTypedState(slotIndex), type=st.type, rows=Array.isArray(st.outputRows)?st.outputRows:[], p=st.pattern||{};
@@ -9287,6 +9344,7 @@ ${JSON.stringify(finalPayload)}`;
         const slot=Number(slotIndex),sourceRows=mtSelfPlainRowsFromText(text);
         if(!Number.isInteger(slot)||slot<1||slot>11)throw new Error('자체형 슬롯 번호가 올바르지 않습니다.');
         if(!sourceRows.length)throw new Error('자체형에서 사용할 한국어 원문을 찾지 못했습니다.');
+        await mtCancelGeneratorJob(slot);
         const state=mtGetTypedState(slot);
         state.type='self_generate';
         state.fileName=String(fileName||'').replace(/\.[^/.]+$/,'').trim()||`자체형 슬롯 ${slot}`;
@@ -9294,7 +9352,7 @@ ${JSON.stringify(finalPayload)}`;
         state.sourceRowsLock=sourceRows.slice();
         state.outputRows=[];
         state.starredSerials=[];
-        state.nextSourceIndex=0;
+        state.nextSourceIndex=0;state.selfCompletedAhead=[];
         state.retryRows=[];
         state.pattern={sourceKorCol:1,engCol:2,subKorCol:3,serialCol:4};
         state.lastSession=null;
@@ -9311,18 +9369,18 @@ ${JSON.stringify(finalPayload)}`;
         return sourceRows.length;
     }
     async function mtRegisterGeneratorFile(file,slotIndex,type){
-        const slot=Number(slotIndex); const ext=String(file.name||'').split('.').pop().toLowerCase();
+        const slot=Number(slotIndex); await mtCancelGeneratorJob(slot); const ext=String(file.name||'').split('.').pop().toLowerCase();
         const state=mtGetTypedState(slot); state.type=type; state.fileName=String(file.name||'').replace(/\.[^/.]+$/,'').trim()||`슬롯 ${slot+1}`; state.outputRows=[];state.starredSerials=[];state.lastSession=null;state.lastError='';state.lastDiagnostic=null;
         if(type==='self_generate'){
             const wb=XLSX.read(new Uint8Array(await file.arrayBuffer()),{type:'array',cellDates:false}); const sh=wb.Sheets[wb.SheetNames[0]]; const rows=XLSX.utils.sheet_to_json(sh,{header:1,defval:''});
-            state.sourceRows=mtSelfDetectRows(rows); state.sourceRowsLock=state.sourceRows.slice(); state.nextSourceIndex=0; state.retryRows=[]; state.pattern={sourceKorCol:1,engCol:2,subKorCol:3,serialCol:4};
+            state.sourceRows=mtSelfDetectRows(rows); state.sourceRowsLock=state.sourceRows.slice(); state.nextSourceIndex=0;state.selfCompletedAhead=[]; state.retryRows=[]; state.pattern={sourceKorCol:1,engCol:2,subKorCol:3,serialCol:4};
             if(!state.sourceRows.length) throw new Error('자체형에서 사용할 한국어 원문을 찾지 못했습니다.');
         } else {
             const wb=XLSX.read(new Uint8Array(await file.arrayBuffer()),{type:'array',cellDates:false}); if(!wb.SheetNames.includes('차례'))throw new Error('참조형 파일에는 반드시 [차례] 시트가 있어야 합니다.');
             const rows=XLSX.utils.sheet_to_json(wb.Sheets['차례'],{header:1,defval:''}); state.topicRows=rows; state.topics=[];
             for(let i=1;i<rows.length;i++){const r=rows[i]||[];const topic=[r[0],r[1],r[2]].map(v=>String(v??'').trim()).filter(Boolean).join(' - ');if(topic)state.topics.push({text:topic,originalRow:i+1});}
             if(!state.topics.length)throw new Error('[차례] 시트에서 유효한 주제를 찾지 못했습니다.');
-            state.pattern={engCol:3,serialCol:2,mainKorCol:4,subKorCol:5,topicOutputCol:1}; state.refQueue=state.topics.slice().sort(()=>Math.random()-0.5); state.nextSourceIndex=0; state.retryRows=[];
+            state.pattern={engCol:3,serialCol:2,mainKorCol:4,subKorCol:5,topicOutputCol:1}; state.refQueue=state.topics.slice().sort(()=>Math.random()-0.5); state.nextSourceIndex=0;state.selfCompletedAhead=[]; state.retryRows=[];
         }
         mtSetSlotType(slot,type); mtSaveTypedState(slot,state);
         // 파일 등록 직후에는 생성 결과가 아직 없어도 원문·유형을 즉시 IndexedDB에 확정합니다.
@@ -9331,154 +9389,155 @@ ${JSON.stringify(finalPayload)}`;
         mtInitSlots();
         mtGeneratorRun(slot,true);
     }
-    function mtParseSelfGeneratedRows(text){
-        const rows=[],invalid=[];
-        const lines=String(text||'').replace(/\r/g,'').split('\n').map(x=>x.trim()).filter(Boolean);
-        lines.forEach((originalLine,index)=>{
-            // 모델이 일시적으로 코드블록이나 Markdown 표를 사용하더라도 내용만 안전하게 읽습니다.
-            if(/^```(?:text|txt|markdown|md)?\s*$/i.test(originalLine) || /^```\s*$/.test(originalLine))return;
-            let line=originalLine.replace(/^\s*(?:\d+[.)]|[-*])\s+(?=[^|]*\|)/,'').trim();
-            if(line.startsWith('|'))line=line.slice(1).trim();
-            if(line.endsWith('|'))line=line.slice(0,-1).trim();
-            const cols=line.split('|').map(x=>x.trim());
-            const isHeader=/^(?:한국어\s*원문|원문|1열)$/i.test(cols[0]||'') && /^(?:영어\s*문장|영어|2열)$/i.test(cols[1]||'');
-            const isDivider=cols.length>=3 && cols.slice(0,3).every(x=>/^:?-{3,}:?$/.test(x));
-            if(isHeader||isDivider)return;
-            if(cols.length<3 || !cols[0] || !cols[1] || !cols[2]){
-                invalid.push({lineNumber:index+1,text:originalLine});
-                return;
-            }
-            rows.push([cols[0],cols[1],cols.slice(2).join(' | ')]);
-        });
-        return {rows,invalid};
-    }
-    function mtParseSelfRepairJson(text){
-        const parsed=mtRefParseJson(text);
-        if(!Array.isArray(parsed)||!parsed.length)throw new Error('자동 복구 응답에 저장할 문장이 없습니다.');
-        return parsed.map((item,index)=>{
-            const korean=String(item?.korean||'').trim();
-            const english=String(item?.english||'').trim();
-            let literal=String(item?.literal||'').trim();
-            if(!korean||!english||!literal)throw new Error(`자동 복구 응답 ${index+1}행에 빈 항목이 있습니다.`);
-            if(!literal.startsWith('['))literal='['+literal;
-            if(!literal.endsWith(']'))literal=literal+']';
-            return [korean,english,literal];
-        });
-    }
-    async function mtRepairSelfGeneratedRows(slotIndex,sourceText,primaryResult,invalid){
-        const repairPrompt=`아래 [한국어 원문 목록]과 [형식이 흔들린 1차 응답]을 비교하여, 학습 카드로 저장할 수 있는 JSON 배열로 복구하세요.
-
-[절대 규칙]
-1. 원문에 없는 내용을 추가하지 말고 모든 원문의 뜻을 빠짐없이 반영하세요.
-2. 원문 한 행을 자연스럽게 여러 카드로 나누는 것은 허용합니다.
-3. 각 배열 항목은 korean, english, literal 문자열을 반드시 모두 포함하세요.
-4. korean은 해당 카드의 한국어 원문, english는 자연스러운 A2 수준 영어, literal은 영어 어순에 대응하는 [청크 / 청크] 형태의 한국어입니다.
-5. JSON 이외의 설명, Markdown, 코드블록은 출력하지 마세요.
-
-[한국어 원문 목록]
-${sourceText}
-
-[형식이 흔들린 1차 응답]
-${String(primaryResult?.text||'')}`;
-        const schema={type:'ARRAY',items:{type:'OBJECT',properties:{korean:{type:'STRING'},english:{type:'STRING'},literal:{type:'STRING'}},required:['korean','english','literal']}};
-        let repairResult=null;
-        try{
-            repairResult=await mtGenFetchText('self_generate',repairPrompt,slotIndex,0,schema,'자체형 형식 자동복구');
-            return {rows:mtParseSelfRepairJson(repairResult.text),repairResult};
-        }catch(repairError){
-            const error=new Error(`자체형 응답 형식 자동 복구에 실패했습니다: ${repairError?.message||repairError}`);
-            error.mtGeneratorExtra={
-                model:String(repairResult?.model||primaryResult?.model||''),
-                phase:'자체형 형식 자동복구',
-                response:{
-                    invalidLines:invalid,
-                    primaryModel:primaryResult?.model||'',
-                    primaryText:String(primaryResult?.text||''),
-                    primaryResponse:primaryResult?.data??null,
-                    repairModel:repairResult?.model||'',
-                    repairText:String(repairResult?.text||''),
-                    repairResponse:repairResult?.data??null
-                }
-            };
-            throw error;
-        }
-    }
-    async function mtGeneratorSelfBatch(slotIndex){
-        const st=mtGetTypedState(slotIndex),cfg=mtGetGenCfg('self_generate'); const start=Number(st.nextSourceIndex||0); const end=Math.min(start+cfg.batchSize,st.sourceRows.length); const batch=st.sourceRows.slice(start,end);
-        if(!batch.length)return false;
-        // 배치의 원문들을 한 번의 요청으로 처리합니다. 기본 3개라면 API 호출도 3회가 아니라 1회입니다.
-        const sourceText=batch.map((text,i)=>`[입력 ${i+1}]\n${String(text).trim()}`).join('\n\n');
+    async function mtGeneratorSelfBatch(slotIndex) {
+        const st=mtGetTypedState(slotIndex),cfg=mtGetGenCfg('self_generate');
+        const signal=mtGeneratorJobs.get(Number(slotIndex))?.controller.signal;
+        const start=Math.max(0,Number(st.nextSourceIndex)||0);
+        const ahead=new Set((st.selfCompletedAhead||[]).map(Number).filter(i=>Number.isInteger(i)&&i>=start&&i<st.sourceRows.length));
+        const indexes=[];
+        for(let i=start;i<st.sourceRows.length && indexes.length<cfg.batchSize;i++)if(!ahead.has(i))indexes.push(i);
+        if(!indexes.length)return false;
+        const schema={type:'ARRAY',items:{type:'OBJECT',properties:{source_id:{type:'INTEGER'},cards:{type:'ARRAY',items:{type:'OBJECT',properties:{korean:{type:'STRING'},english:{type:'STRING'},literal:{type:'STRING'}},required:['korean','english','literal']}}},required:['source_id','cards']}};
+        const sources=indexes.map(index=>({source_id:index+1,korean:String(st.sourceRows[index])}));
         const prompt=mtGetGenPrompt('self_generate','main')+
-            `\n\n[한국어 원문 목록]\n${sourceText}`+
-            `\n\n[추가 출력 규칙]\n- 각 결과 행은 한국어 원문 | 영어문장 | 직독직해 형식으로만 작성하세요.\n- 한 원문을 자연스럽게 나누어야 한다면 여러 결과 행으로 작성해도 됩니다. 불필요하게 행 수를 맞추지 마세요.\n- 모든 원문의 뜻이 빠짐없이 결과에 반영되어야 하며, 각 행의 한국어 원문 칸도 비워 두지 마세요.\n- 번호, [입력 n], 헤더, 설명, 빈 줄을 절대 출력하지 마세요.`;
-        const res=await mtGenFetchText('self_generate',prompt,slotIndex,0.1,null,'자체형 일괄생성');
-        const parsed=mtParseSelfGeneratedRows(res.text);
-        if(!parsed.rows.length && !parsed.invalid.length) throw new Error('자체형 일괄 응답에 저장할 행이 없습니다.');
-        // 평소의 파이프 응답은 그대로 사용하고, 오늘처럼 일부 행의 형식만 흔들린 경우에만
-        // 원문과 1차 응답을 함께 보내 구조화 JSON으로 한 차례 자동 복구합니다.
-        let generatedRows=parsed.rows;
-        if(parsed.invalid.length){
-            const repaired=await mtRepairSelfGeneratedRows(slotIndex,sourceText,res,parsed.invalid);
-            generatedRows=repaired.rows;
+            '\n\n[이번 요청의 출력 형식]\n번역 내용과 학습 지침은 위 프롬프트를 따르되, 최종 출력은 아래 JSON 배열 형식으로 반환하세요. 기존 파이프 구분 출력 예시 대신 이 JSON 형식을 사용하세요.\n'+
+            '입력마다 source_id를 그대로 반환하고 cards에 번역 카드를 넣으세요. 한 원문을 여러 카드로 나누어도 됩니다. 모든 source_id를 정확히 한 번씩 포함하세요. 원문의 의미를 빠짐없이 반영하세요.\n'+
+            '[{"source_id":1,"cards":[{"korean":"한국어 원문 또는 분할 문장","english":"English sentence","literal":"[직독직해 / 번역]"}]}]\n입력:\n'+JSON.stringify(sources);
+        const response=await mtGenFetchText('self_generate',prompt,slotIndex,0.1,schema,'자체형 원문별 생성');
+        mtAssertGeneratorState(slotIndex,st,signal);
+        const payload=mtRefParseJson(response.text);
+        if(!Array.isArray(payload))throw new Error('자체형 응답은 원문별 JSON 배열이어야 합니다.');
+        const requestedIds=new Set(indexes.map(i=>i+1));
+        if(payload.some(item=>!item || !Number.isInteger(item.source_id) || !requestedIds.has(item.source_id)))
+            throw new Error('응답에 요청하지 않은 원문 번호가 포함되어 있습니다. 원문 진행 위치를 유지합니다.');
+        let serial=(st.outputRows||[]).reduce((max,row)=>Math.max(max,Number(row?.[(st.pattern?.serialCol||4)-1])||0),0)+1;
+        const rows=[],completed=[],failed=[];
+        for(const index of indexes) {
+            const entries=payload.filter(item=>item.source_id===index+1),cards=entries[0]?.cards;
+            const valid=entries.length===1 && Array.isArray(cards) && cards.length>0 && cards.every(card=>
+                card && ['korean','english','literal'].every(key=>typeof card[key]==='string' && card[key].trim()) && /[A-Za-z]/.test(card.english));
+            if(!valid){failed.push(index+1);continue;}
+            cards.forEach(card=>rows.push([card.korean.trim(),card.english.trim(),card.literal.trim(),String(serial++)]));
+            completed.push(index);
         }
-        // 입력 행 수와 결과 행 수는 일부러 같게 강제하지 않는다. 한 원문이 둘 이상의
-        // 자연스러운 카드로 나뉘어도 모두 보존한다.
-        const serialStart=(st.outputRows||[]).reduce((max,row)=>{
-            const n=Number(String(row?.[(st.pattern?.serialCol||4)-1]??'').trim());
-            return Number.isFinite(n)?Math.max(max,Math.floor(n)):max;
-        },0)+1;
-        const results=generatedRows.map((cols,i)=>[cols[0],cols[1],cols[2],String(serialStart+i)]);
-        const todayKey=mtGetKoreaDateKey();
-        const daily=st.selfDailyGenerated&&typeof st.selfDailyGenerated==='object'?{...st.selfDailyGenerated}:{};
-        daily[todayKey]=Math.max(0,Number(daily[todayKey]||0))+results.length;
-        st.selfDailyGenerated=daily;
-        st.outputRows.push(...results); st.nextSourceIndex=end; st.lastRun=Date.now(); st.translationComplete=false; mtSaveTypedState(slotIndex,st); mtInitSlots(); return true;
+        if(rows.length) {
+            mtAssertGeneratorState(slotIndex,st,signal);
+            completed.forEach(index=>ahead.add(index));
+            let next=start;while(ahead.has(next)){ahead.delete(next);next++;}
+            st.outputRows.push(...rows);st.nextSourceIndex=next;st.selfCompletedAhead=[...ahead].sort((a,b)=>a-b);
+            const day=mtGetKoreaDateKey();st.selfDailyGenerated={...(st.selfDailyGenerated||{}),[day]:Math.max(0,Number(st.selfDailyGenerated?.[day]||0))+rows.length};
+            st.selfDailyProcessedSources={...(st.selfDailyProcessedSources||{}),[day]:Math.max(0,Number(st.selfDailyProcessedSources?.[day]||0))+completed.length};
+            st.lastRun=Date.now();st.translationComplete=next>=st.sourceRows.length;st.lastError='';
+            mtSaveTypedState(slotIndex,st);await mtPersistTypedSlotStates();mtInitSlots();
+        }
+        if(failed.length)throw new Error(`원문 ${completed.length}개는 저장했습니다. 결과가 없거나 형식이 잘못된 원문 ${failed.join(', ')}번만 다음 생성에서 다시 시도합니다.`);
+        return true;
     }
     function mtRefParseJson(text){const s=String(text||'').trim();try{return JSON.parse(s);}catch(_){}const a=s.indexOf('['),b=s.lastIndexOf(']');if(a>=0&&b>a)return JSON.parse(s.slice(a,b+1));throw new Error('JSON 파싱 실패');}
-    async function mtGeneratorReferenceForTopic(slotIndex,topic){
-        const dPrompt=mtGetGenPrompt('reference_generate','dialogue').replace('{{TOPIC}}',topic.text);
-        const dialoguePayload={type:'ARRAY',items:{type:'OBJECT',properties:{english:{type:'STRING'},korean:{type:'STRING'}},required:['english','korean']}};
-        const d=await mtGenFetchText('reference_generate',dPrompt,slotIndex,0.7,dialoguePayload,'1차(대화생성)');
-        let dialogue=mtRefParseJson(d.text); if(!Array.isArray(dialogue)||dialogue.length!==6)throw new Error('대화문이 정확히 6문장이 아닙니다.');
-        const payloadData=JSON.stringify(dialogue.map((x,i)=>({index:i,english:x.english,korean:x.korean})));
-        const litPrompt=mtGetGenPrompt('reference_generate','literal').replace('{{DATA}}',payloadData);
-        const litSchema={type:'ARRAY',items:{type:'OBJECT',properties:{index:{type:'INTEGER'},english_chunks:{type:'ARRAY',items:{type:'STRING'}},korean_chunks:{type:'ARRAY',items:{type:'STRING',description:'Pure Korean text chunk'}}},required:['index','english_chunks','korean_chunks']}};
-        const l=await mtGenFetchText('reference_generate',litPrompt,slotIndex,0.1,litSchema,'2차(직독직해)');
-        let literal=mtRefParseJson(l.text); const out=[]; for(let i=0;i<6;i++){const chunks=literal.find(x=>Number(x.index)===i)?.korean_chunks||[];const lit=chunks.map(x=>String(x).trim()).filter(Boolean);out.push([topic.text,`${topic.originalRow}-${i+1}`,dialogue[i].english,dialogue[i].korean,lit.length?`[${lit.join(' / ')}]`:'[생성 실패]']);} return out;
+    async function mtGeneratorReferenceForTopic(slotIndex,topic) {
+        const prompt=mtGetGenPrompt('reference_generate','dialogue').replace('{{TOPIC}}',topic.text);
+        const schema={type:'ARRAY',items:{type:'OBJECT',properties:{english:{type:'STRING'},korean:{type:'STRING'}},required:['english','korean']}};
+        const first=await mtGenFetchText('reference_generate',prompt,slotIndex,0.7,schema,'1차(대화생성)');
+        const dialogue=mtRefParseJson(first.text);
+        if(!Array.isArray(dialogue)||dialogue.length!==6||dialogue.some(item=>!item||typeof item.english!=='string'||!item.english.trim()||typeof item.korean!=='string'||!item.korean.trim()))
+            throw new Error('대화문은 영어·한국어가 모두 있는 6문장이어야 합니다.');
+        const input=JSON.stringify(dialogue.map((item,index)=>({index,english:item.english,korean:item.korean})));
+        const literalSchema={type:'ARRAY',items:{type:'OBJECT',properties:{index:{type:'INTEGER'},english_chunks:{type:'ARRAY',items:{type:'STRING'}},korean_chunks:{type:'ARRAY',items:{type:'STRING'}}},required:['index','english_chunks','korean_chunks']}};
+        const second=await mtGenFetchText('reference_generate',mtGetGenPrompt('reference_generate','literal').replace('{{DATA}}',input),slotIndex,0.1,literalSchema,'2차(직독직해)');
+        const literal=mtRefParseJson(second.text);
+        if(!Array.isArray(literal)||literal.length!==6||new Set(literal.map(item=>item?.index)).size!==6)
+            throw new Error('직독직해 결과의 문장 번호가 누락되었거나 중복되었습니다.');
+        return dialogue.map((item,index)=>{
+            const chunks=literal.find(row=>row?.index===index),eng=chunks?.english_chunks,kor=chunks?.korean_chunks;
+            if(!Array.isArray(eng)||!Array.isArray(kor)||!eng.length||eng.length!==kor.length||
+                eng.some(text=>typeof text!=='string'||!text.trim())||
+                kor.some(text=>typeof text!=='string'||!text.trim()||!/[가-힣]/.test(text)||/[A-Za-z]/.test(text))||
+                !mtEnglishChunksCoverSentence(eng,item.english))throw new Error(`직독직해 ${index+1}번의 어구 수 또는 원문 대응이 올바르지 않습니다.`);
+            return [topic.text,'',item.english,item.korean,`[${kor.map(text=>text.trim()).join(' / ')}]`];
+        });
     }
-    async function mtGeneratorReferenceBatch(slotIndex){
+    async function mtGeneratorReferenceBatch(slotIndex) {
         const st=mtGetTypedState(slotIndex),cfg=mtGetGenCfg('reference_generate');
-        let q=Array.isArray(st.refQueue)?st.refQueue.slice():[]; if(!q.length)q=(st.topics||[]).slice().sort(()=>Math.random()-0.5); if(!q.length)return false;
-        const batch=q.splice(0,Math.min(cfg.batchSize,q.length)); const results=await Promise.all(batch.map(topic=>mtGeneratorReferenceForTopic(slotIndex,topic)));
-        const generatedCount=results.reduce((sum,rows)=>sum+(Array.isArray(rows)?rows.length:0),0);
-        const priorCardCount=Array.isArray(st.outputRows)?st.outputRows.length:0;
-        const priorTotal=Math.max(priorCardCount,Math.max(0,Number(st.referenceTotalGeneratedCount||0)));
-        const todayKey=mtGetKoreaDateKey();
-        const daily=st.referenceDailyGenerated&&typeof st.referenceDailyGenerated==='object'?{...st.referenceDailyGenerated}:{};
-        daily[todayKey]=Math.max(0,Number(daily[todayKey]||0))+generatedCount;
-        st.referenceDailyGenerated=daily;
-        st.referenceTotalGeneratedCount=priorTotal+generatedCount;
-        st.refQueue=q; results.forEach(rows=>st.outputRows.push(...rows)); st.lastRun=Date.now(); mtSaveTypedState(slotIndex,st); mtInitSlots(); return true;
-    }
-    function mtRefNextSerial(st){const rows=st.outputRows||[];let n=1;for(let i=rows.length-1;i>=0;i--){const m=String(rows[i]?.[1]??'').match(/^(\d+)-/);if(m){n=Number(m[1])+1;break;}}return n;}
-    const mtGeneratorTimers={};
-    async function mtGeneratorRun(slotIndex,immediate=false){
-        const st=mtGetTypedState(slotIndex), type=st.type; if(!['self_generate','reference_generate'].includes(type)||!st.fileName)return;
-        if(mtGeneratorTimers[slotIndex]){clearTimeout(mtGeneratorTimers[slotIndex]);mtGeneratorTimers[slotIndex]=null;}
-        try{
-            if(type==='self_generate'){
-                await mtGeneratorSelfBatch(slotIndex);
-                const fresh=mtGetTypedState(slotIndex); if(Number(fresh.nextSourceIndex||0)>=fresh.sourceRows.length){fresh.translationComplete=true;fresh.translationCompletedAt=Date.now();fresh.nextRun=null;mtSaveTypedState(slotIndex,fresh);mtInitSlots();return;}
-            } else await mtGeneratorReferenceBatch(slotIndex);
-        }catch(e){
-            st.lastError=String(e?.message||e);mtSaveTypedState(slotIndex,st);
-            const diagnostic=e?.mtGeneratorExtra&&typeof e.mtGeneratorExtra==='object'?e.mtGeneratorExtra:{};
-            mtGeneratorRecordError(type,slotIndex,e,{phase:'typed-run',...diagnostic});
-            mtInitSlots();
+        const signal=mtGeneratorJobs.get(Number(slotIndex))?.controller.signal;
+        if(!Array.isArray(st.refQueue)||!st.refQueue.length) {
+            st.refQueue=(st.topics||[]).slice();
+            for(let i=st.refQueue.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[st.refQueue[i],st.refQueue[j]]=[st.refQueue[j],st.refQueue[i]];}
         }
-        const cfg=mtGetGenCfg(type); const next=Date.now()+cfg.intervalMin*60*1000; const cur=mtGetTypedState(slotIndex);cur.nextRun=next;mtSaveTypedState(slotIndex,cur);mtGeneratorTimers[slotIndex]=setTimeout(()=>mtGeneratorRun(slotIndex,false),Math.max(1000,next-Date.now()));
+        const batch=st.refQueue.slice(0,Math.min(cfg.batchSize,st.refQueue.length));
+        if(!batch.length)return false;
+        const failures=[];let cursor=0,completed=0,stop=false;
+        const worker=async()=>{
+            while(cursor<batch.length && !stop) {
+                const topic=batch[cursor++];
+                try {
+                    mtAssertGeneratorState(slotIndex,st,signal);
+                    const rows=await mtGeneratorReferenceForTopic(slotIndex,topic);
+                    mtAssertGeneratorState(slotIndex,st,signal);
+                    const serial=mtRefNextSerial(st);
+                    const output=rows.map((row,index)=>[row[0],`${serial}-${index+1}`,...row.slice(2)]);
+                    const position=st.refQueue.findIndex(item=>item===topic || (item.originalRow===topic.originalRow && item.text===topic.text));
+                    if(position<0)throw mtGeneratorAbortError();
+                    const prior=Math.max(st.outputRows.length,Number(st.referenceTotalGeneratedCount)||0);
+                    st.outputRows.push(...output);st.refQueue.splice(position,1);
+                    const day=mtGetKoreaDateKey();st.referenceDailyGenerated={...(st.referenceDailyGenerated||{}),[day]:Math.max(0,Number(st.referenceDailyGenerated?.[day]||0))+output.length};
+                    st.referenceTotalGeneratedCount=prior+output.length;st.lastRun=Date.now();
+                    mtSaveTypedState(slotIndex,st);
+                    try{await mtPersistTypedSlotStates();}catch(error){stop=true;throw error;}
+                    completed++;mtInitSlots();
+                } catch(error) {
+                    if(error?.name==='AbortError')throw error;
+                    failures.push(error);
+                    mtGeneratorRecordError('reference_generate',slotIndex,error,{phase:'주제별 생성',topic:topic.text});
+                }
+                if(cursor<batch.length && !stop)await mtGeneratorSleep(Math.max(0,cfg.delaySec||0)*1000,signal);
+            }
+        };
+        const workers=await Promise.allSettled(Array.from({length:Math.min(3,batch.length)},()=>worker()));
+        const cancelled=workers.find(result=>result.status==='rejected');
+        if(cancelled)throw cancelled.reason;
+        if(failures.length)throw new Error(`주제 ${completed}개를 저장했습니다. 실패한 ${failures.length}개는 대기 목록에 남아 다음 생성에서 다시 시도합니다. ${failures[0].message}`);
+        return true;
     }
-    function mtRescheduleGeneratorSlots(type){for(let i=1;i<=11;i++){if(mtGetSlotType(i)===type){const st=mtGetTypedState(i);st.nextRun=Date.now()+mtGetGenCfg(type).intervalMin*60*1000;mtSaveTypedState(i,st);if(mtGeneratorTimers[i])clearTimeout(mtGeneratorTimers[i]);mtGeneratorTimers[i]=setTimeout(()=>mtGeneratorRun(i,false),Math.max(1000,st.nextRun-Date.now()));}}}
+    function mtRefNextSerial(st) {
+        return (st.outputRows||[]).reduce((max,row)=>{const match=String(row?.[1]??'').match(/^(\d+)-/);return match?Math.max(max,Number(match[1])):max;},0)+1;
+    }
+    const mtGeneratorTimers={};
+    function mtGeneratorRun(slotIndex,immediate=false) {
+        const slot=Number(slotIndex);
+        if(mtRestoreInProgress)return Promise.resolve();
+        if(mtGeneratorJobs.has(slot))return mtGeneratorJobs.get(slot).promise;
+        const st=mtGetTypedState(slot),type=st.type;
+        if(!['self_generate','reference_generate'].includes(type)||!st.fileName)return Promise.resolve();
+        if(type==='self_generate' && st.nextSourceIndex>=st.sourceRows?.length){st.translationComplete=true;return Promise.resolve();}
+        if(mtGeneratorTimers[slot])clearTimeout(mtGeneratorTimers[slot]);delete mtGeneratorTimers[slot];
+        const job={controller:new AbortController(),promise:null};
+        job.promise=Promise.resolve().then(async()=>{
+            try {
+                // Retry outstanding storage BEFORE spending another API request.
+                await mtPersistTypedSlotStates();mtAssertGeneratorState(slot,st,job.controller.signal);
+                if(type==='self_generate')await mtGeneratorSelfBatch(slot);else await mtGeneratorReferenceBatch(slot);
+                mtAssertGeneratorState(slot,st,job.controller.signal);st.lastError='';
+            } catch(error) {
+                if(error?.name==='AbortError'||job.controller.signal.aborted)return;
+                if(mtGetTypedState(slot)===st && mtGetSlotType(slot)===type) {
+                    st.lastError=String(error?.message||error);mtSaveTypedState(slot,st);
+                    mtGeneratorRecordError(type,slot,error,{phase:'typed-run'});mtInitSlots();
+                }
+            } finally {
+                if(mtGeneratorJobs.get(slot)===job)mtGeneratorJobs.delete(slot);
+                if(!job.controller.signal.aborted && !mtRestoreInProgress && mtGetSlotType(slot)===type && mtGetTypedState(slot)===st) {
+                    const complete=type==='self_generate' && Number(st.nextSourceIndex||0)>=st.sourceRows.length;
+                    if(complete){st.translationComplete=true;st.translationCompletedAt=Date.now();st.nextRun=null;}
+                    else {st.nextRun=Date.now()+mtGetGenCfg(type).intervalMin*60000;mtGeneratorTimers[slot]=setTimeout(()=>mtGeneratorRun(slot),Math.max(1000,st.nextRun-Date.now()));}
+                    mtSaveTypedState(slot,st);mtInitSlots();
+                }
+            }
+        });
+        mtGeneratorJobs.set(slot,job);
+        job.promise.catch(error=>mtGeneratorRecordError(type,slot,error,{phase:'job-finalize'}));
+        return job.promise;
+    }
+    function mtRescheduleGeneratorSlots(type){for(let i=1;i<=11;i++){if(mtGetSlotType(i)===type){const st=mtGetTypedState(i);st.nextRun=Date.now()+mtGetGenCfg(type).intervalMin*60*1000;mtSaveTypedState(i,st);if(mtGeneratorJobs.has(i))continue;if(mtGeneratorTimers[i])clearTimeout(mtGeneratorTimers[i]);mtGeneratorTimers[i]=setTimeout(()=>mtGeneratorRun(i,false),Math.max(1000,st.nextRun-Date.now()));}}}
     function mtOpenGeneratorPromptEditor(slotIndex,type){
         const st=mtGetTypedState(slotIndex),cfg=mtGetGenCfg(type); document.getElementById('mtGeneratorPromptTitle').innerText=`${mtGeneratorFileLabel(type)} 생성 설정`;document.getElementById('mtGeneratorPromptSubtitle').innerText=type==='self_generate'?`슬롯 ${slotIndex} · 현재 설정: API 1회 호출당 원문 ${cfg.batchSize}문장을 함께 생성`:`슬롯 ${slotIndex}`;
         const batchLabel=document.getElementById('mtGenBatchLabel'),batchHelp=document.getElementById('mtGenBatchHelp');
@@ -9510,6 +9569,7 @@ ${String(primaryResult?.text||'')}`;
                 mtSaveGenPrompt(type,'literal',document.getElementById('mtGenPromptLiteral')?.value||'');
             }
             mtRescheduleGeneratorSlots(type);
+            await mtPersistTypedSlotStates();
             mtCloseGeneratorPromptEditor();
             mtInitSlots();
             alert('생성 설정을 저장했습니다. 다음 생성부터 적용됩니다.');
@@ -9614,7 +9674,18 @@ ${String(primaryResult?.text||'')}`;
     function mtSaveGeneratorEditRow(){if(mtGeneratorEditSlot==null)return;const st=mtGetTypedState(mtGeneratorEditSlot),r=st.outputRows?.[mtGeneratorEditIndex]||[],a=document.getElementById('mtGenEditCol1').value,b=document.getElementById('mtGenEditCol2').value,c=document.getElementById('mtGenEditCol3').value;if(st.type==='reference_generate'){r[3]=a;r[2]=b;r[4]=c;}else{r[0]=a;r[1]=b;r[2]=c;}mtSaveTypedState(mtGeneratorEditSlot,st);mtCloseGeneratorEditModal();mtRenderGeneratorList();mtInitSlots();}
     function mtExportGeneratorSlot(event,slotIndex){if(event)event.stopPropagation();const st=mtGetTypedState(slotIndex),rows=Array.isArray(st.outputRows)?st.outputRows:[];if(!rows.length)return alert('내보낼 데이터가 없습니다.');const p=st.pattern||{},serialIdx=(p.serialCol|| (st.type==='reference_generate'?2:4))-1,starSet=new Set((st.starredSerials||[]).map(String));let out=[];if(st.type==='self_generate'){out=[['한국어 원문','영어문장','직독직해','일련번호','중요'],...rows.map(r=>[r[0]||'',r[1]||'',r[2]||'',r[serialIdx]||'',starSet.has(String(r[serialIdx]||''))?'★':''])];}else{out=[['주제','일련번호','영어문장','한국어','직독직해','중요'],...rows.map(r=>[r[0]||'',r[1]||'',r[2]||'',r[3]||'',r[4]||'',starSet.has(String(r[1]||''))?'★':''])];}const ws=XLSX.utils.aoa_to_sheet(out);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,st.type==='self_generate'?'자체형':'참조형');XLSX.writeFile(wb,`${st.fileName||mtGeneratorFileLabel(st.type)}_${new Date().toISOString().slice(0,10)}.xlsx`);}
     // 초기 진입 시 기존 생성형 슬롯의 예약을 복구합니다.
-    function mtRestoreGeneratorTimers(){for(let i=1;i<=11;i++){const type=mtGetSlotType(i);if(type==='self_generate'||type==='reference_generate'){const st=mtGetTypedState(i);if(st.fileName){const next=Math.max(1000,Number(st.nextRun||0)-Date.now());if(st.nextRun && st.nextRun>Date.now())mtGeneratorTimers[i]=setTimeout(()=>mtGeneratorRun(i,false),next);else mtGeneratorRun(i,false);}}}}
+    function mtRestoreGeneratorTimers() {
+        if(mtRestoreInProgress)return;
+        for(let i=1;i<=11;i++) {
+            if(mtGeneratorTimers[i])clearTimeout(mtGeneratorTimers[i]);delete mtGeneratorTimers[i];
+            const type=mtGetSlotType(i);
+            if(!['self_generate','reference_generate'].includes(type)||mtGeneratorJobs.has(i))continue;
+            const st=mtGetTypedState(i);
+            if(!st.fileName || (type==='self_generate' && Number(st.nextSourceIndex||0)>=st.sourceRows?.length))continue;
+            if(st.nextRun && st.nextRun>Date.now())mtGeneratorTimers[i]=setTimeout(()=>mtGeneratorRun(i),Math.max(1000,st.nextRun-Date.now()));
+            else mtGeneratorRun(i);
+        }
+    }
     // 생성 타이머는 영구 상태 복원이 끝난 뒤 initApp에서 시작합니다.
 
     document.getElementById('mtFileUpload').addEventListener('change', async function(e) {
@@ -9855,7 +9926,7 @@ ${String(primaryResult?.text||'')}`;
             let slotName = mtCurrentUploadedFileName || (wordsArr[0].kor.substring(0, 10) + "...");
             let slotData = { name: slotName, words: wordsArr, lastSession: null };
 
-            if (Number.isInteger(Number(mtActiveSlotIndex)) && Number(mtActiveSlotIndex) >= 1 && Number(mtActiveSlotIndex) <= 8) {
+            if (Number.isInteger(Number(mtActiveSlotIndex)) && Number(mtActiveSlotIndex) >= 1 && Number(mtActiveSlotIndex) <= 11) {
                 mtSetNormalSlotSync(Number(mtActiveSlotIndex), slotData);
             } else {
                 localStorage.setItem('word_slot_' + mtActiveSlotIndex, JSON.stringify(slotData));
@@ -9958,7 +10029,7 @@ ${String(primaryResult?.text||'')}`;
     }
 
     function mtEscapeHTML(str) {
-        return str.replace(/[&<>'"]/g, 
+        return String(str??'').replace(/[&<>'"]/g, 
             tag => ({
                 '&': '&amp;',
                 '<': '&lt;',
@@ -10968,46 +11039,16 @@ ${String(primaryResult?.text||'')}`;
         }
     }
 
-    async function saveToDatabase() {
-        let db;
-        try {
-            db = await initDB();
-            const tx = db.transaction(STORE_NAME, "readwrite");
-            tx.objectStore(STORE_NAME).put(boardDataList, "communityBoardsData");
-            await waitForTransaction(tx);
-        } catch (e) {
-            console.error("게시판 데이터베이스 저장 오류:", e);
-        } finally {
-            if (db) db.close();
-        }
+    function saveToDatabase() {
+        return mtWriteAppRecord(STORE_NAME, 'communityBoardsData', boardDataList, '게시판');
     }
 
-    async function saveSlotsToDatabase() {
-        let db;
-        try {
-            db = await initDB();
-            const tx = db.transaction(SLOT_STORE_NAME, "readwrite");
-            tx.objectStore(SLOT_STORE_NAME).put(slotsData, SLOT_DATA_KEY);
-            await waitForTransaction(tx);
-        } catch (e) {
-            console.error("소설 슬롯 IndexedDB 저장 오류:", e);
-        } finally {
-            if (db) db.close();
-        }
+    function saveSlotsToDatabase() {
+        return mtWriteAppRecord(SLOT_STORE_NAME, SLOT_DATA_KEY, slotsData, '영작 슬롯');
     }
 
-    async function saveWordsToDatabase() {
-        let db;
-        try {
-            db = await initDB();
-            const tx = db.transaction(VOCA_STORE_NAME, "readwrite");
-            tx.objectStore(VOCA_STORE_NAME).put(words, VOCA_DATA_KEY);
-            await waitForTransaction(tx);
-        } catch (e) {
-            console.error("단어장 IndexedDB 저장 오류:", e);
-        } finally {
-            if (db) db.close();
-        }
+    function saveWordsToDatabase() {
+        return mtWriteAppRecord(VOCA_STORE_NAME, VOCA_DATA_KEY, words, '단어장');
     }
 
     async function loadFromDatabase() {
@@ -11665,8 +11706,7 @@ ${String(primaryResult?.text||'')}`;
             if (typeof mtInitSlots === 'function') mtInitSlots();
             // 기존 localStorage 슬롯도 첫 실행 즉시 영구 사본을 만들어 다음 새로고침부터 보호합니다.
             mtQueueTypedSlotStatePersistence();
-            // 전체 데이터 복원이 완료된 뒤 자동저장 권한과 놓친 20분 주기를 복구합니다.
-            if (typeof mtInitAutoBackup === 'function') await mtInitAutoBackup();
+            mtAppReady=true;
         } catch (error) {
             // 초기화 중 한 모듈이 실패해도 다른 기능까지 중단하지 않습니다.
             console.error('앱 초기화 중 일부 기능 오류:', error);
@@ -11846,7 +11886,7 @@ ${String(primaryResult?.text||'')}`;
   (function syncAppVersionFromFileName(){
     // 파일을 다른 이름으로 저장하거나 브라우저가 경로를 변환해도, 기본 표시가
     // 사라지지 않게 한다. 정상 파일명에서는 아래 값이 자동으로 새 번호로 대체된다.
-    const fallbackVersion='v123';
+    const fallbackVersion='v122';
     let fileName='';
     try{fileName=decodeURIComponent(String(location.pathname||'').split('/').pop()||'');}
     catch(_){fileName=String(location.pathname||'').split('/').pop()||'';}
@@ -12077,18 +12117,6 @@ ${String(primaryResult?.text||'')}`;
 
   // 붙여넣기 UI 함수는 본문 스크립트의 let 상태(mtEbookTemp 등)에 접근해야 하므로,
   // 위쪽 본문 스크립트에서 정의합니다.
-  return;
-
-  let slot=null, type='normal';
-  const parse=text=>String(text||'').replace(/^\uFEFF/,'').normalize('NFC').split(/\r?\n/).filter(x=>x.trim()!=='').map(x=>x.split('\t'));
-  window.mtOpenNormalImportSourceModal=function(s,t){slot=Number(s);type=t==='ebook'?'ebook':'normal';const sub=document.getElementById('mtNormalImportSourceSubtitle'),m=document.getElementById('mtNormalImportSourceModal');if(sub)sub.textContent=type==='ebook'?'파일 또는 클립보드에서 전자책 문장을 가져오세요.':'파일 또는 클립보드에서 문장을 가져오세요.';if(m)m.style.display='flex';};
-  window.mtCloseNormalImportSourceModal=function(){const m=document.getElementById('mtNormalImportSourceModal');if(m)m.style.display='none';};
-  window.mtNormalImportFromFile=function(){if(!Number.isInteger(slot))return;window.mtCloseNormalImportSourceModal();window.mtTriggerUpload(slot,type);};
-  window.mtOpenNormalClipboardModal=function(){const source=document.getElementById('mtNormalImportSourceModal'),m=document.getElementById('mtNormalClipboardModal'),ta=document.getElementById('mtNormalClipboardText');if(source)source.style.display='none';if(ta){ta.value='';setTimeout(()=>ta.focus(),0);}if(m)m.style.display='flex';};
-  window.mtCloseNormalClipboardModal=function(){const m=document.getElementById('mtNormalClipboardModal');if(m)m.style.display='none';};
-  window.mtPasteFromSystemClipboard=async function(){const ta=document.getElementById('mtNormalClipboardText');if(!ta)return;try{ta.value=await navigator.clipboard.readText();}catch(_){alert('브라우저에서 클립보드 읽기가 차단되었습니다. 텍스트를 직접 붙여넣어 주세요.');}};
-  window.mtRegisterNormalClipboardText=function(){const rows=parse(document.getElementById('mtNormalClipboardText')?.value);if(!rows.length)return alert('등록할 텍스트가 없습니다.');if(!Number.isInteger(slot))return alert('등록할 슬롯을 찾지 못했습니다. 다시 시도해 주세요.');window.mtCloseNormalClipboardModal();if(type==='ebook'){const st=window.mtGetTypedState(slot);st.type='ebook';st.fileName=st.fileName||`붙여넣기 전자책 ${slot}`;window.mtSetSlotType(slot,'ebook');window.mtSaveTypedState(slot,st);window.mtEbookTemp={slotIndex:slot,fileName:st.fileName,rows,sourceSheetName:'클립보드',addMode:false};window.mtOpenEbookColumnModal(rows);}else window.mtRegisterNormalRows(rows,slot,`붙여넣기 일반 ${slot}`,'clipboard');};
-  window.mtRegisterConfiguredEmptySlotFile=function(){if(window.mtConfiguredEmptySlot==null)return;const s=Number(window.mtConfiguredEmptySlot),t=window.mtPendingSlotType;window.mtCloseConfiguredEmptySlotModal();if(t==='normal'||t==='ebook')return window.mtOpenNormalImportSourceModal(s,t);if(t)return window.mtTriggerUpload(s,t);window.mtOpenSlotTypeModal(s);};
 })();
 </script>
 <script id="v78-board-placement-guard">
