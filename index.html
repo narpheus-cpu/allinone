@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v124</title>
+    <title>올인원 영작-단어장 시스템 · v125</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -12233,7 +12233,7 @@ ${JSON.stringify(finalPayload)}`;
   (function syncAppVersionFromFileName(){
     // 파일을 다른 이름으로 저장하거나 브라우저가 경로를 변환해도, 기본 표시가
     // 사라지지 않게 한다. 정상 파일명에서는 아래 값이 자동으로 새 번호로 대체된다.
-    const fallbackVersion='v124';
+    const fallbackVersion='v125';
     let fileName='';
     try{fileName=decodeURIComponent(String(location.pathname||'').split('/').pop()||'');}
     catch(_){fileName=String(location.pathname||'').split('/').pop()||'';}
@@ -12800,5 +12800,162 @@ ${JSON.stringify(finalPayload)}`;
 </script>
 
 <style>.mt-generator-runtime{margin-top:8px;padding:8px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;text-align:left}.mt-generator-runtime-label{font-size:11px;line-height:1.6;overflow-wrap:anywhere}.mt-generator-runtime .btn-excel{font-size:10px;padding:4px 7px}#mtGenMode{width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:5px}#mtGeneratorPromptModal .mt-generator-grid > div{grid-column:1 / -1}</style>
+<script>(function(){
+    'use strict';
+    const SETTINGS_KEY='mt_ebook_popup_settings_v1';
+    const EDGE_NAMES=['n','s','e','w','ne','nw','se','sw'];
+    const CARD_ID='mt-flashcard';
+
+    const style=document.createElement('style');
+    style.id='mt-ebook-popup-v125-style';
+    style.textContent=`
+        #mt-flashcard.mt-ebook-typing.mt-ebook-freeform {
+            transform:none !important;
+            max-width:none !important;
+            max-height:none !important;
+            min-width:min(360px,calc(100vw - 16px)) !important;
+            min-height:min(280px,calc(100vh - 16px)) !important;
+            resize:none !important;
+            overflow:auto !important;
+        }
+        #mt-flashcard.mt-ebook-typing .mt-ebook-drag-handle {
+            cursor:move !important;
+            touch-action:none;
+        }
+        #mt-flashcard.mt-ebook-typing .mt-ebook-resize-handle {
+            position:absolute !important;
+            display:block !important;
+            margin:0 !important;
+            padding:0 !important;
+            border:0 !important;
+            border-radius:0 !important;
+            background:transparent !important;
+            opacity:1 !important;
+            z-index:5200 !important;
+            touch-action:none;
+        }
+        #mt-flashcard .mt-ebook-resize-handle[data-edge="n"] {left:12px;right:12px;top:-5px;width:auto;height:10px;cursor:ns-resize;}
+        #mt-flashcard .mt-ebook-resize-handle[data-edge="s"] {left:12px;right:12px;bottom:-5px;width:auto;height:10px;cursor:ns-resize;}
+        #mt-flashcard .mt-ebook-resize-handle[data-edge="e"] {top:12px;bottom:12px;right:-5px;width:10px;height:auto;cursor:ew-resize;}
+        #mt-flashcard .mt-ebook-resize-handle[data-edge="w"] {top:12px;bottom:12px;left:-5px;width:10px;height:auto;cursor:ew-resize;}
+        #mt-flashcard .mt-ebook-resize-handle[data-edge="ne"],
+        #mt-flashcard .mt-ebook-resize-handle[data-edge="nw"],
+        #mt-flashcard .mt-ebook-resize-handle[data-edge="se"],
+        #mt-flashcard .mt-ebook-resize-handle[data-edge="sw"] {width:18px;height:18px;}
+        #mt-flashcard .mt-ebook-resize-handle[data-edge="ne"] {right:-5px;top:-5px;cursor:nesw-resize;}
+        #mt-flashcard .mt-ebook-resize-handle[data-edge="nw"] {left:-5px;top:-5px;cursor:nwse-resize;}
+        #mt-flashcard .mt-ebook-resize-handle[data-edge="se"] {right:-5px;bottom:-5px;cursor:nwse-resize;}
+        #mt-flashcard .mt-ebook-resize-handle[data-edge="sw"] {left:-5px;bottom:-5px;cursor:nesw-resize;}
+        #mt-flashcard.mt-ebook-typing .mt-ebook-resize-handle[data-edge="se"]::after {
+            content:"";position:absolute;right:4px;bottom:4px;width:10px;height:10px;
+            border-right:3px solid #64748b;border-bottom:3px solid #64748b;border-radius:0 0 3px 0;
+        }
+        #mt-flashcard.mt-ebook-window-changing {user-select:none !important;-webkit-user-select:none !important;}
+    `;
+    document.head.appendChild(style);
+
+    const clamp=(value,min,max)=>Math.min(Math.max(value,min),Math.max(min,max));
+    const readSettings=()=>{
+        try {const parsed=JSON.parse(localStorage.getItem(SETTINGS_KEY)||'null');return parsed&&typeof parsed==='object'?parsed:{};}
+        catch(_){return {};}
+    };
+    const writeSettings=value=>{
+        try{localStorage.setItem(SETTINGS_KEY,JSON.stringify(value));}catch(_){}
+    };
+    const limits=()=>{
+        const maxWidth=Math.max(240,window.innerWidth-16),maxHeight=Math.max(220,window.innerHeight-16);
+        return {margin:8,maxWidth,maxHeight,minWidth:Math.min(360,maxWidth),minHeight:Math.min(280,maxHeight)};
+    };
+    const clampGeometry=(width,height,left,top)=>{
+        const limit=limits(),w=clamp(width,limit.minWidth,limit.maxWidth),h=clamp(height,limit.minHeight,limit.maxHeight);
+        return {width:w,height:h,left:clamp(left,limit.margin,window.innerWidth-w-limit.margin),top:clamp(top,limit.margin,window.innerHeight-h-limit.margin)};
+    };
+    const saveGeometry=card=>{
+        if(!card?.classList.contains('mt-ebook-typing'))return;
+        const rect=card.getBoundingClientRect(),settings=readSettings();
+        Object.assign(settings,{freeform:true,x:Math.round(rect.left),y:Math.round(rect.top),widthPx:Math.round(rect.width),heightPx:Math.round(rect.height)});
+        writeSettings(settings);
+    };
+    const setGeometry=(card,geometry)=>{
+        card.classList.add('mt-ebook-freeform');
+        card.style.transform='none';
+        card.style.left=Math.round(geometry.left)+'px';
+        card.style.top=Math.round(geometry.top)+'px';
+        card.style.width=Math.round(geometry.width)+'px';
+        card.style.height=Math.round(geometry.height)+'px';
+    };
+    const openGeometry=card=>{
+        const settings=readSettings(),limit=limits();
+        const width=Number.isFinite(Number(settings.widthPx))?Number(settings.widthPx):Math.min(760,Math.round(window.innerWidth*0.78),limit.maxWidth);
+        const height=Number.isFinite(Number(settings.heightPx))?Number(settings.heightPx):Math.min(620,Math.round(window.innerHeight*0.78),limit.maxHeight);
+        const left=Number.isFinite(Number(settings.x))?Number(settings.x):(window.innerWidth-width)/2;
+        const top=Number.isFinite(Number(settings.y))?Number(settings.y):(window.innerHeight-height)/2;
+        setGeometry(card,clampGeometry(width,height,left,top));
+        saveGeometry(card);
+    };
+
+    const card=document.getElementById(CARD_ID),dragHandle=document.getElementById('mtEbookPopupDragHandle');
+    if(!card||!dragHandle)return;
+    // Prevent the older conditional binding. v125 owns both movement and resizing.
+    card.dataset.ebookManipulationBound='1';
+    for(const edge of EDGE_NAMES){
+        const handle=document.createElement('div');
+        handle.className='mt-ebook-resize-handle';handle.dataset.edge=edge;handle.title='팝업 크기 조절';handle.setAttribute('aria-hidden','true');
+        card.appendChild(handle);
+    }
+
+    let action=null;
+    const begin=(mode,edge,event)=>{
+        if(!card.classList.contains('mt-ebook-typing')||event.button!==0)return;
+        const rect=card.getBoundingClientRect();
+        action={mode,edge,pointerId:event.pointerId,startX:event.clientX,startY:event.clientY,left:rect.left,top:rect.top,width:rect.width,height:rect.height,right:rect.right,bottom:rect.bottom};
+        card.classList.add('mt-ebook-freeform','mt-ebook-window-changing');
+        setGeometry(card,clampGeometry(rect.width,rect.height,rect.left,rect.top));
+        try{event.target.setPointerCapture?.(event.pointerId);}catch(_){}
+        event.preventDefault();event.stopPropagation();
+    };
+    dragHandle.addEventListener('pointerdown',event=>{
+        if(event.target.closest('button,input,select,textarea,a,.mt-ebook-resize-handle'))return;
+        begin('move','',event);
+    });
+    card.querySelectorAll('.mt-ebook-resize-handle').forEach(handle=>handle.addEventListener('pointerdown',event=>begin('resize',handle.dataset.edge,event)));
+
+    document.addEventListener('pointermove',event=>{
+        if(!action||event.pointerId!==action.pointerId)return;
+        const dx=event.clientX-action.startX,dy=event.clientY-action.startY,limit=limits();
+        if(action.mode==='move'){
+            setGeometry(card,clampGeometry(action.width,action.height,action.left+dx,action.top+dy));
+        }else{
+            let left=action.left,top=action.top,right=action.right,bottom=action.bottom;
+            if(action.edge.includes('e'))right=clamp(action.right+dx,action.left+limit.minWidth,window.innerWidth-limit.margin);
+            if(action.edge.includes('w'))left=clamp(action.left+dx,limit.margin,action.right-limit.minWidth);
+            if(action.edge.includes('s'))bottom=clamp(action.bottom+dy,action.top+limit.minHeight,window.innerHeight-limit.margin);
+            if(action.edge.includes('n'))top=clamp(action.top+dy,limit.margin,action.bottom-limit.minHeight);
+            setGeometry(card,clampGeometry(right-left,bottom-top,left,top));
+        }
+        event.preventDefault();
+    },{passive:false});
+    const finish=event=>{
+        if(!action||(event?.pointerId!==undefined&&event.pointerId!==action.pointerId))return;
+        action=null;card.classList.remove('mt-ebook-window-changing');saveGeometry(card);
+    };
+    document.addEventListener('pointerup',finish);
+    document.addEventListener('pointercancel',finish);
+    window.addEventListener('blur',()=>finish());
+    window.addEventListener('resize',()=>{
+        if(!card.classList.contains('mt-ebook-typing'))return;
+        const rect=card.getBoundingClientRect();setGeometry(card,clampGeometry(rect.width,rect.height,rect.left,rect.top));saveGeometry(card);
+    });
+
+    let wasOpen=false;
+    const syncOpenState=()=>{
+        const open=card.classList.contains('mt-ebook-typing');
+        if(open&&!wasOpen)requestAnimationFrame(()=>openGeometry(card));
+        wasOpen=open;
+    };
+    new MutationObserver(syncOpenState).observe(card,{attributes:true,attributeFilter:['class']});
+    syncOpenState();
+})();
+</script>
 </body>
 </html>
