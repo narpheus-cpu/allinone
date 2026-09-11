@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v123</title>
+    <title>올인원 영작-단어장 시스템 · v124</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -8288,7 +8288,7 @@ ${JSON.stringify(finalPayload)}`;
                 const source=[];
                 if(normal) (Array.isArray(normal)?normal:(normal.words||[])).forEach(w=>{const k=String(w.kor??w.meaning??'').trim();if(k)source.push(k);});
                 else if(Array.isArray(old.outputRows)) old.outputRows.forEach(r=>{const k=String(r?.[(old.pattern?.mainKorCol||1)-1]??'').trim();if(k)source.push(k);});
-                const st={type:'self_generate',fileName:source.length?(old.fileName||`슬롯 ${slot}`):'',sourceRows:source,sourceRowsLock:source.slice(),nextSourceIndex:0,retryRows:[],outputRows:[],pattern:{sourceKorCol:1,engCol:2,subKorCol:3,serialCol:4},starredSerials:[],lastSession:null,lastError:'',lastDiagnostic:null};
+                const st={type:'self_generate',fileName:source.length?(old.fileName||`슬롯 ${slot}`):'',sourceRows:source,sourceRowsLock:source.slice(),sourceRowsOriginal:source.slice(),nextSourceIndex:0,retryRows:[],outputRows:[],pattern:{sourceKorCol:1,engCol:2,subKorCol:3,serialCol:4},starredSerials:[],lastSession:null,lastError:'',lastDiagnostic:null};
                 mtSetSlotType(slot,'self_generate'); mtSaveTypedState(slot,st); try{mtDeleteNormalSlotSync(slot);}catch(_){ }
             } else {
                 const topics=[];
@@ -9352,6 +9352,7 @@ ${JSON.stringify(finalPayload)}`;
         st.selfDailyGenerated={};st.selfDailyProcessedSources={};
     }
     function mtEnsureSelfPipeline(st) {
+        if(!Array.isArray(st.sourceRowsOriginal))st.sourceRowsOriginal=Array.isArray(st.sourceRowsLock)?st.sourceRowsLock.slice():(st.sourceRows||[]).slice();
         if(st.selfPipelineVersion===123 && st.selfTasks)return;
         const tasks={},total=st.sourceRows?.length||0,next=Math.min(total,Math.max(0,Number(st.nextSourceIndex)||0));
         for(let i=0;i<next;i++)tasks[i+1]={status:'done',attempts:0};
@@ -9385,6 +9386,38 @@ ${JSON.stringify(finalPayload)}`;
         const attempts=(Number(st.selfTasks[id]?.attempts)||0)+1;
         st.selfTasks[id]={status:attempts>=maxAttempts?'review':'retry',attempts,lastError:String(message),retryAt:Date.now()+Math.min(300000,15000*2**attempts)};
     }
+    function mtSelfShouldPassThrough(source) {
+        // Punctuation, symbols, emoji, numbers, and invisible marks have no language
+        // to translate. Sending them to the model can yield an empty structured result.
+        return !/\p{L}/u.test(String(source??'').normalize('NFC'));
+    }
+    function mtSelfHasPassThroughWork(st) {
+        return (st.sourceRows||[]).some((source,index)=>st.selfTasks[index+1]?.status!=='done'&&mtSelfShouldPassThrough(source));
+    }
+    function mtSelfAppendPassThrough(st,id) {
+        const source=String(st.sourceRows[id-1]??'');
+        st.outputRows.push([source,source,source,String(st.selfNextSerial++),id,0]);
+        st.selfTasks[id]={status:'done',attempts:Number(st.selfTasks[id]?.attempts)||0,passthrough:true};
+        st.selfSortPending=true;
+    }
+    function mtBuildSelfSourceDownload(slotIndex) {
+        const slot=Number(slotIndex),st=mtGetTypedState(slot);
+        if(st.type!=='self_generate')throw new Error('자체형 슬롯에서만 원문을 다운로드할 수 있습니다.');
+        mtEnsureSelfPipeline(st);
+        const rows=Array.isArray(st.sourceRowsOriginal)?st.sourceRowsOriginal:(st.sourceRows||[]);
+        if(!rows.length)throw new Error('다운로드할 원문이 없습니다.');
+        const title=String(st.fileName||`자체형 슬롯 ${slot}`).replace(/\.(xlsx|xls|txt)$/i,'').replace(/[<>:"/\\|?*\x00-\x1F]/g,'_').replace(/[. ]+$/,'').trim()||`자체형 슬롯 ${slot}`;
+        return {text:rows.map(value=>String(value??'')).join('\r\n'),fileName:`${title}_원문_${new Date().toISOString().slice(0,10)}.txt`};
+    }
+    function mtDownloadSelfSource(event,slotIndex) {
+        event?.stopPropagation();
+        try {
+            const file=mtBuildSelfSourceDownload(slotIndex),url=URL.createObjectURL(new Blob(['\uFEFF',file.text],{type:'text/plain;charset=utf-8'}));
+            const link=document.createElement('a');link.href=url;link.download=file.fileName;document.body.appendChild(link);link.click();link.remove();
+            setTimeout(()=>URL.revokeObjectURL(url),1000);
+            return file;
+        } catch(error) { alert(error.message);return null; }
+    }
     function mtSelfSourceText(text){return String(text||'').normalize('NFC').replace(/[^\p{L}\p{N}]/gu,'');}
     function mtValidateSelfCards(source,cards) {
         if(!Array.isArray(cards)||!cards.length||cards.length>24)throw new Error('번역 카드 수가 올바르지 않습니다.');
@@ -9416,6 +9449,18 @@ ${JSON.stringify(finalPayload)}`;
     async function mtGeneratorSelfBatch(slotIndex) {
         const st=mtGetTypedState(slotIndex),cfg=mtGetGenCfg('self_generate'),signal=mtGeneratorJobs.get(Number(slotIndex))?.controller.signal;
         mtEnsureSelfPipeline(st);
+        const passthroughIds=[];
+        for(let id=1;id<=st.sourceRows.length;id++){
+            if(st.selfTasks[id]?.status!=='done'&&mtSelfShouldPassThrough(st.sourceRows[id-1])){
+                mtSelfAppendPassThrough(st,id);passthroughIds.push(id);
+            }
+        }
+        if(passthroughIds.length){
+            const day=mtGetKoreaDateKey();
+            st.selfDailyGenerated={...(st.selfDailyGenerated||{}),[day]:Math.max(0,Number(st.selfDailyGenerated?.[day]||0))+passthroughIds.length};
+            st.selfDailyProcessedSources={...(st.selfDailyProcessedSources||{}),[day]:Math.max(0,Number(st.selfDailyProcessedSources?.[day]||0))+passthroughIds.length};
+            st.lastRun=Date.now();st.lastError='';mtSelfSyncProgress(st);mtSelfSortRows(slotIndex,st);
+        }
         const now=Date.now(),fresh=[],retries=[];
         for(let id=1;id<=st.sourceRows.length;id++) {
             const t=st.selfTasks[id];
@@ -9432,7 +9477,7 @@ ${JSON.stringify(finalPayload)}`;
             if(ids.length && characters+size>cfg.maxBatchChars)break;
             ids.push(id);characters+=size;if(ids.length>=limit)break;
         }
-        if(!ids.length){mtSelfSyncProgress(st);return false;}
+        if(!ids.length){mtSelfSyncProgress(st);return passthroughIds.length>0;}
         const schema={type:'ARRAY',items:{type:'OBJECT',properties:{source_id:{type:'INTEGER'},cards:{type:'ARRAY',minItems:1,maxItems:24,items:{type:'OBJECT',properties:{korean:{type:'STRING'},english:{type:'STRING'},english_chunks:{type:'ARRAY',items:{type:'STRING'}},korean_chunks:{type:'ARRAY',items:{type:'STRING'}}},required:['korean','english','english_chunks','korean_chunks']}}},required:['source_id','cards']}};
         const prompt=mtGetGenPrompt('self_generate','main')+'\n\n[현재 생성 형식: 이 규칙은 이전 출력 예시보다 우선합니다]\nJSON 배열만 반환하세요. 각 입력 source_id를 정확히 한 번 포함하고 cards에 번역을 넣으세요. cards에는 korean, english, english_chunks, korean_chunks가 필요합니다. 한국어 원문의 글자·숫자는 추가·삭제·수정하지 마세요. 문장 분할과 공백·문장부호 정리만 허용합니다. 분할 카드들을 이어 붙이면 원문 전체가 원래 순서로 보존되어야 합니다. english_chunks를 이어 붙이면 영어문장의 모든 단어가 같은 순서로 포함되어야 합니다. korean_chunks는 같은 수의 한국어 직독직해 어구이며 대괄호와 슬래시를 포함하지 마세요.\n입력:\n'+JSON.stringify(ids.map(id=>({source_id:id,korean:String(st.sourceRows[id-1])})));
         let response,payload;
@@ -9493,7 +9538,7 @@ ${JSON.stringify(finalPayload)}`;
         const cfg=mtGetGenCfg(st.type);let next=Date.now()+(st.type==='self_generate'&&cfg.runMode==='continuous'?Math.max(250,cfg.delaySec*1000):cfg.intervalMin*60000);
         if(st.type==='self_generate'){
             const summary=mtSelfSyncProgress(st);
-            if(st.translationComplete || (!summary.pending&&!summary.retry))return;
+            if(st.translationComplete || (!summary.pending&&!summary.retry&&!mtSelfHasPassThroughWork(st)))return;
             if(!summary.pending)next=Math.max(next,summary.earliest);
         }
         next=Math.max(next,Number(st.generatorRetryAt)||0);
@@ -9508,7 +9553,7 @@ ${JSON.stringify(finalPayload)}`;
         if(!['self_generate','reference_generate'].includes(type)||!st.fileName||st.generatorPaused)return Promise.resolve();
         if(type==='self_generate'){
             const summary=mtSelfSyncProgress(st);
-            if(!summary.pending&&!summary.retry){st.nextRun=null;mtRefreshGeneratorSlot(slot);return Promise.resolve();}
+            if(!summary.pending&&!summary.retry&&!mtSelfHasPassThroughWork(st)){st.nextRun=null;mtRefreshGeneratorSlot(slot);return Promise.resolve();}
         }
         if(mtGeneratorTimers[slot])clearTimeout(mtGeneratorTimers[slot]);delete mtGeneratorTimers[slot];
         const job={controller:new AbortController(),promise:null};
@@ -9557,7 +9602,7 @@ ${JSON.stringify(finalPayload)}`;
             if(mtGeneratorTimers[i])clearTimeout(mtGeneratorTimers[i]);delete mtGeneratorTimers[i];
             const type=mtGetSlotType(i),st=mtGetTypedState(i);
             if(!['self_generate','reference_generate'].includes(type)||!st.fileName||st.generatorPaused||mtGeneratorJobs.has(i))continue;
-            if(type==='self_generate'){const s=mtSelfSyncProgress(st);if(!s.pending&&!s.retry)continue;}
+            if(type==='self_generate'){const s=mtSelfSyncProgress(st);if(!s.pending&&!s.retry&&!mtSelfHasPassThroughWork(st))continue;}
             if(st.nextRun>Date.now())mtGeneratorTimers[i]=setTimeout(()=>mtGeneratorRun(i),st.nextRun-Date.now());else mtGeneratorRun(i);
         }
     }
@@ -9589,7 +9634,10 @@ ${JSON.stringify(finalPayload)}`;
         const actions=document.createElement('div');actions.style.cssText='display:flex;gap:4px;flex-wrap:wrap;margin-top:5px';
         const button=(text,fn)=>{const b=document.createElement('button');b.type='button';b.className='btn-excel';b.textContent=text;b.onclick=e=>{e.stopPropagation();Promise.resolve(fn()).catch(error=>alert(error.message));};actions.appendChild(b);};
         button(st.generatorPaused?'재개':'일시 정지',()=>mtToggleGeneratorPause(slot));
-        if(st.type==='self_generate')button('확인 필요 원문',()=>mtOpenSelfReview(slot));
+        if(st.type==='self_generate'){
+            button('원문',()=>mtDownloadSelfSource(null,slot));
+            button('확인 필요 원문',()=>mtOpenSelfReview(slot));
+        }
         box.appendChild(actions);
     }
     function mtRefreshGeneratorSlot(slot){
@@ -9642,7 +9690,7 @@ ${JSON.stringify(finalPayload)}`;
         const slot=Number(slotIndex),st=mtGetTypedState(slot),wb=XLSX.read(new Uint8Array(await file.arrayBuffer()),{type:'array',cellDates:false});
         if(type==='self_generate'){
             const sh=wb.Sheets[wb.SheetNames[0]],rows=XLSX.utils.sheet_to_json(sh,{header:1,defval:''}),added=mtSelfDetectRows(rows); if(!added.length)throw new Error('추가할 한국어 원문을 찾지 못했습니다.');
-            st.sourceRows=[...(st.sourceRows||[]),...added];st.sourceRowsLock=st.sourceRows.slice();mtSaveTypedState(slot,st);mtInitSlots();await mtGeneratorRun(slot,true);return;
+            const originalRows=Array.isArray(st.sourceRowsOriginal)?st.sourceRowsOriginal.slice():(st.sourceRows||[]).slice();st.sourceRows=[...(st.sourceRows||[]),...added];st.sourceRowsLock=st.sourceRows.slice();st.sourceRowsOriginal=[...originalRows,...added];mtSaveTypedState(slot,st);mtInitSlots();await mtGeneratorRun(slot,true);return;
         }
         if(!wb.SheetNames.includes('차례'))throw new Error('참조형 파일에는 반드시 [차례] 시트가 있어야 합니다.');
         const rows=XLSX.utils.sheet_to_json(wb.Sheets['차례'],{header:1,defval:''}),added=[];for(let i=1;i<rows.length;i++){const r=rows[i]||[];const topic=[r[0],r[1],r[2]].map(v=>String(v??'').trim()).filter(Boolean).join(' - ');if(topic)added.push({text:topic,originalRow:i+1});}if(!added.length)throw new Error('추가할 참조 주제가 없습니다.');
@@ -9701,7 +9749,7 @@ ${JSON.stringify(finalPayload)}`;
             // 생성형 클립보드는 기존 파일 추가 경로를 오용하지 않고 원문/주제 텍스트를 직접 추가한다.
             const slot=Number(mtAddDataSourceSlot), st=mtGetTypedState(slot);
             if(mtAddDataSourceType==='self_generate'){
-                const added=rows.map(r=>String(r?.[0]??'').trim()).filter(Boolean); st.sourceRows=[...(st.sourceRows||[]),...added]; st.sourceRowsLock=st.sourceRows.slice();
+                const added=rows.map(r=>String(r?.[0]??'').trim()).filter(Boolean),originalRows=Array.isArray(st.sourceRowsOriginal)?st.sourceRowsOriginal.slice():(st.sourceRows||[]).slice(); st.sourceRows=[...(st.sourceRows||[]),...added]; st.sourceRowsLock=st.sourceRows.slice();st.sourceRowsOriginal=[...originalRows,...added];
             }else{
                 const added=rows.map((r,i)=>({text:r.map(v=>String(v??'').trim()).filter(Boolean).join(' - '),originalRow:(st.topics||[]).length+i+1})).filter(x=>x.text); st.topics=[...(st.topics||[]),...added]; st.refQueue=[...(st.refQueue||[]),...added].sort(()=>Math.random()-0.5);
             }
@@ -9728,6 +9776,7 @@ ${JSON.stringify(finalPayload)}`;
         state.fileName=String(fileName||'').replace(/\.[^/.]+$/,'').trim()||`자체형 슬롯 ${slot}`;
         state.sourceRows=sourceRows;
         state.sourceRowsLock=sourceRows.slice();
+        state.sourceRowsOriginal=sourceRows.slice();
         state.outputRows=[];
         state.starredSerials=[];
         state.nextSourceIndex=0;state.selfCompletedAhead=[];mtResetSelfPipeline(state);
@@ -9751,7 +9800,7 @@ ${JSON.stringify(finalPayload)}`;
         const state=mtGetTypedState(slot); state.type=type; state.fileName=String(file.name||'').replace(/\.[^/.]+$/,'').trim()||`슬롯 ${slot+1}`; state.outputRows=[];state.starredSerials=[];state.lastSession=null;state.lastError='';state.lastDiagnostic=null;
         if(type==='self_generate'){
             const wb=XLSX.read(new Uint8Array(await file.arrayBuffer()),{type:'array',cellDates:false}); const sh=wb.Sheets[wb.SheetNames[0]]; const rows=XLSX.utils.sheet_to_json(sh,{header:1,defval:''});
-            state.sourceRows=mtSelfDetectRows(rows); state.sourceRowsLock=state.sourceRows.slice(); state.nextSourceIndex=0;state.selfCompletedAhead=[];mtResetSelfPipeline(state); state.retryRows=[]; state.pattern={sourceKorCol:1,engCol:2,subKorCol:3,serialCol:4};
+            state.sourceRows=mtSelfDetectRows(rows); state.sourceRowsLock=state.sourceRows.slice();state.sourceRowsOriginal=state.sourceRows.slice(); state.nextSourceIndex=0;state.selfCompletedAhead=[];mtResetSelfPipeline(state); state.retryRows=[]; state.pattern={sourceKorCol:1,engCol:2,subKorCol:3,serialCol:4};
             if(!state.sourceRows.length) throw new Error('자체형에서 사용할 한국어 원문을 찾지 못했습니다.');
         } else {
             const wb=XLSX.read(new Uint8Array(await file.arrayBuffer()),{type:'array',cellDates:false}); if(!wb.SheetNames.includes('차례'))throw new Error('참조형 파일에는 반드시 [차례] 시트가 있어야 합니다.');
@@ -12184,7 +12233,7 @@ ${JSON.stringify(finalPayload)}`;
   (function syncAppVersionFromFileName(){
     // 파일을 다른 이름으로 저장하거나 브라우저가 경로를 변환해도, 기본 표시가
     // 사라지지 않게 한다. 정상 파일명에서는 아래 값이 자동으로 새 번호로 대체된다.
-    const fallbackVersion='v123';
+    const fallbackVersion='v124';
     let fileName='';
     try{fileName=decodeURIComponent(String(location.pathname||'').split('/').pop()||'');}
     catch(_){fileName=String(location.pathname||'').split('/').pop()||'';}
