@@ -8754,7 +8754,7 @@ ${JSON.stringify(finalPayload)}`;
         const main=document.getElementById('mt-main-menu'), viewer=document.getElementById('mtEbookViewer');
         if(main) main.style.display='none';
         if(viewer) viewer.style.display='block';
-        const backdrop=document.getElementById('mtEbookModalBackdrop'); if(backdrop) backdrop.style.display='none';
+        const backdrop=document.getElementById('mtEbookModalBackdrop'); if(backdrop && !mtEbookTypingActive) backdrop.style.display='none';
         document.getElementById('mtEbookViewerTitle').textContent=st.fileName;
         document.getElementById('mtEbookViewerSubtitle').textContent=mtEbookDisplayMode === 'eng'
             ? `총 ${words.length}문장 · 한 페이지 ${MT_EBOOK_PAGE_SIZE}문장 · 언마스킹 완료 문장만 영어로 표시합니다.`
@@ -8989,10 +8989,30 @@ ${JSON.stringify(finalPayload)}`;
         }
     }
 
+    // 전자책 팝업의 현재 카드 위치와 뒤쪽 목록의 페이지/표시 상태를 실시간으로 맞춥니다.
+    function mtSyncEbookViewerToPopup(slotIndex, listIndex) {
+        const slot = Number(slotIndex);
+        const index = Number(listIndex);
+        if (!Number.isInteger(slot) || !Number.isInteger(index) || index < 0) return;
+
+        const targetPage = Math.floor(index / MT_EBOOK_PAGE_SIZE) + 1;
+        mtSaveEbookPage(slot, targetPage);
+
+        // 팝업은 유지한 채 뒤쪽 전자책 목록만 현재 상태로 다시 렌더링합니다.
+        mtOpenEbookViewer(slot, true);
+
+        requestAnimationFrame(() => {
+            const list = document.getElementById('mtEbookList');
+            const item = list?.querySelector(`.mt-ebook-item[data-index="${index}"]`);
+            if (item) item.scrollIntoView({ block:'center', inline:'nearest' });
+        });
+    }
+
     function mtOpenEbookTyping(slotIndex,index){
         const words=mtGetEbookWords(slotIndex), word=words[index]; if(!word)return;
         mtEbookTypingActive=true; mtEbookActiveSlot=Number(slotIndex); mtActiveSlotIndex=slotIndex;
         mtEbookCurrentListIndex=Number(index);
+        mtSyncEbookViewerToPopup(Number(slotIndex), Number(index));
         mtCurrentStudyWords=[word]; mtCurrentIndex=0;
         mtOriginalSlotData={name:mtGetTypedState(slotIndex).fileName,words:[word],lastSession:null,ebook:true};
         const backdrop=document.getElementById('mtEbookModalBackdrop'); if(backdrop) backdrop.style.display='block';
@@ -10875,6 +10895,17 @@ ${JSON.stringify(finalPayload)}`;
         mtSaveTypedState(slot,st);
         // IndexedDB 스냅샷도 즉시 시작해 localStorage를 못 쓰는 환경까지 보완합니다.
         try{mtPersistTypedSlotStates().catch(e=>console.warn('전자책 완료 상태 영구 저장 실패:',e));}catch(_){}
+
+        // 팝업이 열린 상태라면 완료된 항목이 즉시 회색(read)으로 보이도록
+        // 현재 카드가 있는 목록 페이지를 곧바로 다시 렌더링합니다.
+        if (
+            mtEbookTypingActive &&
+            Number(mtEbookActiveSlot) === slot &&
+            Number.isInteger(mtEbookCurrentListIndex)
+        ) {
+            mtSyncEbookViewerToPopup(slot, mtEbookCurrentListIndex);
+        }
+
         return changed;
     }
 
@@ -10903,19 +10934,25 @@ ${JSON.stringify(finalPayload)}`;
 
     function mtAdvanceEbookAfterEnter() {
         if (!mtEbookTypingActive) return;
-        const slot = mtEbookActiveSlot;
+        const slot = Number(mtEbookActiveSlot);
         const current = mtCurrentStudyWords?.[mtCurrentIndex];
-        const currentOriginalIndex = Number(current?.originalIndex);
-        if (Number.isInteger(currentOriginalIndex)) {
+
+        if (current) {
             mtCommitEbookCompletion(slot,current);
         }
         mtRecordEbookCompletedCardIfReady();
 
         const words = mtGetEbookWords(slot);
-        const nextIndex = Number.isInteger(currentOriginalIndex) ? currentOriginalIndex + 1 : 0;
+        // 원본 행 번호가 아니라 실제 전자책 목록에서 현재 보던 위치를 기준으로 다음 카드로 이동합니다.
+        const currentListIndex = Number.isInteger(mtEbookCurrentListIndex)
+            ? mtEbookCurrentListIndex
+            : Number(current?.originalIndex);
+        const nextIndex = Number.isInteger(currentListIndex) ? currentListIndex + 1 : 0;
+
         if (nextIndex < words.length) {
             // 전자책에서는 Enter 정답 처리 후 곧바로 다음 문장으로 넘어갑니다.
-            mtOpenEbookTyping(Number(slot), nextIndex);
+            // mtOpenEbookTyping 내부에서 목록 페이지도 다음 카드 위치에 맞춰 자동으로 변경됩니다.
+            mtOpenEbookTyping(slot, nextIndex);
         } else {
             // 마지막 문장까지 완료한 경우에만 전자책 목록으로 돌아갑니다.
             mtCloseEbookTyping();
