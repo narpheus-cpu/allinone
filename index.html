@@ -903,6 +903,11 @@
         .board-title-row { cursor: pointer; transition: background-color 0.2s; }
         .board-title-row:hover { background-color: var(--board-hover-bg); }
         .board-content-row { display: none; }
+        .board-exercise-sub { display:block; color:var(--text-sub); margin-top:4px; }
+        .board-exercise-mask { display:flex; flex-wrap:wrap; gap:0 .45em; margin:0 0 8px; }
+        .board-exercise-form { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+        .board-exercise-input { flex:1 1 220px; min-width:0; padding:8px; font:inherit; }
+        .board-exercise-status { min-height:1.7em; margin-top:4px; }
         .board-content-cell {
             padding: 30px 20px; background-color: #f9fafb; color: #111827; line-height: 1.7;
             border-bottom: 1px solid var(--border-color); border-radius: 0 0 8px 8px; font-size: var(--board-base-font-size);
@@ -3336,7 +3341,7 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
         <!-- 메인 화면 -->
         <div id="mt-main-menu" class="mt-main-menu-minimal">
             <div class="mt-slots-grid" id="mtSlotsGrid"></div>
-            <input type="file" id="mtFileUpload" style="display:none;" accept=".xlsx, .xls, .txt" />
+            <input type="file" id="mtFileUpload" style="display:none;" />
         </div>
 
         <!-- 언마스킹 영작 상세 통계 모달 -->
@@ -3392,13 +3397,13 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
     </div>
     <div class="mt-type-option-grid" style="margin-top:16px;">
       <button type="button" class="mt-type-option" onclick="mtStartAddDataFromFile()"><span class="mt-type-option-badge">FILE</span><div class="mt-type-option-title">파일 불러오기</div><div class="mt-type-option-desc">기존 데이터를 유지하고 새 데이터를 추가합니다.</div></button>
-      <button type="button" class="mt-type-option" onclick="mtOpenAddClipboardModal()"><span class="mt-type-option-badge">PASTE</span><div class="mt-type-option-title">클립보드 붙여넣기</div><div class="mt-type-option-desc">탭으로 열이 구분된 데이터를 기존 데이터 뒤에 추가합니다.</div></button>
+      <button type="button" class="mt-type-option" onclick="mtOpenAddClipboardModal()"><span class="mt-type-option-badge">PASTE</span><div class="mt-type-option-title">클립보드 붙여넣기</div><div class="mt-type-option-desc">열이 구분된 데이터를 기존 데이터 뒤에 추가합니다.</div></button>
     </div>
   </div>
 </div>
 <div id="mtAddClipboardModal" class="modal-overlay" style="display:none;">
   <div class="modal-card mt-type-modal-card" style="width:min(640px,94vw);">
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div><div style="font-size:16px;font-weight:800;">클립보드 붙여넣기</div><div style="font-size:11px;color:#64748b;margin-top:3px;">탭으로 열이 구분된 새 데이터를 붙여넣으세요.</div></div><button class="btn-excel" onclick="mtCloseAddClipboardModal()">닫기</button></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div><div style="font-size:16px;font-weight:800;">클립보드 붙여넣기</div><div style="font-size:11px;color:#64748b;margin-top:3px;">표나 열이 구분된 텍스트를 붙여넣으세요.</div></div><button class="btn-excel" onclick="mtCloseAddClipboardModal()">닫기</button></div>
     <textarea id="mtAddClipboardText" style="width:100%;height:220px;margin-top:12px;box-sizing:border-box;padding:9px;border:1px solid #d1d5db;border-radius:8px;resize:vertical;font-size:11px;line-height:1.45;"></textarea>
     <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:8px;"><button class="btn-excel" onclick="mtPasteIntoAddClipboard()">클립보드에서 붙여넣기</button><button class="btn-download" onclick="mtConfirmAddClipboard()">추가</button></div>
   </div>
@@ -3431,12 +3436,12 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
                     <button type="button" class="mt-type-option" onclick="mtNormalImportFromFile()">
                         <span class="mt-type-option-badge">FILE</span>
                         <div class="mt-type-option-title">파일 불러오기</div>
-                        <div id="mtNormalImportFileDesc" class="mt-type-option-desc">Excel(.xlsx/.xls) 또는 탭으로 구분된 TXT 파일을 불러옵니다.</div>
+                        <div id="mtNormalImportFileDesc" class="mt-type-option-desc">Excel, TSV, CSV 또는 열이 구분된 텍스트 파일을 불러옵니다.</div>
                     </button>
                     <button type="button" class="mt-type-option" onclick="mtOpenNormalClipboardModal()">
                         <span class="mt-type-option-badge">PASTE</span>
                         <div class="mt-type-option-title">클립보드 붙여넣기</div>
-                        <div id="mtNormalImportPasteDesc" class="mt-type-option-desc">탭(\t)으로 열이 구분된 텍스트를 붙여넣어 바로 카드로 등록합니다.</div>
+                        <div id="mtNormalImportPasteDesc" class="mt-type-option-desc">표나 열이 구분된 텍스트를 붙여넣습니다.</div>
                     </button>
                 </div>
             </div>
@@ -3475,7 +3480,7 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
                 <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
                     <div>
                         <div id="mtNormalClipboardTitle" style="font-size:16px;font-weight:800;color:#111827;">클립보드 텍스트 붙여넣기</div>
-                        <div id="mtNormalClipboardSubtitle" style="font-size:11px;color:#64748b;margin-top:3px;">행은 줄바꿈, 열은 탭(\t)으로 구분된 내용을 붙여넣으세요.</div>
+                        <div id="mtNormalClipboardSubtitle" style="font-size:11px;color:#64748b;margin-top:3px;">스프레드시트에서 복사한 표나 구분자로 나뉜 텍스트를 붙여넣으세요.</div>
                     </div>
                     <button class="btn-excel" type="button" onclick="mtCloseNormalClipboardModal()">닫기</button>
                 </div>
@@ -3615,32 +3620,6 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px; gap: 10px;">
                     <button class="btn-excel" style="flex: 1; padding: 10px;" onclick="mtCloseModal()">취소</button>
                     <button class="btn-primary" style="flex: 1; padding: 10px;" onclick="mtApplyOptionsAndStart()">시작하기</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- 다중 열 선택 모달 -->
-        <div id="mtColumnSelectModal" class="modal-overlay">
-            <div class="modal-card" style="width: 350px;">
-                <div style="font-weight: 700; font-size: 15px; color: #111827; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 15px;">열 선택 (다중 한국어 감지)</div>
-                <p style="font-size:12px; color:#666; margin-top:0;">한국어 열이 2개 이상 감지되었습니다. 각 항목에 사용할 열을 지정해 주세요.</p>
-
-                <div style="margin-bottom:10px;">
-                    <label style="font-size:13px; font-weight:600; display:block; margin-bottom:4px;">주문장 (한국어)</label>
-                    <select id="mtColMainKor" style="width:100%; padding:6px; border-radius:4px; border:1px solid var(--border-color); outline:none; font-size:13px;"></select>
-                </div>
-                <div style="margin-bottom:10px;">
-                    <label style="font-size:13px; font-weight:600; display:block; margin-bottom:4px;">보조문장 (한국어 직독직해 청크)</label>
-                    <select id="mtColSubKor" style="width:100%; padding:6px; border-radius:4px; border:1px solid var(--border-color); outline:none; font-size:13px;"></select>
-                </div>
-                <div style="margin-bottom:20px;">
-                    <label style="font-size:13px; font-weight:600; display:block; margin-bottom:4px;">영어문장 (마스킹 대상)</label>
-                    <select id="mtColEng" style="width:100%; padding:6px; border-radius:4px; border:1px solid var(--border-color); outline:none; font-size:13px;"></select>
-                </div>
-
-                <div style="display:flex; justify-content:space-between; gap:10px;">
-                    <button class="btn-excel" style="flex:1; padding:8px;" onclick="document.getElementById('mtColumnSelectModal').style.display='none'">취소</button>
-                    <button class="btn-primary" style="flex:1; padding:8px;" onclick="mtConfirmColumnSelect()">적용</button>
                 </div>
             </div>
         </div>
@@ -3952,7 +3931,7 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
                         <option value="euc-kr">EUC-KR (엑셀/윈도우)</option>
                         <option value="utf-16le">UTF-16</option>
                     </select>
-                    <input type="file" id="boardFileInput" accept=".xlsx, .xls, .csv, .txt">
+                    <input type="file" id="boardFileInput">
                 </div>
                 <div class="board-upload-row">
                     <textarea id="boardPasteInput" class="board-paste-area" placeholder="이곳에 텍스트를 복사하여 붙여넣기 한 뒤 우측 버튼을 누르세요."></textarea>
@@ -6224,15 +6203,165 @@ Rules:
     /* ========================================== */
     /* 4. 언마스킹 영작 기능 관리             */
     /* ========================================== */
-    let mtCurrentUploadedFileName = ""; 
     let mtActiveSlotIndex = null;
     let mtOriginalSlotData = null; 
     let mtCurrentStudyWords = []; 
     let mtCurrentIndex = 0;
     let mtRevealedSet = new Set(); 
     let mtCardHadDirectTyping = false;
-    let mtTempParsedData = null;
+    let mtNormalColumnTemp = null;
     let mtEbookTemp = null;
+    const MT_EXERCISE_COLUMNS = {main:2, sub:3, answer:4};
+    const mtCellText = value => String(value ?? '').trim();
+
+    function mtIsExerciseHeader(row) {
+        const key = value => mtCellText(value).toLowerCase().replace(/[\s_-]+/g, '');
+        return /^(?:한국어원문|원문한국어)$/.test(key(row?.[2])) &&
+            /^(?:영작용한국어|영작한국어)$/.test(key(row?.[3])) &&
+            /^(?:a2)?(?:영어)?모범답안$/.test(key(row?.[4]));
+    }
+
+    function mtIsExerciseTable(rows) {
+        const sample = rows.slice(0, 20);
+        if (sample.some(mtIsExerciseHeader)) return true;
+        const candidates = sample.filter(row => row.length >= 5 && mtCellText(row[2]) && mtCellText(row[4]));
+        const matches = candidates.filter(row =>
+            [row[0], row[1]].every(value => /^(?:\d+(?:[.-]\d+)*)?$/.test(mtCellText(value))) &&
+            /[가-힣]/.test(mtCellText(row[2])) &&
+            /[가-힣]/.test(mtCellText(row[3])) &&
+            /[a-z]/i.test(mtCellText(row[4])) && !/[가-힣]/.test(mtCellText(row[4])));
+        return matches.length > 0 && matches.length >= Math.ceil(candidates.length * 0.8);
+    }
+
+    function mtBracketExercisePrompt(value) {
+        const text = mtCellText(value);
+        return !text || (text.startsWith('[') && text.endsWith(']')) ? text : '[' + text + ']';
+    }
+
+    function mtIsExportTableHeader(row) {
+        const labels = row.map(value => mtCellText(value).toLowerCase());
+        return labels.some(value => value === 'no' || value === '번호') &&
+            labels.some(value => value.includes('한국어') || value.includes('주문장')) &&
+            labels.some(value => value.includes('영어'));
+    }
+
+    function mtDecodeTableText(bytes, encoding = 'auto') {
+        let result;
+        if (encoding !== 'auto') result = new TextDecoder(encoding).decode(bytes);
+        else if (bytes[0] === 0xff && bytes[1] === 0xfe) result = new TextDecoder('utf-16le').decode(bytes);
+        else if (bytes[0] === 0xfe && bytes[1] === 0xff) result = new TextDecoder('utf-16be').decode(bytes);
+        else {
+            try { result = new TextDecoder('utf-8', {fatal:true}).decode(bytes); }
+            catch (_) { result = new TextDecoder('euc-kr').decode(bytes); }
+        }
+        return result.replace(/^\uFEFF/, '').normalize('NFC');
+    }
+
+    function mtParseDelimitedRows(text, separator, limit = Infinity) {
+        const rows = [];
+        let row = [], field = '', quoted = false;
+        const finishRow = () => {
+            row.push(field);
+            if (row.some(value => value.trim())) rows.push(row);
+            row = [];
+            field = '';
+        };
+        for (let index = 0; index < text.length && rows.length < limit; index++) {
+            const char = text[index], next = text[index + 1];
+            if (quoted) {
+                if (char === '"' && next === '"') {
+                    field += '"';
+                    index++;
+                } else if (char === '"' && (next === separator || next === '\n' || next === '\r' || next === undefined)) {
+                    quoted = false;
+                } else field += char;
+            } else if (char === separator) {
+                row.push(field);
+                field = '';
+            } else if (char === '\n' || char === '\r') {
+                finishRow();
+                if (char === '\r' && next === '\n') index++;
+            } else if (char === '"' && !field && text.indexOf('"', index + 1) !== -1) {
+                quoted = true;
+            } else field += char;
+        }
+        if (rows.length < limit) finishRow();
+        return rows;
+    }
+
+    function mtReadDelimitedTable(value, extension = '') {
+        const text = String(value ?? '').replace(/^\uFEFF/, '').normalize('NFC');
+        const directive = /^sep=(.)\r?\n/i.exec(text);
+        if (directive) return mtParseDelimitedRows(text.slice(directive[0].length), directive[1]);
+        const preferred = ({tsv:'\t', tab:'\t', csv:',', scv:',', psv:'|'})[extension];
+        const separators = new Set([preferred, '\t', ',', ';', '|', '\x1f', ':'].filter(Boolean));
+        let bestSeparator = preferred || '\t', bestScore = 0;
+        for (const separator of separators) {
+            if (!text.includes(separator)) continue;
+            const sample = mtParseDelimitedRows(text, separator, 20);
+            if (mtIsExerciseTable(sample)) return mtParseDelimitedRows(text, separator);
+            const widths = new Map();
+            for (const row of sample) {
+                if (row.length > 1) widths.set(row.length, (widths.get(row.length) || 0) + 1);
+            }
+            const matchingRows = Math.max(0, ...widths.values());
+            const score = matchingRows / Math.max(1, sample.length);
+            if (score > bestScore) {
+                bestScore = score;
+                bestSeparator = separator;
+            }
+        }
+        return mtParseDelimitedRows(text, bestSeparator);
+    }
+
+    function mtWorkbookTableRows(sheet, formatted = false) {
+        if (!sheet?.['!ref']) return [];
+        const range = XLSX.utils.decode_range(sheet['!ref']);
+        range.s.c = 0;
+        return XLSX.utils.sheet_to_json(sheet, {header:1, defval:'', blankrows:false, raw:!formatted, range});
+    }
+
+    async function mtReadImportTable(file, {encoding = 'auto', ebook = false} = {}) {
+        const extension = String(file.name || '').split('.').pop().toLowerCase();
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        const spreadsheet = /^(?:xlsx|xlsm|xlsb|xls|xltx|xltm|xlt|ods|fods|uos|numbers|sylk|slk|dif|dbf|prn|wk[1-4]|wks|qpw|123|xml|html|htm)$/.test(extension) ||
+            (bytes[0] === 0x50 && bytes[1] === 0x4b) || (bytes[0] === 0xd0 && bytes[1] === 0xcf);
+        if (!spreadsheet) return mtReadDelimitedTable(mtDecodeTableText(bytes, encoding), extension);
+        if (typeof XLSX === 'undefined') throw new Error('스프레드시트 처리 모듈을 불러오지 못했습니다.');
+
+        const workbook = XLSX.read(bytes, {type:'array', cellDates:false});
+        let fallback = null;
+        for (const name of workbook.SheetNames) {
+            const rows = mtWorkbookTableRows(workbook.Sheets[name], ebook);
+            if (!rows.length) continue;
+            if (mtIsExerciseTable(rows)) return rows;
+            const hasStars = ebook && rows.slice(0, 3).some(row => row.some(value => mtCellText(value) === '중요'));
+            if (!fallback || (hasStars && !fallback.hasStars)) fallback = {rows, hasStars};
+        }
+        return fallback?.rows || [];
+    }
+
+    function mtImportCardRows(rows, mainCol, subCol, engCol) {
+        const exercise = mtIsExerciseTable(rows) && mainCol === MT_EXERCISE_COLUMNS.main &&
+            subCol === MT_EXERCISE_COLUMNS.sub && engCol === MT_EXERCISE_COLUMNS.answer;
+        const headerIndex = rows.findIndex((row, index) => mtIsExerciseHeader(row) || (index === 0 && mtIsExportTableHeader(row)));
+        const header = rows[headerIndex] || [];
+        const importantCol = header.findIndex(value => /^(중요|별표|important|star)$/i.test(mtCellText(value)));
+        const cards = [], sourceRows = [];
+        for (const row of rows.slice(headerIndex + 1)) {
+            if (mtIsExerciseHeader(row)) continue;
+            const kor = mtCellText(row[mainCol]), eng = mtCellText(row[engCol]).replace(/\s+/g, ' ');
+            if (!kor || !eng) continue;
+            const sub = mtCellText(row[subCol]);
+            sourceRows.push(row);
+            cards.push({
+                exercise,
+                kor, eng, subKor:exercise ? mtBracketExercisePrompt(sub) : sub,
+                starred:importantCol >= 0 && mtCellText(row[importantCol]).includes('★')
+            });
+        }
+        return {cards, sourceRows};
+    }
     // 일반형·전자책·자체형의 최초 등록에서 공통으로 쓰는 입력 출처 상태입니다.
     let mtInitialImportSlot = null;
     let mtInitialImportType = 'normal';
@@ -6246,8 +6375,8 @@ Rules:
         const pasteDesc=document.getElementById('mtNormalImportPasteDesc');
         if(title) title.textContent=isSelf?'자체형 입력 방법':(mtInitialImportType==='ebook'?'전자책 입력 방법':'일반 입력 방법');
         if(sub) sub.textContent=isSelf?'한국어 원문을 일반 TXT 파일 또는 줄바꿈 텍스트로 가져오세요. 첫 줄부터 내용으로 처리합니다.':(mtInitialImportType==='ebook'?'파일 또는 클립보드에서 전자책 문장을 가져오세요.':'파일 또는 클립보드에서 문장을 가져오세요.');
-        if(fileDesc) fileDesc.textContent=isSelf?'한 줄에 한국어 원문 하나가 들어 있는 일반 TXT 파일을 불러옵니다. 탭과 헤더는 필요하지 않습니다.':'Excel(.xlsx/.xls) 또는 탭으로 구분된 TXT 파일을 불러옵니다.';
-        if(pasteDesc) pasteDesc.textContent=isSelf?'한국어 원문을 한 줄에 하나씩 붙여넣습니다. 첫 줄도 헤더가 아닌 내용으로 등록됩니다.':'탭(\\t)으로 열이 구분된 텍스트를 붙여넣어 바로 카드로 등록합니다.';
+        if(fileDesc) fileDesc.textContent=isSelf?'한 줄에 한국어 원문 하나가 들어 있는 일반 TXT 파일을 불러옵니다. 탭과 헤더는 필요하지 않습니다.':'Excel, TSV, CSV 또는 열이 구분된 텍스트 파일을 불러옵니다.';
+        if(pasteDesc) pasteDesc.textContent=isSelf?'한국어 원문을 한 줄에 하나씩 붙여넣습니다. 첫 줄도 헤더가 아닌 내용으로 등록됩니다.':'표나 열이 구분된 텍스트를 붙여넣습니다.';
         const modal=document.getElementById('mtNormalImportSourceModal'); if(modal) modal.style.display='flex';
     }
     function mtCloseNormalImportSourceModal(){const modal=document.getElementById('mtNormalImportSourceModal');if(modal)modal.style.display='none';}
@@ -6258,29 +6387,26 @@ Rules:
         const title=document.getElementById('mtNormalClipboardTitle'),sub=document.getElementById('mtNormalClipboardSubtitle');
         if(source)source.style.display='none';
         if(title)title.textContent=isSelf?'자체형 한국어 원문 붙여넣기':'클립보드 텍스트 붙여넣기';
-        if(sub)sub.textContent=isSelf?'한국어 원문을 한 줄에 하나씩 입력하세요. 첫 줄부터 모두 번역 대상으로 등록됩니다.':'행은 줄바꿈, 열은 탭(\\t)으로 구분된 내용을 붙여넣으세요.';
+        if(sub)sub.textContent=isSelf?'한국어 원문을 한 줄에 하나씩 입력하세요. 첫 줄부터 모두 번역 대상으로 등록됩니다.':'스프레드시트에서 복사한 표나 구분자로 나뉜 텍스트를 붙여넣으세요.';
         if(ta){ta.value='';ta.placeholder=isSelf?'첫 번째 한국어 원문\n두 번째 한국어 원문\n세 번째 한국어 원문':'1열\\t2열\\t3열\n오빠!\\tOppa!\\t[오빠!]\n응?\\tYeah?\\t[응?]';}
         if(name)name.value='';if(modal)modal.style.display='flex';setTimeout(()=>name?.focus(),0);
     }
     function mtCloseNormalClipboardModal(){const modal=document.getElementById('mtNormalClipboardModal');if(modal)modal.style.display='none';}
     async function mtPasteFromSystemClipboard(){const ta=document.getElementById('mtNormalClipboardText');if(!ta)return;try{ta.value=await navigator.clipboard.readText();}catch(_){alert('브라우저에서 클립보드 읽기가 차단되었습니다. 텍스트를 직접 붙여넣어 주세요.');}}
     async function mtRegisterNormalClipboardText(){
-        const raw=String(document.getElementById('mtNormalClipboardText')?.value||'').replace(/^\uFEFF/,'').normalize('NFC').trim();
-        if(!raw)return alert('등록할 텍스트가 없습니다.');
-        if(!Number.isInteger(mtInitialImportSlot))return alert('등록할 슬롯을 찾지 못했습니다. 다시 시도해 주세요.');
-        const slot=mtInitialImportSlot,type=mtInitialImportType;
-        const typeName=type==='ebook'?'전자책':(type==='self_generate'?'자체형':'일반');
-        const slotName=String(document.getElementById('mtInitialSlotName')?.value||'').trim() || `${typeName} 슬롯 ${slot}`;
-        mtCloseNormalClipboardModal();
-        if(type==='self_generate'){
-            try{await mtRegisterSelfGenerateText(raw,slot,slotName);}catch(e){alert(`자체형 원문 등록 중 오류가 발생했습니다.\n${e?.message||e}`);}return;
+        const raw = String(document.getElementById('mtNormalClipboardText')?.value || '');
+        if (!raw.trim()) return alert('등록할 텍스트가 없습니다.');
+        if (!Number.isInteger(mtInitialImportSlot)) return alert('등록할 슬롯을 찾지 못했습니다. 다시 시도해 주세요.');
+        const slot = mtInitialImportSlot, type = mtInitialImportType;
+        const typeName = mtGetSlotTypeLabel(type);
+        const slotName = mtCellText(document.getElementById('mtInitialSlotName')?.value) || typeName + ' 슬롯 ' + slot;
+        try {
+            if (type === 'self_generate') await mtRegisterSelfGenerateText(raw, slot, slotName);
+            else mtRegisterStudyTable(mtReadDelimitedTable(raw), slot, slotName, type);
+            mtCloseNormalClipboardModal();
+        } catch (err) {
+            alert('텍스트 등록 중 오류가 발생했습니다.\n' + (err.message || err));
         }
-        const rows=raw.split(/\r?\n/).filter(x=>x.trim()!=='').map(x=>x.split('\t'));
-        if(!rows.length)return alert('등록할 텍스트가 없습니다.');
-        if(type==='ebook'){
-            const state=mtGetTypedState(slot);state.type='ebook';state.fileName=slotName;mtSetSlotType(slot,'ebook');mtSaveTypedState(slot,state);
-            mtEbookTemp={slotIndex:slot,fileName:state.fileName,rows,sourceSheetName:'클립보드',addMode:false};mtOpenEbookColumnModal(rows);
-        }else mtRegisterNormalRows(rows,slot,slotName,'clipboard');
     }
     let mtEbookTypingActive = false;
     let mtEbookActiveSlot = null;
@@ -7218,7 +7344,7 @@ Rules:
                 // 전자책은 별표가 outputRows가 아니라 starredSerials에 저장됩니다.
                 // 목록용 단어 객체에도 starred 값을 넣어 모아보기 집계에서 빠지지 않게 합니다.
                 const words=mtGetEbookWords(i);
-                words.forEach((w,idx)=>{if(w?.starred)all.push({kor:w.kor,eng:w.eng,subKor:w.subKor,starred:true,originalIndex:idx,sourceSlot:i,sourceIndex:idx,serial:w.serial});});
+                words.forEach((w,idx)=>{if(w?.starred)all.push({...w,originalIndex:idx,sourceSlot:i,sourceIndex:idx});});
                 continue;
             }
             if(type==='self_generate'||type==='reference_generate'){
@@ -7226,7 +7352,7 @@ Rules:
                 continue;
             }
             const parsed=mtGetNormalSlotSync(i);
-            if(parsed){const words=Array.isArray(parsed)?parsed:(parsed.words||[]);words.forEach((w,idx)=>{if(w?.starred)all.push({kor:w.kor,eng:w.eng,starred:true,originalIndex:idx,sourceSlot:i,sourceIndex:idx});})}
+            if(parsed){const words=Array.isArray(parsed)?parsed:(parsed.words||[]);words.forEach((w,idx)=>{if(w?.starred)all.push({kor:w.kor,eng:w.eng,subKor:w.subKor,exercise:w.exercise,starred:true,originalIndex:idx,sourceSlot:i,sourceIndex:idx});})}
         }
         return all;
     }
@@ -8220,43 +8346,25 @@ ${JSON.stringify(finalPayload)}`;
     function mtTriggerUpload(slotIndex,typeOverride){
         const slot=Number(slotIndex);if(!Number.isInteger(slot)||slot<1||slot>11)return;
         mtActiveSlotIndex=slot; const input=document.getElementById('mtFileUpload');if(!input)return;
+        delete input.dataset.mtAddMode;
+        delete input.dataset.mtGenAppend;
         if(typeOverride) input.dataset.mtPendingType=String(typeOverride); else delete input.dataset.mtPendingType;
         input.value='';input.click();
     }
 
-    async function mtEbookHandleFile(file, slotIndex){
-        const idx = Number(slotIndex);
-        if (!Number.isInteger(idx) || idx < 0) throw new Error('전자책 슬롯 번호가 올바르지 않습니다.');
-        if (typeof XLSX === 'undefined') throw new Error('엑셀 처리 모듈을 불러오지 못했습니다.');
-        const data = new Uint8Array(await file.arrayBuffer());
-        const wb = XLSX.read(data, {type:'array', cellDates:false});
-        if (!wb.SheetNames || wb.SheetNames.length === 0) throw new Error('엑셀 파일에 시트가 없습니다.');
-
-        // 앱 자체 내보내기 파일은 [전자책원본]과 별표가 포함된 [전자책] 시트를 함께 가집니다.
-        // 별표 이력을 복원할 수 있도록 [중요] 열이 있는 시트를 우선 사용합니다.
-        const exportCandidate = wb.SheetNames.find(name => {
-            const sh = wb.Sheets[name];
-            if (!sh) return false;
-            const probe = XLSX.utils.sheet_to_json(sh, {header:1, defval:'', raw:false}).slice(0,3);
-            return probe.some(r => Array.isArray(r) && r.some(v => String(v ?? '').trim() === '중요'));
-        });
-        const sheetName = exportCandidate || wb.SheetNames[0];
-        const sheet = wb.Sheets[sheetName];
-        if (!sheet) throw new Error('전자책 데이터를 읽을 수 없습니다.');
-        const rows = XLSX.utils.sheet_to_json(sheet, {header:1, defval:'', raw:false})
-            .map(r => Array.isArray(r) ? r.map(v => v == null ? '' : String(v)) : [])
-            .filter(r => r.some(v => String(v).trim() !== ''));
-        if (!rows.length) throw new Error('전자책 시트에 데이터가 없습니다.');
-        const state = mtGetTypedState(idx);
-        state.type = 'ebook';
-        state.fileName = String(file.name || '').replace(/\.[^/.]+$/, '').trim() || `슬롯 ${idx+1}`;
-        mtSetSlotType(idx, 'ebook');
-        mtSaveTypedState(idx, state);
-        mtEbookTemp = {slotIndex:idx, fileName:state.fileName, rows, sourceSheetName:sheetName};
-        mtOpenEbookColumnModal(rows);
+    function mtRegisterStudyTable(rows, slot, name, type, addMode = false) {
+        if (!rows.length) throw new Error('불러올 표 데이터가 없습니다.');
+        if (type === 'ebook') {
+            mtEbookTemp = {slotIndex:slot, fileName:name, rows, addMode};
+            if (mtIsExerciseTable(rows)) {
+                const {main, sub, answer} = MT_EXERCISE_COLUMNS;
+                mtApplyEbookColumns(main, sub, answer);
+            } else mtOpenEbookColumnModal(rows);
+        } else {
+            mtRegisterNormalRows(rows, slot, name, addMode);
+        }
     }
 
-    
     function mtOpenTypeChangeModal(slotIndex){
         const slot=Number(slotIndex); if(!Number.isInteger(slot))return;
         const type=mtGetSlotType(slot)||''; const m=document.getElementById('mtTypeChangeModal'); if(!m)return;
@@ -8302,25 +8410,18 @@ ${JSON.stringify(finalPayload)}`;
         }catch(e){alert(`유형 변경 중 오류가 발생했습니다.\n${e?.message||e}`);}
     }
 
-    function mtRegisterNormalRows(rows,slotIndex,fileName,sourceType='file'){
-        const prepared=mtDetectAndRemoveHeaderRows(rows);
-        if(!prepared.length) throw new Error('일반에서 사용할 데이터가 없습니다.');
-        // 모든 행을 실제 최대 열 수까지 정규화합니다. 1~N열 어느 위치든 안전하게 선택할 수 있습니다.
-        const maxCols=Math.max(1,...prepared.map(r=>Array.isArray(r)?r.length:0));
-        const normalized=prepared.map(r=>{
-            const src=Array.isArray(r)?r:[];
-            const row=new Array(maxCols).fill('');
-            for(let i=0;i<src.length && i<maxCols;i++) row[i]=src[i];
-            return row;
-        });
-        mtNormalColumnTemp={rows:normalized,slotIndex:Number(slotIndex),fileName:String(fileName||''),sourceType:String(sourceType||'file'),maxCols};
-        mtOpenNormalColumnSelectModal(normalized);
+    function mtRegisterNormalRows(rows, slotIndex, fileName, addMode){
+        mtNormalColumnTemp = {rows, slotIndex, fileName, addMode};
+        if (mtIsExerciseTable(rows)) {
+            const {main, sub, answer} = MT_EXERCISE_COLUMNS;
+            mtApplyNormalColumns(main, sub, answer);
+        } else mtOpenNormalColumnSelectModal(rows);
     }
 
     function mtOpenNormalColumnSelectModal(rows){
         const modal=document.getElementById('mtNormalColumnSelectModal');
         if(!modal) throw new Error('일반 열 선택 화면을 불러오지 못했습니다.');
-        const maxCols=Math.max(1,...rows.map(r=>Array.isArray(r)?r.length:0));
+        const maxCols = rows.reduce((width, row) => Math.max(width, row.length), 1);
         const buildOptions=(allowNone=false)=>{
             let html=allowNone?'<option value="-1">선택 안 함</option>':'';
             for(let c=0;c<maxCols;c++){
@@ -8358,10 +8459,11 @@ ${JSON.stringify(finalPayload)}`;
         const headerIndex=(patterns)=>exportHeader.findIndex(v=>patterns.some(p=>v===p||v.includes(p)));
         let mainIdx=headerIndex(['한국어','주문장','korean','main','의미']);
         let engIdx=headerIndex(['영어','영어문장','english','translation','eng']);
-        let subIdx=headerIndex(['보조문장','직독직해','힌트','sub','literal','masking']);
+        let subIdx=headerIndex(['보조문장','직독직해','한국어청크','힌트','sub','literal','masking']);
         if(mainIdx<0) mainIdx=koCols[0]?.c ?? 0;
-        if(subIdx<0) subIdx=koCols.find(x=>x.c!==mainIdx)?.c ?? -1;
-        if(engIdx<0) engIdx=enCols.find(x=>x.c!==mainIdx && x.c!==subIdx)?.c ?? enCols[0]?.c ?? Math.min(1,maxCols-1);
+        if(subIdx<0) subIdx=koCols.find(x=>x.c!==mainIdx && x.c!==engIdx && x.ko>0)?.c ?? -1;
+        if(engIdx<0) engIdx=enCols.find(x=>x.c!==mainIdx && x.c!==subIdx && x.en>0)?.c ?? (mainIdx===0?Math.min(1,maxCols-1):0);
+        if(engIdx===subIdx) subIdx=-1;
         main.value=String(mainIdx);
         sub.value=String(subIdx);
         eng.value=String(engIdx);
@@ -8376,125 +8478,88 @@ ${JSON.stringify(finalPayload)}`;
         mtNormalColumnTemp=null;
     }
 
-    function mtConfirmNormalColumnSelect(){
-        try {
-            if(!mtNormalColumnTemp){ alert('불러온 데이터가 없습니다. 파일 또는 클립보드를 다시 선택해 주세요.'); return; }
-            const mainEl=document.getElementById('mtNormalMainCol');
-            const subEl=document.getElementById('mtNormalSubCol');
-            const engEl=document.getElementById('mtNormalEngCol');
-            if(!mainEl||!subEl||!engEl) throw new Error('열 선택 입력칸을 찾을 수 없습니다.');
-            const mainIdx=parseInt(mainEl.value,10);
-            const subIdx=parseInt(subEl.value,10);
-            const engIdx=parseInt(engEl.value,10);
-            if(!Number.isInteger(mainIdx)||mainIdx<0) { alert('주문장 열을 선택해 주세요.'); return; }
-            if(!Number.isInteger(engIdx)||engIdx<0) { alert('영어문장 열을 선택해 주세요.'); return; }
-            if(subIdx===mainIdx) { alert('보조문장 열은 주문장 열과 다른 열을 선택해 주세요.'); return; }
-
-            const rows=Array.isArray(mtNormalColumnTemp.rows)?mtNormalColumnTemp.rows:[];
-            const slot=Number(mtNormalColumnTemp.slotIndex);
-            const rawName=String(mtNormalColumnTemp.fileName||'');
-            const sourceType=String(mtNormalColumnTemp.sourceType||'file');
-            const maxCols=Math.max(1,Number(mtNormalColumnTemp.maxCols)||0,...rows.map(r=>Array.isArray(r)?r.length:0));
-            if(mainIdx>=maxCols || engIdx>=maxCols || (subIdx>=0 && subIdx>=maxCols)) {
-                alert(`선택한 열이 없습니다. 현재 데이터는 ${maxCols}열까지 있습니다.`); return;
-            }
-
-            const normalize=v=>String(v??'').trim();
-            const fixedRows=rows.map(src=>{
-                const out=new Array(maxCols).fill('');
-                const a=Array.isArray(src)?src:[];
-                for(let i=0;i<a.length && i<maxCols;i++) out[i]=a[i];
-                return out;
-            });
-            const firstLower=(fixedRows[0]||[]).map(normalize).map(v=>v.toLowerCase());
-            const looksLikeExportHeader=firstLower.some(v=>v==='no'||v==='번호') && firstLower.some(v=>v.includes('한국어')) && firstLower.some(v=>v.includes('영어'));
-            const start=looksLikeExportHeader?1:0;
-            const words=[];
-            const baseId=Date.now();
-            for(let i=start;i<fixedRows.length;i++){
-                const r=fixedRows[i]||[];
-                const kor=normalize(r[mainIdx]);
-                const sub=subIdx>=0?normalize(r[subIdx]):'';
-                const eng=normalize(r[engIdx]);
-                if(!kor||!eng) continue;
-                const serial=String(words.length+1);
-                const starCell=normalize(r[1]);
-                words.push({id:baseId+words.length,number:serial,createdAt:Date.now(),eng,kor,subKor:sub,score:0,lastQueriedAt:0,selected:false,isEditing:false,starred:/★/.test(starCell)});
-            }
-            if(!words.length) throw new Error(`선택한 열에서 주문장과 영어문장 데이터를 찾지 못했습니다. (주문장=${mainIdx+1}열, 영어문장=${engIdx+1}열)`);
-
-            // 붙여넣기 최초 등록 시 사용자가 입력한 슬롯 이름을 최우선으로 사용합니다.
-            const displayName=String(rawName).replace(/\.[^/.]+$/,'').trim()
-                || (sourceType==='clipboard' ? normalize(fixedRows[0]?.[0]) : '')
-                || `슬롯 ${slot+1}`;
-            const stored={name:displayName,words,lastSession:null,type:'normal',completedMaskKeys:[],columnPattern:{mainKorCol:mainIdx+1,subKorCol:subIdx>=0?subIdx+1:null,engCol:engIdx+1}};
-            mtSetNormalSlotSync(slot, stored);
-            mtSetSlotType(slot,'normal');
-            mtNormalColumnTemp=null;
-            const modal=document.getElementById('mtNormalColumnSelectModal'); if(modal) modal.style.display='none';
-            // 전체 슬롯 재렌더링은 실패해도 가져오기 자체는 성공하도록 분리합니다.
-            try { mtInitSlots(); } catch(renderErr) { console.error('[일반] 슬롯 렌더링 오류:',renderErr); }
-            alert(`[슬롯 ${slot+1}] 일반 ${words.length}개 카드 등록 완료!`);
-        } catch(err) {
-            console.error('[일반 열 적용 오류]',err);
-            alert(`일반 데이터 적용 중 오류가 발생했습니다.\n${err?.message||String(err)}`);
-        }
+    function mtConfirmNormalColumnSelect() {
+        const main = Number(document.getElementById('mtNormalMainCol').value);
+        const sub = Number(document.getElementById('mtNormalSubCol').value);
+        const eng = Number(document.getElementById('mtNormalEngCol').value);
+        try { mtApplyNormalColumns(main, sub, eng); }
+        catch (err) { alert('일반 데이터 적용 중 오류가 발생했습니다.\n' + (err.message || err)); }
     }
 
-    
+    function mtApplyNormalColumns(main, sub, eng) {
+        if (!mtNormalColumnTemp) throw new Error('불러온 데이터가 없습니다.');
+        if (main === eng || main === sub || eng === sub) throw new Error('각 문장에 서로 다른 열을 선택해 주세요.');
+        const {rows, slotIndex:slot, fileName, addMode} = mtNormalColumnTemp;
+        const {cards} = mtImportCardRows(rows, main, sub, eng);
+        if (!cards.length) throw new Error('주문장과 영어문장을 함께 가진 행을 찾지 못했습니다.');
+
+        const existing = addMode ? mtGetNormalSlotSync(slot) : null;
+        const priorWords = existing?.words || [];
+        const now = Date.now();
+        const words = cards.map((card, index) => {
+            const originalIndex = priorWords.length + index;
+            return {...card, id:now + index, number:String(originalIndex + 1), createdAt:now,
+                originalIndex, score:0, lastQueriedAt:0, selected:false, isEditing:false};
+        });
+        const columnPattern = {mainKorCol:main+1, subKorCol:sub>=0?sub+1:null, engCol:eng+1};
+        const stored = {
+            name:fileName || '슬롯 ' + slot, type:'normal', completedMaskKeys:[],
+            ...existing, words:priorWords.concat(words), lastSession:null, columnPattern
+        };
+        mtSetNormalSlotSync(slot, stored);
+        mtSetSlotType(slot, 'normal');
+        mtCloseNormalColumnSelectModal();
+        mtInitSlots();
+        alert('[슬롯 ' + slot + '] 일반 카드 ' + words.length + '개를 ' + (addMode ? '추가했습니다.' : '등록했습니다.'));
+    }
+
     function mtOpenEbookColumnModal(rows){
         const modal=document.getElementById('mtEbookColumnModal'); if(!modal)return;
-        const maxCols=Math.max(1,...rows.map(r=>Array.isArray(r)?r.length:0));
+        const maxCols = rows.reduce((width, row) => Math.max(width, row.length), 1);
         const buildOptions=(allowNone=false)=>{ let h=allowNone?'<option value="-1">선택 안 함</option>':''; for(let c=0;c<maxCols;c++){ let sample=''; for(const r of rows){ const v=String(r?.[c]??'').trim(); if(v){sample=v.slice(0,24);break;} } h+=`<option value="${c}">열 ${c+1}${sample?` (${mtEscapeHTML(sample)})`:''}</option>`;} return h; };
         document.getElementById('mtEbookMainCol').innerHTML=buildOptions(false);
         document.getElementById('mtEbookSubCol').innerHTML=buildOptions(true);
         document.getElementById('mtEbookEngCol').innerHTML=buildOptions(false);
         // 영어 열은 내용으로 추천하되, 한국어 열의 기본 배치는 항상
         // 주문장=1열, 보조문장=3열로 맞춥니다.
-        const scores=Array.from({length:maxCols},(_,c)=>{let k=0,e=0; for(const r of rows.slice(0,30)){const v=String(r?.[c]??''); k+=(v.match(/[가-힣]/g)||[]).length; e+=(v.match(/[A-Za-z]/g)||[]).length;} return {c,k,e};});
-        const ko=scores.filter(x=>x.k>0).sort((a,b)=>b.k-a.k).map(x=>x.c);
+        const sample = rows.slice(0, 30);
+        const scores = Array.from({length:maxCols}, (_, c) => ({
+            c, e:sample.reduce((total, row) => total + (String(row[c] ?? '').match(/[a-z]/gi) || []).length, 0)
+        }));
         const en=scores.filter(x=>x.e>0).sort((a,b)=>b.e-a.e).map(x=>x.c);
         document.getElementById('mtEbookMainCol').value='0';
-        document.getElementById('mtEbookSubCol').value=maxCols>=3?'2':'-1';
-        if(en.length) document.getElementById('mtEbookEngCol').value=String(en[0]);
+        const eng = en.find(col => col !== 0) ?? (maxCols >= 2 ? 1 : 0);
+        document.getElementById('mtEbookSubCol').value=maxCols>=3 && eng!==2?'2':'-1';
+        document.getElementById('mtEbookEngCol').value=String(eng);
         modal.style.display='flex';
     }
     function mtCloseEbookColumnModal(){ const m=document.getElementById('mtEbookColumnModal'); if(m)m.style.display='none'; mtEbookTemp=null; }
     function mtConfirmEbookColumns(){
         if(!mtEbookTemp)return;
         const mainCol=Number(document.getElementById('mtEbookMainCol').value), subCol=Number(document.getElementById('mtEbookSubCol').value), engCol=Number(document.getElementById('mtEbookEngCol').value);
-        if(!Number.isInteger(mainCol)||!Number.isInteger(engCol)||mainCol<0||engCol<0){alert('주문장 열과 영어문장 열을 선택해 주세요.');return;}
+        try { mtApplyEbookColumns(mainCol, subCol, engCol); }
+        catch (err) { alert('전자책 데이터 적용 중 오류가 발생했습니다.\n' + (err.message || err)); }
+    }
 
-        const rows=Array.isArray(mtEbookTemp.rows)?mtEbookTemp.rows:[];
-        const header=Array.isArray(rows[0]) ? rows[0].map(v=>String(v??'').trim().toLowerCase()) : [];
-        const importantCol=header.findIndex(v=>v==='중요'||v==='별표'||v.includes('important')||v.includes('star'));
-        const looksLikeExportHeader=header.some(v=>v==='no'||v==='번호') && header.some(v=>v.includes('한국어')||v.includes('주문장')) && header.some(v=>v.includes('영어'));
-        const start=looksLikeExportHeader?1:0;
-        const words=[];
-        for(let i=start;i<rows.length;i++){
-            const r=rows[i]||[];
-            const main=String(r?.[mainCol]??'').trim();
-            const sub=subCol>=0?String(r?.[subCol]??'').trim():'';
-            const eng=String(r?.[engCol]??'').trim();
-            if(!main||!eng) continue;
-            const serial=String(words.length+1);
-            const starred=importantCol>=0 && /★/.test(String(r?.[importantCol]??''));
-            words.push({eng,kor:main,subKor:sub,literalKor:sub,serial,starred,originalIndex:words.length,ebookRead:false});
-        }
-        if(!words.length){alert('선택한 열에서 주문장과 영어문장을 함께 가진 행을 찾지 못했습니다.');return;}
+    function mtApplyEbookColumns(mainCol, subCol, engCol) {
+        if (!mtEbookTemp) throw new Error('불러온 데이터가 없습니다.');
+        if (mainCol === engCol || mainCol === subCol || engCol === subCol) throw new Error('각 문장에 서로 다른 열을 선택해 주세요.');
+        const {cards:words, sourceRows} = mtImportCardRows(mtEbookTemp.rows, mainCol, subCol, engCol);
+        if (!words.length) throw new Error('주문장과 영어문장을 함께 가진 행을 찾지 못했습니다.');
+        words.forEach((word, index) => { word.serial = String(index + 1); });
         const importedStarredSerials=words.filter(w=>w.starred).map(w=>String(w.serial));
         const slot=mtEbookTemp.slotIndex, state=mtGetTypedState(slot);
 
         if(mtEbookTemp.addMode){
             const base=Array.isArray(state.outputRows)?state.outputRows.slice():[];
-            const addRows=words.map((w,i)=>[w.eng,w.kor,w.subKor,String(base.length+i+1)]);
+            const addRows=words.map((w,i)=>[w.eng,w.kor,w.subKor,String(base.length+i+1),w.exercise]);
             const priorStars=new Set((state.starredSerials||[]).map(String));
             words.forEach((w,i)=>{if(w.starred) priorStars.add(String(base.length+i+1));});
             state.type='ebook';
             state.outputRows=base.concat(addRows);
             state.starredSerials=Array.from(priorStars);
-            state.sourceRows=[...(state.sourceRows||[]),...rows.slice(start)];
-            state.ebook={...(state.ebook||{}),mainCol,subCol,engCol,sourceRows:[...(state.ebook?.sourceRows||[]),...rows.slice(start)]};
+            state.sourceRows=[...(state.sourceRows||[]),...sourceRows];
+            state.ebook={...(state.ebook||{}),mainCol,subCol,engCol,sourceRows:[...(state.ebook?.sourceRows||[]),...sourceRows]};
             state.pattern={engCol:1,mainKorCol:2,subKorCol:3,serialCol:4};
             state.ebookReadIndexes=Array.isArray(state.ebookReadIndexes)?state.ebookReadIndexes:[];
             state.lastSession=null;state.lastError='';
@@ -8505,8 +8570,8 @@ ${JSON.stringify(finalPayload)}`;
 
         state.type='ebook';
         state.fileName=mtEbookTemp.fileName;
-        state.ebook={mainCol,subCol,engCol,sourceRows:rows.slice(start)};
-        state.outputRows=words.map(w=>[w.eng,w.kor,w.subKor,w.serial]);
+        state.ebook={mainCol,subCol,engCol,sourceRows};
+        state.outputRows=words.map(w=>[w.eng,w.kor,w.subKor,w.serial,w.exercise]);
         state.pattern={engCol:1,mainKorCol:2,subKorCol:3,serialCol:4};
         state.starredSerials=importedStarredSerials;
         state.ebookReadIndexes=[];
@@ -8519,7 +8584,7 @@ ${JSON.stringify(finalPayload)}`;
         mtCloseEbookColumnModal();mtInitSlots();mtOpenEbookViewer(slot);
     }
 
-    function mtGetEbookWords(slotIndex){ const st=mtRestoreEbookCompletionRecord(slotIndex,mtGetTypedState(slotIndex)); const p=st.pattern||{engCol:1,mainKorCol:2,subKorCol:3,serialCol:4}; const read=new Set((st.ebookReadIndexes||[]).map(Number)); const stars=new Set((st.starredSerials||[]).map(String)); return (st.outputRows||[]).map((r,i)=>{const serial=String(r?.[p.serialCol-1]??(i+1)).trim();return {eng:String(r?.[p.engCol-1]??'').trim(),kor:String(r?.[p.mainKorCol-1]??'').trim(),subKor:String(r?.[p.subKorCol-1]??'').trim(),serial,originalIndex:i,ebookRead:read.has(i),starred:stars.has(serial)};}).filter(w=>w.kor&&w.eng); }
+    function mtGetEbookWords(slotIndex){ const st=mtRestoreEbookCompletionRecord(slotIndex,mtGetTypedState(slotIndex)); const p=st.pattern||{engCol:1,mainKorCol:2,subKorCol:3,serialCol:4}; const read=new Set((st.ebookReadIndexes||[]).map(Number)); const stars=new Set((st.starredSerials||[]).map(String)); return (st.outputRows||[]).map((r,i)=>{const serial=String(r?.[p.serialCol-1]??(i+1)).trim();return {eng:String(r?.[p.engCol-1]??'').trim(),kor:String(r?.[p.mainKorCol-1]??'').trim(),subKor:String(r?.[p.subKorCol-1]??'').trim(),serial,originalIndex:i,exercise:r?.[4]===true,ebookRead:read.has(i),starred:stars.has(serial)};}).filter(w=>w.kor&&w.eng); }
     let mtEbookEditTarget = null;
 
     function mtDeleteEbookItem(slotIndex, index, event) {
@@ -8774,7 +8839,10 @@ ${JSON.stringify(finalPayload)}`;
             const isRead=isEbook ? w.ebookRead : mtGetCardSuccessCount(Number(slotIndex),w,absoluteIndex)>0;
             item.className='mt-ebook-item'+(isRead?' read':'');
             item.dataset.index=absoluteIndex;
-            const displayText = (mtEbookDisplayMode === 'eng' && isRead) ? w.eng : w.kor;
+            const showingEnglish = mtEbookDisplayMode === 'eng' && isRead;
+            const displayText = showingEnglish ? w.eng : w.kor;
+            const subPrompt = isEbook && !showingEnglish && w.exercise && w.subKor
+                ? '<br><span class="mt-paren-text">' + mtEscapeHTML(w.subKor) + '</span>' : '';
             item.innerHTML=`<div class="mt-ebook-item-inner"><input type="checkbox" class="mt-ebook-item-select" aria-label="문장 ${absoluteIndex+1}번 선택" ${mtEbookSelectedIndexes.has(absoluteIndex)?'checked':''}><div class="mt-ebook-item-main-wrap"><button type="button" class="mt-ebook-item-delete-btn" title="항목 삭제" aria-label="항목 삭제">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v5"></path><path d="M14 11v5"></path>
@@ -8783,7 +8851,7 @@ ${JSON.stringify(finalPayload)}`;
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z"></path>
                 </svg>
-            </button><span class="mt-ebook-item-num">${absoluteIndex+1}</span><span class="mt-ebook-item-main">${mtEscapeHTML(displayText)}</span></div></div>`;
+            </button><span class="mt-ebook-item-num">${absoluteIndex+1}</span><span class="mt-ebook-item-main">${mtEscapeHTML(displayText)}${subPrompt}</span></div></div>`;
             const check=item.querySelector('.mt-ebook-item-select');
             // 체크박스 클릭은 선택 상태만 변경하고 카드 열기 이벤트가 부모 행으로 전파되지 않도록 합니다.
             check.addEventListener('click',(e)=>{ e.stopPropagation(); }); check.addEventListener('change',(e)=>{ e.stopPropagation(); if(check.checked) mtEbookSelectedIndexes.add(absoluteIndex); else mtEbookSelectedIndexes.delete(absoluteIndex); mtEbookUpdateSelectionUi(Number(slotIndex), pageWords, start); });
@@ -9737,6 +9805,7 @@ ${JSON.stringify(finalPayload)}`;
         if(mtAddDataSourceSlot==null)return;
         const input=document.getElementById('mtFileUpload'); if(!input)return;
         mtCloseAddDataSourceModal();
+        delete input.dataset.mtGenAppend;
         input.dataset.mtAddMode='1'; input.dataset.mtAddSlot=String(mtAddDataSourceSlot); input.dataset.mtAddType=mtAddDataSourceType;
         mtActiveSlotIndex=mtAddDataSourceSlot; input.value=''; input.click();
     }
@@ -9751,35 +9820,21 @@ ${JSON.stringify(finalPayload)}`;
         try{ta.value=await navigator.clipboard.readText();}catch(_){alert('브라우저에서 클립보드 읽기가 차단되었습니다. 텍스트를 직접 붙여넣어 주세요.');}
     }
     function mtConfirmAddClipboard(){
-        if(mtAddDataSourceSlot==null)return;
-        const ta=document.getElementById('mtAddClipboardText'); const raw=String(ta?.value||'').replace(/^\uFEFF/,'').trim();
-        if(!raw)return alert('추가할 텍스트가 없습니다.');
-        const rows=raw.split(/\r?\n/).filter(line=>line.trim()!=='').map(line=>line.split('\t'));
-        if(!rows.length)return alert('추가할 행이 없습니다.');
-        if(mtAddDataSourceType==='normal'){
-            try{mtAppendNormalRows(mtAddDataSourceSlot,rows);mtCloseAddClipboardModal();mtCloseAddDataSourceModal();}catch(e){alert(`일반 데이터 추가 중 오류가 발생했습니다.\n${e?.message||e}`);}return;
-        }
-        if(mtAddDataSourceType==='ebook'){
-            mtCloseAddClipboardModal(); mtCloseAddDataSourceModal();
-            mtEbookTemp={slotIndex:mtAddDataSourceSlot,fileName:mtGetTypedState(mtAddDataSourceSlot).fileName,rows,sourceSheetName:'클립보드',addMode:true};
-            mtOpenEbookColumnModal(rows); return;
-        }
-        if(mtAddDataSourceType==='self_generate' || mtAddDataSourceType==='reference_generate'){
-            const input=document.getElementById('mtFileUpload');
-            // 생성형 클립보드는 기존 파일 추가 경로를 오용하지 않고 원문/주제 텍스트를 직접 추가한다.
-            const slot=Number(mtAddDataSourceSlot), st=mtGetTypedState(slot);
-            if(mtAddDataSourceType==='self_generate'){
-                const added=rows.map(r=>String(r?.[0]??'').trim()).filter(Boolean),originalRows=Array.isArray(st.sourceRowsOriginal)?st.sourceRowsOriginal.slice():(st.sourceRows||[]).slice(); st.sourceRows=[...(st.sourceRows||[]),...added]; st.sourceRowsLock=st.sourceRows.slice();st.sourceRowsOriginal=[...originalRows,...added];
-            }else{
-                const added=rows.map((r,i)=>({text:r.map(v=>String(v??'').trim()).filter(Boolean).join(' - '),originalRow:(st.topics||[]).length+i+1})).filter(x=>x.text); st.topics=[...(st.topics||[]),...added]; st.refQueue=[...(st.refQueue||[]),...added].sort(()=>Math.random()-0.5);
-            }
-            st.nextRun=Date.now(); mtSaveTypedState(slot,st); mtCloseAddDataSourceModal(); mtGeneratorRun(slot,true); return;
+        if (mtAddDataSourceSlot == null) return;
+        const raw = String(document.getElementById('mtAddClipboardText')?.value || '');
+        if (!raw.trim()) return alert('추가할 텍스트가 없습니다.');
+        try {
+            mtRegisterStudyTable(mtReadDelimitedTable(raw), mtAddDataSourceSlot, '', mtAddDataSourceType, true);
+            mtCloseAddClipboardModal();
+            mtCloseAddDataSourceModal();
+        } catch (err) {
+            alert('데이터 추가 중 오류가 발생했습니다.\n' + (err.message || err));
         }
     }
 
     function mtStartGeneratorAppend(slotIndex){
         const slot=Number(slotIndex),type=mtGetSlotType(slot); if(!['self_generate','reference_generate'].includes(type))return;
-        const input=document.getElementById('mtFileUpload'); if(!input)return; input.dataset.mtGenAppend='1'; input.dataset.mtGenAppendSlot=String(slot); input.dataset.mtGenAppendType=type; mtActiveSlotIndex=slot; input.value=''; input.click();
+        const input=document.getElementById('mtFileUpload'); if(!input)return; delete input.dataset.mtAddMode; input.dataset.mtGenAppend='1'; input.dataset.mtGenAppendSlot=String(slot); input.dataset.mtGenAppendType=type; mtActiveSlotIndex=slot; input.value=''; input.click();
     }
     function mtSelfPlainRowsFromText(text){
         // 헤더를 추정하거나 첫 행을 건너뛰지 않습니다. 줄바꿈 하나가 원문 카드 하나입니다.
@@ -10051,253 +10106,39 @@ ${JSON.stringify(finalPayload)}`;
     // 생성 타이머는 영구 상태 복원이 끝난 뒤 initApp에서 시작합니다.
 
     document.getElementById('mtFileUpload').addEventListener('change', async function(e) {
-        const file = e.target.files && e.target.files[0];
-        if (e.target.dataset.mtAddMode === '1') {
-            const addSlot=Number(e.target.dataset.mtAddSlot), addType=String(e.target.dataset.mtAddType||'');
-            delete e.target.dataset.mtAddMode;delete e.target.dataset.mtAddSlot;delete e.target.dataset.mtAddType;
-            if(!file)return;
-            try{
-                const ext=String(file.name||'').split('.').pop().toLowerCase();
-                let rows=[];
-                if(ext==='txt'){
-                    const raw=await file.text();rows=raw.replace(/^\uFEFF/,'').normalize('NFC').split(/\r?\n/).filter(x=>x.trim()!=='').map(x=>x.split('\t'));
-                }else if(ext==='xlsx'||ext==='xls'){
-                    const wb=XLSX.read(new Uint8Array(await file.arrayBuffer()),{type:'array'});const sh=wb.Sheets[wb.SheetNames[0]];rows=XLSX.utils.sheet_to_json(sh,{header:1,defval:''});
-                }else throw new Error('Excel(.xlsx/.xls) 또는 탭으로 구분된 TXT 파일만 추가할 수 있습니다.');
-                if(addType==='normal') mtAppendNormalRows(addSlot,rows);
-                else {mtEbookTemp={slotIndex:addSlot,fileName:mtGetTypedState(addSlot).fileName,rows,sourceSheetName:file.name,addMode:true};mtOpenEbookColumnModal(rows);}
-            }catch(err){alert(`데이터 추가 중 오류가 발생했습니다.\n${err?.message||err}`);}
-            e.target.value='';return;
-        }
-
-        if (e.target.dataset.mtGenAppend === '1') {
-            const addSlot=Number(e.target.dataset.mtGenAppendSlot), addType=String(e.target.dataset.mtGenAppendType||'');
-            delete e.target.dataset.mtGenAppend; delete e.target.dataset.mtGenAppendSlot; delete e.target.dataset.mtGenAppendType;
-            if(!file)return;
-            try{ await mtAppendGeneratorFile(file,addSlot,addType); }catch(err){ alert(`${mtGeneratorFileLabel(addType)} 데이터 추가 중 오류가 발생했습니다.\n${err?.message||err}`); }
-            e.target.value=''; return;
-        }
-
+        const input = e.target;
+        const file = input.files?.[0];
         if (!file) return;
-
-        mtCurrentUploadedFileName = file.name.replace(/\.[^/.]+$/, '');
-        const ext = file.name.split('.').pop().toLowerCase();
-        const activeSlot = mtActiveSlotIndex;
-        const selectedType = String(e.target.dataset.mtPendingType || mtGetSlotType(activeSlot) || '');
-        delete e.target.dataset.mtPendingType;
-
+        const {mtAddMode, mtAddSlot, mtAddType, mtGenAppend, mtGenAppendSlot, mtGenAppendType, mtPendingType} = input.dataset;
+        for (const key of ['mtAddMode','mtAddSlot','mtAddType','mtGenAppend','mtGenAppendSlot','mtGenAppendType','mtPendingType']) {
+            delete input.dataset[key];
+        }
+        input.value = '';
         try {
-            // TXT 업로드는 탭(\t) 기준으로 표 형태를 복원한 뒤 기존 엑셀 처리 경로를 그대로 사용합니다.
-            let uploadFile = file;
-            if (ext === 'txt') {
-                const buffer = await file.arrayBuffer();
-                const uint8 = new Uint8Array(buffer);
-                let rawText = '';
-                if (uint8.length >= 2 && uint8[0] === 0xFF && uint8[1] === 0xFE) rawText = new TextDecoder('utf-16le').decode(uint8);
-                else if (uint8.length >= 3 && uint8[0] === 0xEF && uint8[1] === 0xBB && uint8[2] === 0xBF) rawText = new TextDecoder('utf-8').decode(uint8);
-                else {
-                    try { rawText = new TextDecoder('utf-8', {fatal:true}).decode(uint8); }
-                    catch (_) { rawText = new TextDecoder('euc-kr').decode(uint8); }
-                }
-                rawText = rawText.replace(/^\uFEFF/, '').normalize('NFC');
-                if(selectedType==='self_generate'){
-                    await mtRegisterSelfGenerateText(rawText,Number(activeSlot),file.name);
-                    return;
-                }
-                const rows = rawText.split(/\r?\n/).filter(line => line.trim() !== '').map(line => line.split('\t'));
-                if (!rows.length) throw new Error('TXT 파일에 데이터가 없습니다.');
-                if (!rows.some(r => r.length > 1)) throw new Error('TXT 파일은 반드시 탭(\t)으로 열이 구분되어 있어야 합니다.');
-                const wb = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), '시트1');
-                const xlsxBytes = XLSX.write(wb, {bookType:'xlsx', type:'array'});
-                uploadFile = new File([xlsxBytes], file.name, {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-            }
-            if(selectedType==='ebook'){
-                if(!['xlsx','xls','txt'].includes(ext)) throw new Error('전자책은 .xlsx, .xls 또는 탭으로 구분된 .txt 파일만 불러올 수 있습니다.');
-                await mtEbookHandleFile(uploadFile, Number(activeSlot));
+            if (mtGenAppend === '1') {
+                await mtAppendGeneratorFile(file, Number(mtGenAppendSlot), mtGenAppendType);
                 return;
             }
-            if(selectedType==='self_generate' || selectedType==='reference_generate'){
-                if(!['xlsx','xls'].includes(ext)) throw new Error(selectedType==='self_generate'?'자체형은 .xlsx, .xls 또는 줄바꿈으로 구분된 일반 .txt 파일을 사용합니다.':'참조형은 .xlsx 또는 .xls 파일을 사용합니다.');
-                await mtRegisterGeneratorFile(uploadFile, Number(activeSlot), selectedType);
+            const addMode = mtAddMode === '1';
+            const slot = Number(addMode ? mtAddSlot : mtActiveSlotIndex);
+            const type = addMode ? mtAddType : (mtPendingType || mtGetSlotType(slot) || 'normal');
+            if (type === 'self_generate' || type === 'reference_generate') {
+                if (type === 'self_generate' && /\.txt$/i.test(file.name)) {
+                    await mtRegisterSelfGenerateText(mtDecodeTableText(new Uint8Array(await file.arrayBuffer())), slot, file.name);
+                } else {
+                    if (!/\.xlsx?$/i.test(file.name)) throw new Error('Excel(.xlsx/.xls) 파일을 선택해 주세요.');
+                    await mtRegisterGeneratorFile(file, slot, type);
+                }
                 return;
             }
-            const reader = new FileReader();
-            if (ext === 'txt') {
-                reader.onload = function(ev) {
-                    try {
-                        const buffer = ev.target.result;
-                        const uint8 = new Uint8Array(buffer);
-                        let rawText = '';
-                        if (uint8.length >= 2 && uint8[0] === 0xFF && uint8[1] === 0xFE) rawText = new TextDecoder('utf-16le').decode(uint8);
-                        else if (uint8.length >= 3 && uint8[0] === 0xEF && uint8[1] === 0xBB && uint8[2] === 0xBF) rawText = new TextDecoder('utf-8').decode(uint8);
-                        else {
-                            try { rawText = new TextDecoder('utf-8', {fatal:true}).decode(uint8); }
-                            catch (_) { rawText = new TextDecoder('euc-kr').decode(uint8); }
-                        }
-                        mtParseTextData(rawText.normalize('NFC'));
-                    } catch (err) { alert('텍스트 파일 파싱 중 오류가 발생했습니다: ' + (err.message || err)); }
-                };
-                reader.readAsArrayBuffer(file);
-            } else {
-                reader.onload = function(ev) {
-                    try {
-                        const data = new Uint8Array(ev.target.result);
-                        const workbook = XLSX.read(data, {type:'array'});
-                        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                        const jsonData = XLSX.utils.sheet_to_json(firstSheet, {header:1, defval:''});
-                        mtProcessParsedData(jsonData);
-                    } catch (err) {
-                        alert('엑셀 파일 읽기 오류: ' + (err.message || err));
-                    }
-                };
-                reader.readAsArrayBuffer(file);
-            }
+            const rows = await mtReadImportTable(file, {ebook:type === 'ebook'});
+            const name = file.name.replace(/\.[^/.]+$/, '').trim();
+            mtRegisterStudyTable(rows, slot, name, type, addMode);
         } catch (err) {
-            console.error('파일 업로드 오류:', err);
-            alert('파일 불러오기 중 오류가 발생했습니다: ' + (err.message || err));
-        } finally {
-            e.target.value = '';
+            console.error('언마스킹 영작 파일 등록 오류', err);
+            alert('파일 불러오기 중 오류가 발생했습니다.\n' + (err.message || err));
         }
     });
-
-    function mtParseTextData(text) {
-        let lines = text.split(/\r?\n/);
-        let jsonData = lines.map(line => line.includes('\t') ? line.split('\t') : line.split(','));
-        mtProcessParsedData(jsonData);
-    }
-
-    function mtProcessParsedData(data) {
-        let validRows = data.filter(row => row && row.length > 0).slice(0, 15);
-        let maxCols = 0;
-        validRows.forEach(row => { if (row.length > maxCols) maxCols = row.length; });
-
-        let korCols = [];
-        let engCols = [];
-
-        for (let c = 0; c < maxCols; c++) {
-            let korScore = 0, engScore = 0;
-            for (let row of validRows) {
-                let cellVal = String(row[c] || '').trim();
-                if (!cellVal || /^\d+$/.test(cellVal)) continue;
-
-                let korMatches = cellVal.match(/[ㄱ-ㅎㅏ-ㅣ가-힣]/g);
-                let engMatches = cellVal.match(/[a-zA-Z]/g);
-
-                if (korMatches) korScore += korMatches.length;
-                if (engMatches) engScore += engMatches.length;
-            }
-
-            if (korScore > 0 || engScore > 0) {
-                if (korScore >= engScore) {
-                    korCols.push({ index: c, score: korScore });
-                } else {
-                    engCols.push({ index: c, score: engScore });
-                }
-            }
-        }
-
-        korCols.sort((a, b) => b.score - a.score);
-        engCols.sort((a, b) => b.score - a.score);
-
-        if (engCols.length === 0) return alert("유효한 영어 데이터를 찾을 수 없습니다.");
-        if (korCols.length === 0) return alert("유효한 한국어 데이터를 찾을 수 없습니다.");
-
-        mtTempParsedData = data; 
-
-        if (korCols.length >= 2) {
-            mtShowColumnSelectModal(korCols, engCols);
-        } else {
-            mtFinalizeDataProcessing(korCols[0].index, -1, engCols[0].index);
-        }
-    }
-
-    function mtShowColumnSelectModal(korCols, engCols) {
-        const mainSel = document.getElementById('mtColMainKor');
-        const subSel = document.getElementById('mtColSubKor');
-        const engSel = document.getElementById('mtColEng');
-
-        mainSel.innerHTML = ''; 
-        subSel.innerHTML = '<option value="-1">선택 안 함</option>'; 
-        engSel.innerHTML = '';
-
-        korCols.forEach((col, i) => {
-            let textSnippet = "";
-            for(let r=0; r<mtTempParsedData.length; r++) {
-                if(mtTempParsedData[r] && mtTempParsedData[r][col.index]) {
-                    textSnippet = String(mtTempParsedData[r][col.index]).substring(0, 15) + "...";
-                    break;
-                }
-            }
-            const label = `열 ${col.index + 1} (${textSnippet})`;
-            mainSel.innerHTML += `<option value="${col.index}" ${i===0 ? 'selected' : ''}>${label}</option>`;
-            subSel.innerHTML += `<option value="${col.index}" ${i===1 ? 'selected' : ''}>${label}</option>`;
-        });
-
-        engCols.forEach((col, i) => {
-            let textSnippet = "";
-            for(let r=0; r<mtTempParsedData.length; r++) {
-                if(mtTempParsedData[r] && mtTempParsedData[r][col.index]) {
-                    textSnippet = String(mtTempParsedData[r][col.index]).substring(0, 15) + "...";
-                    break;
-                }
-            }
-            const label = `열 ${col.index + 1} (${textSnippet})`;
-            engSel.innerHTML += `<option value="${col.index}" ${i===0 ? 'selected' : ''}>${label}</option>`;
-        });
-
-        // 일반형도 열 선택 창을 열 때 주문장=1열, 보조문장=3열을 우선합니다.
-        // 해당 열이 한국어 후보에 없을 때만 기존 감지 순서를 유지합니다.
-        if(korCols.some(col=>Number(col.index)===0)) mainSel.value='0';
-        if(korCols.some(col=>Number(col.index)===2)) subSel.value='2';
-
-        document.getElementById('mtColumnSelectModal').style.display = 'flex';
-    }
-
-    function mtConfirmColumnSelect() {
-        const mainKorIdx = parseInt(document.getElementById('mtColMainKor').value);
-        const subKorIdx = parseInt(document.getElementById('mtColSubKor').value);
-        const engIdx = parseInt(document.getElementById('mtColEng').value);
-
-        document.getElementById('mtColumnSelectModal').style.display = 'none';
-        mtFinalizeDataProcessing(mainKorIdx, subKorIdx, engIdx);
-    }
-
-    function mtFinalizeDataProcessing(mainKorIdx, subKorIdx, engIdx) {
-        let wordsArr = [];
-        for (let row of mtTempParsedData) {
-            if(!row || row.length === 0) continue;
-            let mainKorVal = String(row[mainKorIdx] || '').trim();
-            let subKorVal = subKorIdx >= 0 ? String(row[subKorIdx] || '').trim() : '';
-            let engVal = String(row[engIdx] || '').trim();
-
-            if (mainKorVal && engVal && !/^\d+$/.test(mainKorVal) && !/^\d+$/.test(engVal)) {
-                let combinedKor = mainKorVal;
-
-                if (subKorVal && subKorVal !== mainKorVal) {
-                    let subClean = subKorVal.replace(/^\(|\)$/g, '').trim();
-                    if(subClean) {
-                        combinedKor += ` (${subClean})`;
-                    }
-                }
-                wordsArr.push({ kor: combinedKor, eng: engVal, starred: false, originalIndex: wordsArr.length });
-            }
-        }
-
-        if (wordsArr.length > 0) {
-            let slotName = mtCurrentUploadedFileName || (wordsArr[0].kor.substring(0, 10) + "...");
-            let slotData = { name: slotName, words: wordsArr, lastSession: null };
-
-            if (Number.isInteger(Number(mtActiveSlotIndex)) && Number(mtActiveSlotIndex) >= 1 && Number(mtActiveSlotIndex) <= 11) {
-                mtSetNormalSlotSync(Number(mtActiveSlotIndex), slotData);
-            } else {
-                localStorage.setItem('word_slot_' + mtActiveSlotIndex, JSON.stringify(slotData));
-            }
-            mtInitSlots();
-        } else {
-            alert("유효한 단어 데이터를 찾을 수 없습니다.");
-        }
-    }
 
     function mtOpenOptionsModal(slotIndex, slotData) {
         mtActiveSlotIndex = slotIndex;
@@ -10649,12 +10490,13 @@ ${JSON.stringify(finalPayload)}`;
         }
 
         const mainKor = String(currentWord.kor || '').trim();
-        const subKor = String(currentWord.subKor || currentWord.literalKor || '').trim();
+        const rawSubKor = String(currentWord.subKor || currentWord.literalKor || '').trim();
+        const subKor = currentWord.exercise ? mtBracketExercisePrompt(rawSubKor) : rawSubKor;
 
         let formattedKor = mtEscapeHTML(mainKor);
         if (subKor) {
             formattedKor += `<br><span class="mt-paren-text">${mtEscapeHTML(subKor)}</span>`;
-        } else {
+        } else if (!currentWord.exercise) {
             formattedKor = formattedKor.replace(/\s*(\([^)]+\))/g, '<br><span class="mt-paren-text">$1</span>');
         }
 
@@ -10777,7 +10619,7 @@ ${JSON.stringify(finalPayload)}`;
         const atEnd = input.selectionStart === input.value.length && input.selectionEnd === input.value.length;
         if (!atEnd) return false;
 
-        if (mtMaskMode === 'chunk') {
+        if (mtMaskMode === 'chunk' && !currentWord.exercise) {
             const tokenRegex = /\S+/g;
             let match;
             while ((match = tokenRegex.exec(target)) !== null) {
@@ -11079,7 +10921,7 @@ ${JSON.stringify(finalPayload)}`;
 
         // 청크별 마스킹: 공백으로 구분된 각 영어 청크를 하나의 검정 막대로 표시합니다.
         // 단, 중간의 어퍼스트러피/대시는 항상 보이고, 문장 끝의 . ! ? 도 항상 보입니다.
-        if (mtMaskMode === 'chunk') {
+        if (mtMaskMode === 'chunk' && !currentWord.exercise) {
             const tokenRegex = /\S+/g;
             const maskTarget = mtGetChunkMaskTarget(targetStr);
             let maskCursor = 0;
@@ -11721,7 +11563,11 @@ ${JSON.stringify(finalPayload)}`;
     }
 
     function createBoardObject(name, rawData) {
-        const validData = rawData.filter(row => row.length > 0 && row.some(cell => String(cell).trim() !== ''));
+        const exercise = mtIsExerciseTable(rawData);
+        const {main, sub, answer} = MT_EXERCISE_COLUMNS;
+        const validData = rawData.filter(row => exercise
+            ? !mtIsExerciseHeader(row) && mtCellText(row[main]) && mtCellText(row[answer])
+            : row.some(cell => mtCellText(cell)));
         if (validData.length === 0) return null;
 
         let krCol = 0; let maxKr = -1;
@@ -11738,13 +11584,14 @@ ${JSON.stringify(finalPayload)}`;
             if(enScore > maxEn) { maxEn = enScore; enCol = c; }
         }
         if (krCol === enCol) { enCol = krCol === 0 ? 1 : 0; }
+        if (exercise) { krCol = main; enCol = answer; }
 
         const items = validData.map((row, index) => ({
-            cells: row, views: 0, author: extractBoardRandomAuthor(String(row[enCol] || row[krCol] || '')),
+            cells: row, views: 0, author: exercise ? '익명' : extractBoardRandomAuthor(String(row[enCol] || row[krCol] || '')),
             starred: false, serial: index + 1, lastViewedAt: 0 
         }));
 
-        return { id: 'board_' + Date.now() + '_' + Math.floor(Math.random()*1000), name: name, items: items, krColIdx: krCol, enColIdx: enCol };
+        return { id: 'board_' + Date.now() + '_' + Math.floor(Math.random()*1000), name: name, items: items, krColIdx: krCol, enColIdx: enCol, subColIdx:exercise ? sub : null };
     }
 
     async function addBoardAndSave(boardObj) {
@@ -11759,50 +11606,81 @@ ${JSON.stringify(finalPayload)}`;
         await saveToDatabase(); renderBoardList();
     }
 
-    document.getElementById('boardFileInput').addEventListener('change', function(e) {
-        const file = e.target.files[0]; if (!file) return;
-        const encodingSelect = document.getElementById('boardEncodingSelect').value;
-        const reader = new FileReader();
-
-        reader.onload = function(e) {
-            const buffer = e.target.result; const uint8 = new Uint8Array(buffer);
-            let workbook, text = '';
-
-            if (file.name.match(/\.xlsx?$|\.xls$/i)) workbook = XLSX.read(uint8, {type: 'array'});
-            else {
-                if (encodingSelect === 'auto') {
-                    if (uint8.length >= 2 && uint8[0] === 0xFF && uint8[1] === 0xFE) text = new TextDecoder('utf-16le').decode(uint8);
-                    else if (uint8.length >= 3 && uint8[0] === 0xEF && uint8[1] === 0xBB && uint8[2] === 0xBF) text = new TextDecoder('utf-8').decode(uint8);
-                    else { try { text = new TextDecoder('utf-8', {fatal: true}).decode(uint8); } catch (err) { text = new TextDecoder('euc-kr').decode(uint8); } }
-                } else text = new TextDecoder(encodingSelect).decode(uint8);
-                text = text.normalize('NFC'); workbook = XLSX.read(text, {type: 'string'});
-            }
-
-            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-            const json = XLSX.utils.sheet_to_json(firstSheet, {header: 1, defval: ''});
-
-            const newBoard = createBoardObject(file.name, json);
-            addBoardAndSave(newBoard);
-            document.getElementById('boardFileInput').value = ''; 
-        };
-        reader.readAsArrayBuffer(file);
+    document.getElementById('boardFileInput').addEventListener('change', async function(e) {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        e.target.value = '';
+        try {
+            const encoding = document.getElementById('boardEncodingSelect').value;
+            const rows = await mtReadImportTable(file, {encoding});
+            const board = createBoardObject(file.name, rows);
+            if (!board) throw new Error('등록할 행이 없습니다.');
+            await addBoardAndSave(board);
+        } catch (err) {
+            alert('게시판 파일 등록 중 오류가 발생했습니다.\n' + (err.message || err));
+        }
     });
 
-    function handleBoardPaste() {
-        const text = document.getElementById('boardPasteInput').value.trim();
-        if (!text) return;
-        const rows = text.split('\n');
-        const data = rows.map(row => row.includes('\t') ? row.split('\t') : row.split(','));
-
-        let boardName = "붙여넣은 문서";
-        if (data.length > 0 && data[0].length > 0) {
-            const firstCell = String(data[0][0]).trim();
-            if (firstCell) boardName = firstCell.length > 15 ? firstCell.substring(0, 15) + "..." : firstCell;
+    async function handleBoardPaste() {
+        const input = document.getElementById('boardPasteInput');
+        const raw = input.value;
+        if (!raw.trim()) return;
+        try {
+            const rows = mtReadDelimitedTable(raw);
+            const firstCell = mtCellText(rows[0]?.[0]);
+            const name = !firstCell || mtIsExerciseHeader(rows[0]) ? '붙여넣은 문서' :
+                (firstCell.length > 15 ? firstCell.slice(0, 15) + '...' : firstCell);
+            const board = createBoardObject(name, rows);
+            if (!board) throw new Error('등록할 행이 없습니다.');
+            await addBoardAndSave(board);
+            if (input.value === raw) input.value = '';
+        } catch (err) {
+            alert('게시판 텍스트 등록 중 오류가 발생했습니다.\n' + (err.message || err));
         }
+    }
 
-        const newBoard = createBoardObject(boardName, data);
-        addBoardAndSave(newBoard);
-        document.getElementById('boardPasteInput').value = '';
+    function renderBoardTypingExercise(cell, answer) {
+        const answerText = answer.replace(/\s+/g, ' ');
+        const mask = document.createElement('div');
+        mask.className = 'board-exercise-mask';
+        mask.setAttribute('aria-label', '가려진 영어 모범답안');
+        for (const word of answerText.split(' ')) {
+            const group = document.createElement('span');
+            group.textContent = word.replace(/[\p{L}\p{N}]/gu, '□');
+            mask.appendChild(group);
+        }
+        const form = document.createElement('form');
+        form.className = 'board-exercise-form';
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'board-exercise-input';
+        input.setAttribute('aria-label', '영어 정답 입력');
+        input.placeholder = '영어 정답 입력';
+        input.autocomplete = 'off';
+        input.spellcheck = false;
+        const submit = document.createElement('button');
+        submit.className = 'btn-primary';
+        submit.type = 'submit';
+        submit.textContent = '정답 확인';
+        const status = document.createElement('div');
+        status.className = 'board-exercise-status';
+        status.setAttribute('role', 'status');
+        form.append(input, submit);
+        form.addEventListener('submit', event => {
+            event.preventDefault();
+            const typed = input.value.trim().replace(/\s+/g, ' ');
+            if (typed && mtTypingTextMatches(typed, answerText)) {
+                mask.textContent = answerText;
+                mask.removeAttribute('aria-label');
+                status.textContent = '정답입니다.';
+                input.readOnly = true;
+                submit.disabled = true;
+            } else {
+                status.textContent = '다시 입력해 주세요.';
+                input.focus();
+            }
+        });
+        cell.append(mask, form, status);
     }
 
     function toggleBoardStarFilter() {
@@ -11835,7 +11713,8 @@ ${JSON.stringify(finalPayload)}`;
         boardFilteredData = board.items.filter(item => {
             const title = String(item.cells[board.krColIdx] || '').toLowerCase();
             const content = String(item.cells[board.enColIdx] || '').toLowerCase();
-            const matchText = !query || title.includes(query) || content.includes(query);
+            const sub = mtCellText(item.cells[board.subColIdx]).toLowerCase();
+            const matchText = !query || title.includes(query) || sub.includes(query) || content.includes(query);
             const matchSerial = item.serial >= minSerial && item.serial <= maxSerial;
             const matchStar = !starOnly || item.starred;
             return matchText && matchSerial && matchStar;
@@ -11957,6 +11836,16 @@ ${JSON.stringify(finalPayload)}`;
             const tdTitle = document.createElement('td');
             tdTitle.className = 'board-subject-col';
             tdTitle.textContent = title || '(제목 없음)';
+            const isExercise = Number.isInteger(board.subColIdx);
+            if (isExercise) {
+                const sub = mtBracketExercisePrompt(item.cells[board.subColIdx]);
+                if (sub) {
+                    const subLine = document.createElement('span');
+                    subLine.className = 'board-exercise-sub';
+                    subLine.textContent = sub;
+                    tdTitle.appendChild(subLine);
+                }
+            }
 
             const tdAuthor = document.createElement('td');
             tdAuthor.className = 'board-author-col';
@@ -11977,7 +11866,8 @@ ${JSON.stringify(finalPayload)}`;
             const tdContent = document.createElement('td');
             tdContent.colSpan = 4;
             tdContent.className = 'board-content-cell';
-            tdContent.textContent = content || '(내용 없음)';
+            if (isExercise) renderBoardTypingExercise(tdContent, content);
+            else tdContent.textContent = content || '(내용 없음)';
             trContent.appendChild(tdContent);
 
             fragment.append(trTitle, trContent);
