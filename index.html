@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v125</title>
+    <title>올인원 영작-단어장 시스템 · v126</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -902,6 +902,8 @@
 
         .board-title-row { cursor: pointer; transition: background-color 0.2s; }
         .board-title-row:hover { background-color: var(--board-hover-bg); }
+        .mt-ebook-column-select { width:100%; min-width:0; max-width:32ch; padding:7px 8px; border:1px solid var(--border-color); border-radius:6px; font:inherit; }
+        .mt-ebook-list-option-row[hidden] { display:none; }
         .board-content-row { display: none; }
         .board-exercise-sub { display:block; color:var(--text-sub); margin-top:4px; }
         .board-exercise-mask { display:flex; flex-wrap:wrap; gap:0 .45em; margin:0 0 8px; }
@@ -3447,34 +3449,6 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
             </div>
         </div>
 
-        <div id="mtNormalColumnSelectModal" class="modal-overlay" style="display:none;">
-            <div class="modal-card" style="width:min(620px,94vw);max-height:88vh;overflow:auto;text-align:left;">
-                <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
-                    <div>
-                        <div style="font-size:16px;font-weight:800;color:#111827;">일반 열 선택</div>
-                        <div style="font-size:11px;color:#64748b;margin-top:3px;">주문장·보조문장·영어문장에 사용할 열을 각각 선택하세요.</div>
-                    </div>
-                    <button class="btn-excel" type="button" onclick="mtCloseNormalColumnSelectModal()">닫기</button>
-                </div>
-                <div class="mt-pattern-grid" style="margin-top:16px;">
-                    <label>주문장 열
-                        <select id="mtNormalMainCol" style="width:100%;box-sizing:border-box;padding:7px 8px;border:1px solid var(--border-color);border-radius:6px;font-size:12px;"></select>
-                    </label>
-                    <label>보조문장 열
-                        <select id="mtNormalSubCol" style="width:100%;box-sizing:border-box;padding:7px 8px;border:1px solid var(--border-color);border-radius:6px;font-size:12px;"></select>
-                    </label>
-                    <label>영어문장 열
-                        <select id="mtNormalEngCol" style="width:100%;box-sizing:border-box;padding:7px 8px;border:1px solid var(--border-color);border-radius:6px;font-size:12px;"></select>
-                    </label>
-                </div>
-                <div id="mtNormalColumnPreview" class="mt-ebook-column-note" style="margin-top:12px;"></div>
-                <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:16px;">
-                    <button class="btn-excel" onclick="mtCloseNormalColumnSelectModal()">취소</button>
-                    <button class="btn-primary" onclick="mtConfirmNormalColumnSelect()">적용</button>
-                </div>
-            </div>
-        </div>
-
         <div id="mtNormalClipboardModal" class="modal-overlay" style="display:none;">
             <div class="modal-card" style="width:min(760px,94vw);max-height:88vh;overflow:auto;text-align:left;">
                 <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
@@ -3644,7 +3618,12 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
                         <select id="mtEbookEngCol" style="width:100%;box-sizing:border-box;padding:7px 8px;border:1px solid var(--border-color);border-radius:6px;font-size:12px;"></select>
                     </label>
                 </div>
-                <div class="mt-ebook-column-note">※ 주문장과 영어문장은 필수입니다. 보조문장은 없는 경우 ‘선택 안 함’을 사용할 수 있습니다.</div>
+                <div class="mt-pattern-grid" style="margin-top:12px;">
+                    <label>목록 표시 열
+                        <select id="mtEbookImportListCol" class="mt-ebook-column-select"></select>
+                    </label>
+                </div>
+                <div class="mt-ebook-column-note">일련번호는 A열을 사용합니다. 번호가 비어 있으면 순서대로 표시합니다.</div>
                 <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:16px;">
                     <button class="btn-excel" onclick="mtCloseEbookColumnModal()">취소</button>
                     <button class="btn-primary" onclick="mtConfirmEbookColumns()">전자책 열기</button>
@@ -3701,6 +3680,9 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
                     <label class="mt-ebook-font-control" title="목록 글꼴 크기"><span>글꼴</span><input class="mt-list-font-size-input" type="number" min="10" max="36" value="18" inputmode="numeric" oninput="var n=Math.max(10,Math.min(36,Number(this.value)||10));document.documentElement.style.setProperty('--mt-live-list-font-size',n+'px');document.querySelectorAll('#mtEbookList .mt-ebook-item-main').forEach(function(el){el.style.setProperty('font-size',n+'px','important')});if(window.mtListUiSave)window.mtListUiSave('font',n)"><span>px</span></label>
                     <label class="mt-ebook-font-control" title="목록 행의 상하 여백"><span>행 여백</span><input class="mt-list-row-padding-input" type="number" min="0" max="40" value="12" inputmode="numeric" oninput="var n=Number(this.value);if(Number.isFinite(n)){n=Math.max(0,Math.min(40,n));document.documentElement.style.setProperty('--mt-live-list-padding-y',n+'px');document.querySelectorAll('#mtEbookList .mt-ebook-item').forEach(function(el){el.style.setProperty('padding-top',n+'px','important');el.style.setProperty('padding-bottom',n+'px','important')});if(window.mtListUiSave)window.mtListUiSave('padding',n)}"><span>px</span></label>
                 </div>
+                <label id="mtEbookListColumnOption" class="mt-ebook-list-option-row" hidden>
+                    <span>목록 표시 열</span><select id="mtEbookListDisplayCol" class="mt-ebook-column-select" onchange="mtSetEbookListColumn(this.value)"></select>
+                </label>
                 <div class="mt-ebook-list-options-grid">
                     <label class="mt-ebook-list-option-row"><span>각 행 사이의 라인</span><input id="mtEbookOptionRowLines" class="mt-ebook-option-toggle" type="checkbox" checked onchange="mtSetEbookListOption('rowLines',this.checked)"></label>
                     <label class="mt-ebook-list-option-row"><span>각 행 앞의 체크박스</span><input id="mtEbookOptionCheckboxes" class="mt-ebook-option-toggle" type="checkbox" checked onchange="mtSetEbookListOption('checkboxes',this.checked)"></label>
@@ -3910,6 +3892,34 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
     <!-- ========================================== -->
     <!-- 5. 게시판 탭 (독립형 대용량 DB 뷰어) -->
     <!-- ========================================== -->
+        <div id="mtNormalColumnSelectModal" class="modal-overlay" style="display:none;">
+            <div class="modal-card" style="width:min(620px,94vw);max-height:88vh;overflow:auto;text-align:left;">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+                    <div>
+                        <div id="mtNormalColumnTitle" style="font-size:16px;font-weight:800;color:#111827;">일반 열 선택</div>
+                        <div style="font-size:11px;color:#64748b;margin-top:3px;">주문장·보조문장·영어문장에 사용할 열을 각각 선택하세요.</div>
+                    </div>
+                    <button class="btn-excel" type="button" onclick="mtCloseNormalColumnSelectModal()">닫기</button>
+                </div>
+                <div class="mt-pattern-grid" style="margin-top:16px;">
+                    <label>주문장 열
+                        <select id="mtNormalMainCol" style="width:100%;box-sizing:border-box;padding:7px 8px;border:1px solid var(--border-color);border-radius:6px;font-size:12px;"></select>
+                    </label>
+                    <label>보조문장 열
+                        <select id="mtNormalSubCol" style="width:100%;box-sizing:border-box;padding:7px 8px;border:1px solid var(--border-color);border-radius:6px;font-size:12px;"></select>
+                    </label>
+                    <label>영어문장 열
+                        <select id="mtNormalEngCol" style="width:100%;box-sizing:border-box;padding:7px 8px;border:1px solid var(--border-color);border-radius:6px;font-size:12px;"></select>
+                    </label>
+                </div>
+                <div id="mtNormalColumnPreview" class="mt-ebook-column-note" style="margin-top:12px;"></div>
+                <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:16px;">
+                    <button class="btn-excel" onclick="mtCloseNormalColumnSelectModal()">취소</button>
+                    <button class="btn-primary" onclick="mtConfirmNormalColumnSelect()">적용</button>
+                </div>
+            </div>
+        </div>
+
     <div id="boardTab" class="tab-content">
         <!-- 게시판 목록 뷰 (첫 화면) -->
         <div id="boardListView" class="active-view">
@@ -6211,26 +6221,40 @@ Rules:
     let mtCardHadDirectTyping = false;
     let mtNormalColumnTemp = null;
     let mtEbookTemp = null;
-    const MT_EXERCISE_COLUMNS = {main:2, sub:3, answer:4};
+    const MT_SIX_COLUMN_DEFAULTS = {main:2, sub:4, eng:5};
+    const MT_FIVE_COLUMN_DEFAULTS = {main:2, sub:3, eng:4};
     const mtCellText = value => String(value ?? '').trim();
 
-    function mtIsExerciseHeader(row) {
+    function mtExerciseHeaderLayout(row) {
         const key = value => mtCellText(value).toLowerCase().replace(/[\s_-]+/g, '');
-        return /^(?:한국어원문|원문한국어)$/.test(key(row?.[2])) &&
-            /^(?:영작용한국어|영작한국어)$/.test(key(row?.[3])) &&
-            /^(?:a2)?(?:영어)?모범답안$/.test(key(row?.[4]));
+        if (!/^(?:한국어원문|원문한국어)$/.test(key(row?.[2])) ||
+            !/^(?:영작용한국어|영작한국어|블록한국어일부)$/.test(key(row?.[3]))) return null;
+        const answer = /^(?:a2)?(?:영어)?모범답안$/;
+        if (answer.test(key(row[5]))) return MT_SIX_COLUMN_DEFAULTS;
+        if (answer.test(key(row[4]))) return MT_FIVE_COLUMN_DEFAULTS;
+        return null;
     }
 
-    function mtIsExerciseTable(rows) {
+    function mtIsExerciseHeader(row) {
+        return Boolean(mtExerciseHeaderLayout(row));
+    }
+
+    function mtExerciseTableLayout(rows) {
         const sample = rows.slice(0, 20);
-        if (sample.some(mtIsExerciseHeader)) return true;
-        const candidates = sample.filter(row => row.length >= 5 && mtCellText(row[2]) && mtCellText(row[4]));
-        const matches = candidates.filter(row =>
-            [row[0], row[1]].every(value => /^(?:\d+(?:[.-]\d+)*)?$/.test(mtCellText(value))) &&
-            /[가-힣]/.test(mtCellText(row[2])) &&
-            /[가-힣]/.test(mtCellText(row[3])) &&
-            /[a-z]/i.test(mtCellText(row[4])) && !/[가-힣]/.test(mtCellText(row[4])));
-        return matches.length > 0 && matches.length >= Math.ceil(candidates.length * 0.8);
+        for (const row of sample) {
+            const layout = mtExerciseHeaderLayout(row);
+            if (layout) return layout;
+        }
+        for (const layout of [MT_SIX_COLUMN_DEFAULTS, MT_FIVE_COLUMN_DEFAULTS]) {
+            const candidates = sample.filter(row => mtCellText(row[layout.main]) && mtCellText(row[layout.eng]));
+            const matches = candidates.filter(row =>
+                [row[0], row[1]].every(value => /^(?:\d+(?:[.-]\d+)*)?$/.test(mtCellText(value))) &&
+                /[가-힣]/.test(mtCellText(row[layout.main])) &&
+                /[가-힣]/.test(mtCellText(row[3])) &&
+                /[a-z]/i.test(mtCellText(row[layout.eng])) && !/[가-힣]/.test(mtCellText(row[layout.eng])));
+            if (matches.length && matches.length >= Math.ceil(candidates.length * 0.8)) return layout;
+        }
+        return null;
     }
 
     function mtBracketExercisePrompt(value) {
@@ -6299,7 +6323,7 @@ Rules:
         for (const separator of separators) {
             if (!text.includes(separator)) continue;
             const sample = mtParseDelimitedRows(text, separator, 20);
-            if (mtIsExerciseTable(sample)) return mtParseDelimitedRows(text, separator);
+            if (mtExerciseTableLayout(sample)) return mtParseDelimitedRows(text, separator);
             const widths = new Map();
             for (const row of sample) {
                 if (row.length > 1) widths.set(row.length, (widths.get(row.length) || 0) + 1);
@@ -6334,33 +6358,120 @@ Rules:
         for (const name of workbook.SheetNames) {
             const rows = mtWorkbookTableRows(workbook.Sheets[name], ebook);
             if (!rows.length) continue;
-            if (mtIsExerciseTable(rows)) return rows;
+            if (mtExerciseTableLayout(rows)) return rows;
             const hasStars = ebook && rows.slice(0, 3).some(row => row.some(value => mtCellText(value) === '중요'));
-            if (!fallback || (hasStars && !fallback.hasStars)) fallback = {rows, hasStars};
+            const tabular = rows.some(row => row.filter(cell => mtCellText(cell)).length >= 2);
+            if (!fallback || (hasStars && !fallback.hasStars) || (tabular && !fallback.tabular && !fallback.hasStars)) {
+                fallback = {rows, hasStars, tabular};
+            }
         }
         return fallback?.rows || [];
     }
 
+    function mtTableWidth(rows) {
+        return rows.reduce((width, row) => Math.max(width, row?.length || 0), 0);
+    }
+
+    function mtColumnLabel(column) {
+        let label = '';
+        for (let n = column + 1; n > 0; n = Math.floor((n - 1) / 26)) {
+            label = String.fromCharCode(65 + (n - 1) % 26) + label;
+        }
+        return label + '열';
+    }
+
+    function mtTableColumnOptions(rows, emptyLabel) {
+        const width = mtTableWidth(rows);
+        let options = emptyLabel ? '<option value="-1">' + emptyLabel + '</option>' : '';
+        for (let column = 0; column < width; column++) {
+            const sample = mtCellText(rows.find(row => mtCellText(row?.[column]))?.[column]);
+            const label = mtColumnLabel(column) + (sample ? ' · ' + sample.slice(0, 36) : '');
+            options += '<option value="' + column + '">' + mtEscapeHTML(label) + '</option>';
+        }
+        return options;
+    }
+
+    function mtDefaultStudyColumns(rows) {
+        const width = mtTableWidth(rows);
+        if (width >= 6) return MT_SIX_COLUMN_DEFAULTS;
+        const exercise = mtExerciseTableLayout(rows);
+        if (exercise) return exercise;
+
+        const header = (rows[0] || []).map(v => mtCellText(v).toLowerCase());
+        const headerColumn = pattern => header.findIndex(value => pattern.test(value));
+        const sample = rows.slice(0, 30);
+        const scores = Array.from({length:width}, (_, col) => ({
+            col,
+            kor:sample.filter(row => /[가-힣]/.test(mtCellText(row[col]))).length,
+            eng:sample.filter(row => /[a-z]/i.test(mtCellText(row[col]))).length
+        }));
+        const best = (key, except = []) => scores.filter(score => score[key] && !except.includes(score.col))
+            .sort((a,b) => b[key] - a[key])[0]?.col;
+        let main = headerColumn(/^(?:한국어(?: 원문)?|주문장|korean|main|의미)$/);
+        let eng = headerColumn(/^(?:영어(?:문장)?|english|translation|eng)$/);
+        let sub = headerColumn(/^(?:보조문장|직독직해|한국어청크|힌트|sub|literal|masking)$/);
+        if (main < 0) main = best('kor', [eng]) ?? (eng === 0 && width > 1 ? 1 : 0);
+        if (eng < 0) eng = best('eng', [main, sub]) ?? (main === 0 && width > 1 ? 1 : 0);
+        if (sub < 0) sub = best('kor', [main, eng]) ?? -1;
+        return {main, sub, eng};
+    }
+
+    function mtShowStudyColumnOptions(prefix, rows) {
+        const defaults = mtDefaultStudyColumns(rows);
+        const requiredOptions = mtTableColumnOptions(rows);
+        const selectors = [
+            ['Main', defaults.main, requiredOptions],
+            ['Sub', defaults.sub, mtTableColumnOptions(rows, '선택 안 함')],
+            ['Eng', defaults.eng, requiredOptions]
+        ];
+        for (const [role, column, options] of selectors) {
+            const select = document.getElementById(prefix + role + 'Col');
+            select.innerHTML = options;
+            select.value = String(column);
+        }
+        return defaults;
+    }
+
+    function mtReadStudyColumns(prefix) {
+        return ['Main','Sub','Eng'].map(role => {
+            const value = document.getElementById(prefix + role + 'Col').value;
+            return value === '' ? NaN : Number(value);
+        });
+    }
+
+    function mtValidateStudyColumns(rows, main, sub, eng) {
+        const width = mtTableWidth(rows);
+        const valid = [main, sub, eng].every(col => Number.isInteger(col) && col < width);
+        if (!valid || main < 0 || eng < 0 || sub < -1) throw new Error('주문장과 영어문장에 사용할 열을 선택해 주세요.');
+        if (main === eng || main === sub || eng === sub) throw new Error('각 문장에 서로 다른 열을 선택해 주세요.');
+    }
+
     function mtImportCardRows(rows, mainCol, subCol, engCol) {
-        const exercise = mtIsExerciseTable(rows) && mainCol === MT_EXERCISE_COLUMNS.main &&
-            subCol === MT_EXERCISE_COLUMNS.sub && engCol === MT_EXERCISE_COLUMNS.answer;
-        const headerIndex = rows.findIndex((row, index) => mtIsExerciseHeader(row) || (index === 0 && mtIsExportTableHeader(row)));
+        mtValidateStudyColumns(rows, mainCol, subCol, engCol);
+        const exercise = mtTableWidth(rows) >= 6 || Boolean(mtExerciseTableLayout(rows));
+        const isSelectedHeader = row => {
+            const main = mtCellText(row[mainCol]).replace(/\s/g, '');
+            const eng = mtCellText(row[engCol]).replace(/\s/g, '');
+            return /^(?:주문장|한국어(?:원문)?|원문한국어|영작용한국어|블록한국어일부|korean|main)$/i.test(main) &&
+                /^(?:영어(?:문장|모범답안)?|(?:A2)?(?:영어)?모범답안|정답|english|translation|eng|answer)$/i.test(eng);
+        };
+        const headerIndex = rows.findIndex((row, index) => mtIsExerciseHeader(row) ||
+            (index === 0 && (mtIsExportTableHeader(row) || isSelectedHeader(row))));
         const header = rows[headerIndex] || [];
         const importantCol = header.findIndex(value => /^(중요|별표|important|star)$/i.test(mtCellText(value)));
         const cards = [], sourceRows = [];
         for (const row of rows.slice(headerIndex + 1)) {
-            if (mtIsExerciseHeader(row)) continue;
+            if (mtIsExerciseHeader(row) || mtIsExportTableHeader(row) || isSelectedHeader(row)) continue;
             const kor = mtCellText(row[mainCol]), eng = mtCellText(row[engCol]).replace(/\s+/g, ' ');
             if (!kor || !eng) continue;
             const sub = mtCellText(row[subCol]);
             sourceRows.push(row);
             cards.push({
-                exercise,
-                kor, eng, subKor:exercise ? mtBracketExercisePrompt(sub) : sub,
+                exercise, kor, eng, subKor:exercise ? mtBracketExercisePrompt(sub) : sub,
                 starred:importantCol >= 0 && mtCellText(row[importantCol]).includes('★')
             });
         }
-        return {cards, sourceRows};
+        return {cards, sourceRows, exercise};
     }
     // 일반형·전자책·자체형의 최초 등록에서 공통으로 쓰는 입력 출처 상태입니다.
     let mtInitialImportSlot = null;
@@ -6442,7 +6553,7 @@ Rules:
         const candidates=[st.lastListReadIndex, st.lastEbookStudyIndex];
         for(const value of candidates){
             const index=Number(value);
-            if(Number.isInteger(index) && index>=0 && index<Number(wordCount)) return index;
+            if(value != null && Number.isInteger(index) && index>=0 && index<Number(wordCount)) return index;
         }
         return null;
     }
@@ -8354,14 +8465,13 @@ ${JSON.stringify(finalPayload)}`;
 
     function mtRegisterStudyTable(rows, slot, name, type, addMode = false) {
         if (!rows.length) throw new Error('불러올 표 데이터가 없습니다.');
+        const registration = {rows, slotIndex:slot, fileName:name, addMode};
         if (type === 'ebook') {
-            mtEbookTemp = {slotIndex:slot, fileName:name, rows, addMode};
-            if (mtIsExerciseTable(rows)) {
-                const {main, sub, answer} = MT_EXERCISE_COLUMNS;
-                mtApplyEbookColumns(main, sub, answer);
-            } else mtOpenEbookColumnModal(rows);
+            mtEbookTemp = registration;
+            mtOpenEbookColumnModal(rows);
         } else {
-            mtRegisterNormalRows(rows, slot, name, addMode);
+            mtNormalColumnTemp = registration;
+            mtOpenNormalColumnSelectModal(rows);
         }
     }
 
@@ -8410,91 +8520,48 @@ ${JSON.stringify(finalPayload)}`;
         }catch(e){alert(`유형 변경 중 오류가 발생했습니다.\n${e?.message||e}`);}
     }
 
-    function mtRegisterNormalRows(rows, slotIndex, fileName, addMode){
-        mtNormalColumnTemp = {rows, slotIndex, fileName, addMode};
-        if (mtIsExerciseTable(rows)) {
-            const {main, sub, answer} = MT_EXERCISE_COLUMNS;
-            mtApplyNormalColumns(main, sub, answer);
-        } else mtOpenNormalColumnSelectModal(rows);
-    }
-
     function mtOpenNormalColumnSelectModal(rows){
-        const modal=document.getElementById('mtNormalColumnSelectModal');
-        if(!modal) throw new Error('일반 열 선택 화면을 불러오지 못했습니다.');
-        const maxCols = rows.reduce((width, row) => Math.max(width, row.length), 1);
-        const buildOptions=(allowNone=false)=>{
-            let html=allowNone?'<option value="-1">선택 안 함</option>':'';
-            for(let c=0;c<maxCols;c++){
-                let sample='';
-                for(const r of rows){
-                    const v=String(r?.[c]??'').trim();
-                    if(v){sample=v.slice(0,28);break;}
-                }
-                html += `<option value="${c}">열 ${c+1}${sample?` (${mtEscapeHTML(sample)})`:''}</option>`;
-            }
-            return html;
-        };
-        const main=document.getElementById('mtNormalMainCol');
-        const sub=document.getElementById('mtNormalSubCol');
-        const eng=document.getElementById('mtNormalEngCol');
-        if(!main||!sub||!eng) throw new Error('일반 열 선택 입력칸을 찾지 못했습니다.');
-        main.innerHTML=buildOptions(false);
-        sub.innerHTML=buildOptions(true);
-        eng.innerHTML=buildOptions(false);
-
-        const scores=Array.from({length:maxCols},(_,c)=>{
-            let ko=0,en=0,nonEmpty=0;
-            for(const r of rows.slice(0,40)){
-                const v=String(r?.[c]??'').trim();
-                if(!v) continue;
-                nonEmpty++;
-                ko+=(v.match(/[가-힣]/g)||[]).length;
-                en+=(v.match(/[A-Za-z]/g)||[]).length;
-            }
-            return {c,ko,en,nonEmpty};
-        });
-        const koCols=scores.filter(x=>x.nonEmpty).sort((a,b)=>b.ko-a.ko);
-        const enCols=scores.filter(x=>x.nonEmpty).sort((a,b)=>b.en-a.en);
-        const exportHeader=rows[0]?.map(v=>String(v??'').trim().toLowerCase())||[];
-        const headerIndex=(patterns)=>exportHeader.findIndex(v=>patterns.some(p=>v===p||v.includes(p)));
-        let mainIdx=headerIndex(['한국어','주문장','korean','main','의미']);
-        let engIdx=headerIndex(['영어','영어문장','english','translation','eng']);
-        let subIdx=headerIndex(['보조문장','직독직해','한국어청크','힌트','sub','literal','masking']);
-        if(mainIdx<0) mainIdx=koCols[0]?.c ?? 0;
-        if(subIdx<0) subIdx=koCols.find(x=>x.c!==mainIdx && x.c!==engIdx && x.ko>0)?.c ?? -1;
-        if(engIdx<0) engIdx=enCols.find(x=>x.c!==mainIdx && x.c!==subIdx && x.en>0)?.c ?? (mainIdx===0?Math.min(1,maxCols-1):0);
-        if(engIdx===subIdx) subIdx=-1;
-        main.value=String(mainIdx);
-        sub.value=String(subIdx);
-        eng.value=String(engIdx);
-        const preview=document.getElementById('mtNormalColumnPreview');
-        if(preview) preview.textContent=`총 ${rows.length}행 · 총 ${maxCols}열 · 주문장/보조문장/영어문장 열을 직접 선택하세요.`;
-        modal.style.display='flex';
+        const modal = document.getElementById('mtNormalColumnSelectModal');
+        const board = mtNormalColumnTemp?.type === 'board';
+        document.getElementById('mtNormalColumnTitle').textContent = board ? '게시판 열 선택' : '일반 열 선택';
+        mtShowStudyColumnOptions('mtNormal', rows);
+        document.getElementById('mtNormalColumnPreview').textContent = '총 ' + rows.length + '행 · ' + mtTableWidth(rows) + '열';
+        modal.style.display = 'flex';
     }
 
     function mtCloseNormalColumnSelectModal(){
-        const modal=document.getElementById('mtNormalColumnSelectModal');
-        if(modal) modal.style.display='none';
-        mtNormalColumnTemp=null;
+        document.getElementById('mtNormalColumnSelectModal').style.display = 'none';
+        mtNormalColumnTemp = null;
     }
 
-    function mtConfirmNormalColumnSelect() {
-        const main = Number(document.getElementById('mtNormalMainCol').value);
-        const sub = Number(document.getElementById('mtNormalSubCol').value);
-        const eng = Number(document.getElementById('mtNormalEngCol').value);
-        try { mtApplyNormalColumns(main, sub, eng); }
-        catch (err) { alert('일반 데이터 적용 중 오류가 발생했습니다.\n' + (err.message || err)); }
+    async function mtConfirmNormalColumnSelect() {
+        const pending = mtNormalColumnTemp;
+        if (!pending || pending.saving) return;
+        const [main, sub, eng] = mtReadStudyColumns('mtNormal');
+        try {
+            if (pending.type === 'board') {
+                const board = createBoardObject(pending.fileName, pending.rows, main, sub, eng);
+                if (!board) throw new Error('주문장과 영어문장을 함께 가진 행을 찾지 못했습니다.');
+                pending.saving = true;
+                await addBoardAndSave(board);
+                if (pending.input && pending.input.value === pending.raw) pending.input.value = '';
+                if (mtNormalColumnTemp === pending) mtCloseNormalColumnSelectModal();
+            } else mtApplyNormalColumns(main, sub, eng);
+        } catch (err) {
+            alert((pending.type === 'board' ? '게시판' : '일반') + ' 데이터 적용 중 오류가 발생했습니다.\n' + (err.message || err));
+        } finally {
+            pending.saving = false;
+        }
     }
 
     function mtApplyNormalColumns(main, sub, eng) {
         if (!mtNormalColumnTemp) throw new Error('불러온 데이터가 없습니다.');
-        if (main === eng || main === sub || eng === sub) throw new Error('각 문장에 서로 다른 열을 선택해 주세요.');
         const {rows, slotIndex:slot, fileName, addMode} = mtNormalColumnTemp;
         const {cards} = mtImportCardRows(rows, main, sub, eng);
         if (!cards.length) throw new Error('주문장과 영어문장을 함께 가진 행을 찾지 못했습니다.');
 
         const existing = addMode ? mtGetNormalSlotSync(slot) : null;
-        const priorWords = existing?.words || [];
+        const priorWords = Array.isArray(existing) ? existing : (existing?.words || []);
         const now = Date.now();
         const words = cards.map((card, index) => {
             const originalIndex = priorWords.length + index;
@@ -8504,7 +8571,7 @@ ${JSON.stringify(finalPayload)}`;
         const columnPattern = {mainKorCol:main+1, subKorCol:sub>=0?sub+1:null, engCol:eng+1};
         const stored = {
             name:fileName || '슬롯 ' + slot, type:'normal', completedMaskKeys:[],
-            ...existing, words:priorWords.concat(words), lastSession:null, columnPattern
+            ...(Array.isArray(existing) ? {} : existing), words:priorWords.concat(words), lastSession:null, columnPattern
         };
         mtSetNormalSlotSync(slot, stored);
         mtSetSlotType(slot, 'normal');
@@ -8513,79 +8580,151 @@ ${JSON.stringify(finalPayload)}`;
         alert('[슬롯 ' + slot + '] 일반 카드 ' + words.length + '개를 ' + (addMode ? '추가했습니다.' : '등록했습니다.'));
     }
 
-    function mtOpenEbookColumnModal(rows){
-        const modal=document.getElementById('mtEbookColumnModal'); if(!modal)return;
-        const maxCols = rows.reduce((width, row) => Math.max(width, row.length), 1);
-        const buildOptions=(allowNone=false)=>{ let h=allowNone?'<option value="-1">선택 안 함</option>':''; for(let c=0;c<maxCols;c++){ let sample=''; for(const r of rows){ const v=String(r?.[c]??'').trim(); if(v){sample=v.slice(0,24);break;} } h+=`<option value="${c}">열 ${c+1}${sample?` (${mtEscapeHTML(sample)})`:''}</option>`;} return h; };
-        document.getElementById('mtEbookMainCol').innerHTML=buildOptions(false);
-        document.getElementById('mtEbookSubCol').innerHTML=buildOptions(true);
-        document.getElementById('mtEbookEngCol').innerHTML=buildOptions(false);
-        // 영어 열은 내용으로 추천하되, 한국어 열의 기본 배치는 항상
-        // 주문장=1열, 보조문장=3열로 맞춥니다.
-        const sample = rows.slice(0, 30);
-        const scores = Array.from({length:maxCols}, (_, c) => ({
-            c, e:sample.reduce((total, row) => total + (String(row[c] ?? '').match(/[a-z]/gi) || []).length, 0)
-        }));
-        const en=scores.filter(x=>x.e>0).sort((a,b)=>b.e-a.e).map(x=>x.c);
-        document.getElementById('mtEbookMainCol').value='0';
-        const eng = en.find(col => col !== 0) ?? (maxCols >= 2 ? 1 : 0);
-        document.getElementById('mtEbookSubCol').value=maxCols>=3 && eng!==2?'2':'-1';
-        document.getElementById('mtEbookEngCol').value=String(eng);
-        modal.style.display='flex';
+    function mtOpenEbookColumnModal(rows) {
+        const modal = document.getElementById('mtEbookColumnModal');
+        const defaults = mtShowStudyColumnOptions('mtEbook', rows);
+        const list = document.getElementById('mtEbookImportListCol');
+        list.innerHTML = mtTableColumnOptions(rows);
+        list.value = String(mtTableWidth(rows) >= 4 ? 3 : defaults.main);
+        modal.style.display = 'flex';
     }
-    function mtCloseEbookColumnModal(){ const m=document.getElementById('mtEbookColumnModal'); if(m)m.style.display='none'; mtEbookTemp=null; }
-    function mtConfirmEbookColumns(){
-        if(!mtEbookTemp)return;
-        const mainCol=Number(document.getElementById('mtEbookMainCol').value), subCol=Number(document.getElementById('mtEbookSubCol').value), engCol=Number(document.getElementById('mtEbookEngCol').value);
-        try { mtApplyEbookColumns(mainCol, subCol, engCol); }
+
+    function mtCloseEbookColumnModal() {
+        document.getElementById('mtEbookColumnModal').style.display = 'none';
+        mtEbookTemp = null;
+    }
+
+    function mtConfirmEbookColumns() {
+        if (!mtEbookTemp) return;
+        const [main, sub, eng] = mtReadStudyColumns('mtEbook');
+        const listValue = document.getElementById('mtEbookImportListCol').value;
+        try { mtApplyEbookColumns(main, sub, eng, listValue === '' ? NaN : Number(listValue)); }
         catch (err) { alert('전자책 데이터 적용 중 오류가 발생했습니다.\n' + (err.message || err)); }
     }
 
-    function mtApplyEbookColumns(mainCol, subCol, engCol) {
-        if (!mtEbookTemp) throw new Error('불러온 데이터가 없습니다.');
-        if (mainCol === engCol || mainCol === subCol || engCol === subCol) throw new Error('각 문장에 서로 다른 열을 선택해 주세요.');
-        const {cards:words, sourceRows} = mtImportCardRows(mtEbookTemp.rows, mainCol, subCol, engCol);
-        if (!words.length) throw new Error('주문장과 영어문장을 함께 가진 행을 찾지 못했습니다.');
-        words.forEach((word, index) => { word.serial = String(index + 1); });
-        const importedStarredSerials=words.filter(w=>w.starred).map(w=>String(w.serial));
-        const slot=mtEbookTemp.slotIndex, state=mtGetTypedState(slot);
-
-        if(mtEbookTemp.addMode){
-            const base=Array.isArray(state.outputRows)?state.outputRows.slice():[];
-            const addRows=words.map((w,i)=>[w.eng,w.kor,w.subKor,String(base.length+i+1),w.exercise]);
-            const priorStars=new Set((state.starredSerials||[]).map(String));
-            words.forEach((w,i)=>{if(w.starred) priorStars.add(String(base.length+i+1));});
-            state.type='ebook';
-            state.outputRows=base.concat(addRows);
-            state.starredSerials=Array.from(priorStars);
-            state.sourceRows=[...(state.sourceRows||[]),...sourceRows];
-            state.ebook={...(state.ebook||{}),mainCol,subCol,engCol,sourceRows:[...(state.ebook?.sourceRows||[]),...sourceRows]};
-            state.pattern={engCol:1,mainKorCol:2,subKorCol:3,serialCol:4};
-            state.ebookReadIndexes=Array.isArray(state.ebookReadIndexes)?state.ebookReadIndexes:[];
-            state.lastSession=null;state.lastError='';
-            mtSaveTypedState(slot,state);mtSetSlotType(slot,'ebook');mtEbookTemp=null;
-            const cm=document.getElementById('mtEbookColumnModal');if(cm)cm.style.display='none';
-            mtInitSlots();alert(`[슬롯 ${slot+1}] 전자책 데이터 ${addRows.length}개를 추가했습니다.`);return;
+    function mtApplyEbookColumns(main, sub, eng, listCol) {
+        const {rows, slotIndex:slot, fileName, addMode} = mtEbookTemp;
+        if (!Number.isInteger(listCol) || listCol < 0 || listCol >= mtTableWidth(rows)) {
+            throw new Error('목록에 표시할 열을 선택해 주세요.');
         }
-
-        state.type='ebook';
-        state.fileName=mtEbookTemp.fileName;
-        state.ebook={mainCol,subCol,engCol,sourceRows};
-        state.outputRows=words.map(w=>[w.eng,w.kor,w.subKor,w.serial,w.exercise]);
-        state.pattern={engCol:1,mainKorCol:2,subKorCol:3,serialCol:4};
-        state.starredSerials=importedStarredSerials;
-        state.ebookReadIndexes=[];
-        // 새 전자책으로 교체할 때는 이전 전자책의 독립 완료 기록도 함께 초기화합니다.
-        try{localStorage.removeItem(MT_EBOOK_COMPLETION_RECORD_PREFIX+Number(slot));sessionStorage.removeItem(MT_EBOOK_COMPLETION_RECORD_PREFIX+Number(slot));}catch(_){}
-        state.lastSession=null;
-        state.lastError='';
-        mtSetSlotType(slot,'ebook');
-        mtSaveTypedState(slot,state);
-        mtCloseEbookColumnModal();mtInitSlots();mtOpenEbookViewer(slot);
+        const {cards, sourceRows} = mtImportCardRows(rows, main, sub, eng);
+        if (!cards.length) throw new Error('주문장과 영어문장을 함께 가진 행을 찾지 못했습니다.');
+        const state = mtGetTypedState(slot);
+        const base = addMode && Array.isArray(state.outputRows) ? state.outputRows : [];
+        const previous = addMode ? state.ebook : null;
+        const priorSource = Array.from({length:base.length}, (_, index) => previous?.sourceRows?.[index] || null);
+        let nextSerial = base.reduce((next, row) => {
+            const serial = Number(row?.[3]);
+            return Number.isSafeInteger(serial) ? Math.max(next, serial + 1) : next;
+        }, Math.max(1, Number(previous?.nextSerial) || 1));
+        const stars = new Set(addMode ? (state.starredSerials || []).map(String) : []);
+        const appended = cards.map(card => {
+            const serial = String(nextSerial++);
+            if (card.starred) stars.add(serial);
+            return [card.eng, card.kor, card.subKor, serial, card.exercise, [main, sub, eng]];
+        });
+        const existingWidth = Math.max(0, Number(previous?.columnCount) || 0);
+        state.type = 'ebook';
+        state.fileName = addMode ? state.fileName : (fileName || '슬롯 ' + slot);
+        state.ebook = {
+            ...previous, listCol, columnCount:Math.max(existingWidth, mtTableWidth(rows)),
+            nextSerial, sourceRows:priorSource.concat(sourceRows)
+        };
+        state.outputRows = base.concat(appended);
+        state.pattern = {engCol:1,mainKorCol:2,subKorCol:3,serialCol:4};
+        state.starredSerials = Array.from(stars);
+        if (!addMode) {
+            state.ebookReadIndexes = [];
+            state.ebookReadKeys = [];
+            state.lastListReadIndex = null;
+            state.lastEbookStudyIndex = null;
+            state.successCounts = {};
+            mtSaveEbookPage(slot, 1);
+            try {
+                localStorage.removeItem(MT_EBOOK_COMPLETION_RECORD_PREFIX + slot);
+                sessionStorage.removeItem(MT_EBOOK_COMPLETION_RECORD_PREFIX + slot);
+            } catch (_) {}
+        }
+        state.lastSession = null;
+        state.lastError = '';
+        mtSetSlotType(slot, 'ebook');
+        mtSaveTypedState(slot, state);
+        mtCloseEbookColumnModal();
+        mtInitSlots();
+        if (addMode) alert('[슬롯 ' + slot + '] 전자책 데이터 ' + appended.length + '개를 추가했습니다.');
+        else mtOpenEbookViewer(slot);
     }
 
-    function mtGetEbookWords(slotIndex){ const st=mtRestoreEbookCompletionRecord(slotIndex,mtGetTypedState(slotIndex)); const p=st.pattern||{engCol:1,mainKorCol:2,subKorCol:3,serialCol:4}; const read=new Set((st.ebookReadIndexes||[]).map(Number)); const stars=new Set((st.starredSerials||[]).map(String)); return (st.outputRows||[]).map((r,i)=>{const serial=String(r?.[p.serialCol-1]??(i+1)).trim();return {eng:String(r?.[p.engCol-1]??'').trim(),kor:String(r?.[p.mainKorCol-1]??'').trim(),subKor:String(r?.[p.subKorCol-1]??'').trim(),serial,originalIndex:i,exercise:r?.[4]===true,ebookRead:read.has(i),starred:stars.has(serial)};}).filter(w=>w.kor&&w.eng); }
+    function mtGetEbookWords(slotIndex) {
+        const state = mtRestoreEbookCompletionRecord(slotIndex, mtGetTypedState(slotIndex));
+        const pattern = state.pattern || {engCol:1, mainKorCol:2, subKorCol:3, serialCol:4};
+        const read = new Set((state.ebookReadIndexes || []).map(Number));
+        const stars = new Set((state.starredSerials || []).map(String));
+        const listCol = state.ebook?.listCol;
+        return (state.outputRows || []).map((row, index) => {
+            const serial = mtCellText(row?.[pattern.serialCol-1]) || String(index+1);
+            const importColumns = Array.isArray(row?.[5]) ? row[5] : null;
+            const source = state.ebook?.sourceRows?.[index];
+            const importedNumber = importColumns ? mtCellText(source?.[0]) : '';
+            const serialFromSource = importedNumber && (!importColumns.includes(0) || /^\d+(?:[.-]\d+)*$/.test(importedNumber));
+            const kor = mtCellText(row?.[pattern.mainKorCol-1]);
+            return {eng:mtCellText(row?.[pattern.engCol-1]), kor, subKor:mtCellText(row?.[pattern.subKorCol-1]),
+                listText:listCol >= 0 && Number.isInteger(listCol) && source ? mtCellText(source[listCol]) : kor,
+                displaySerial:serialFromSource ? importedNumber : String(index+1),
+                serial, originalIndex:index,
+                exercise:row?.[4] === true, ebookRead:read.has(index), starred:stars.has(serial)};
+        }).filter(word => word.kor && word.eng);
+    }
+
+    function mtSetEbookListColumn(value) {
+        if (mtEbookActiveSlot == null || mtGetSlotType(mtEbookActiveSlot) !== 'ebook') return;
+        const state = mtGetTypedState(mtEbookActiveSlot);
+        const column = Number(value);
+        if (!state.ebook || value === '' || !Number.isInteger(column) || column < -1 ||
+            column >= Math.max(Number(state.ebook.columnCount) || 0, mtTableWidth(state.ebook.sourceRows || []))) return;
+        state.ebook.listCol = column;
+        mtEbookDisplayMode = 'kor';
+        mtSaveTypedState(mtEbookActiveSlot, state);
+        mtOpenEbookViewer(mtEbookActiveSlot, true);
+    }
+
+    function mtRenderEbookListColumnOption(state, isEbook) {
+        const option = document.getElementById('mtEbookListColumnOption');
+        const sourceRows = state.ebook?.sourceRows || [];
+        option.hidden = !isEbook || !mtTableWidth(sourceRows);
+        if (option.hidden) return;
+        const select = document.getElementById('mtEbookListDisplayCol');
+        select.innerHTML = mtTableColumnOptions(sourceRows, '주문장');
+        select.value = String(state.ebook.listCol ?? -1);
+        if (!select.value) select.value = '-1';
+    }
+
     let mtEbookEditTarget = null;
+
+    function mtUpdateEbookAfterDeletion(slot, state, indexes) {
+        const deleted = new Set(indexes);
+        const serialCol = (state.pattern?.serialCol || 4) - 1;
+        const keys = new Set(indexes.map(i => mtEbookCompletionRowKey(state.outputRows[i], i, state.pattern)));
+        const serials = new Set(indexes.map(i => mtCellText(state.outputRows[i]?.[serialCol])));
+        const remaining = state.outputRows.length - deleted.size;
+        const shifted = new Map();
+        for (let old = 0, next = 0; old < state.outputRows.length; old++) {
+            shifted.set(old, remaining ? Math.min(next, remaining-1) : null);
+            if (!deleted.has(old)) next++;
+        }
+        const shift = index => index == null ? null : (shifted.get(Number(index)) ?? null);
+        state.starredSerials = (state.starredSerials || []).filter(serial => !serials.has(String(serial)));
+        state.ebookReadKeys = (state.ebookReadKeys || []).filter(key => !keys.has(key));
+        state.ebookReadIndexes = (state.ebookReadIndexes || []).map(Number)
+            .filter(i => Number.isInteger(i) && shifted.has(i) && !deleted.has(i)).map(shift);
+        state.lastListReadIndex = shift(state.lastListReadIndex);
+        state.lastEbookStudyIndex = shift(state.lastEbookStudyIndex);
+        const record = mtGetEbookCompletionRecord(slot);
+        record.keys = record.keys.filter(key => !keys.has(key));
+        record.lastIndex = shift(record.lastIndex);
+        mtSaveEbookCompletionRecord(slot, record);
+        mtEbookSelectedIndexes.clear();
+    }
 
     function mtDeleteEbookItem(slotIndex, index, event) {
         if (event) {
@@ -8606,20 +8745,12 @@ ${JSON.stringify(finalPayload)}`;
             : `전자책 목록의 ${displayIndex + 1}번 항목을 삭제하시겠습니까?`;
         if (!confirm(message)) return;
 
+        mtUpdateEbookAfterDeletion(slot, st, [displayIndex]);
         st.outputRows.splice(displayIndex, 1);
 
         // 원본 행도 같은 인덱스로 관리되는 현재 전자책 구조에 맞춰 함께 삭제합니다.
         if (st.ebook && Array.isArray(st.ebook.sourceRows) && displayIndex < st.ebook.sourceRows.length) {
             st.ebook.sourceRows.splice(displayIndex, 1);
-        }
-
-        // 삭제한 인덱스 이후의 읽음 완료 인덱스를 한 칸씩 당깁니다.
-        if (Array.isArray(st.ebookReadIndexes)) {
-            st.ebookReadIndexes = st.ebookReadIndexes
-                .map(Number)
-                .filter(Number.isInteger)
-                .filter(i => i !== displayIndex)
-                .map(i => i > displayIndex ? i - 1 : i);
         }
 
         st.lastSession = null;
@@ -8649,7 +8780,7 @@ ${JSON.stringify(finalPayload)}`;
         if(main) main.value=word.kor || '';
         if(sub) sub.value=word.subKor || '';
         if(eng) eng.value=word.eng || '';
-        if(serial) serial.textContent=`문장 ${word.serial || (index+1)}`;
+        if(serial) serial.textContent=`문장 ${word.displaySerial || word.serial || (index+1)}`;
         const overlay=document.getElementById('mtEbookEditOverlay');
         if(overlay) overlay.style.display='flex';
         setTimeout(()=>main?.focus(),0);
@@ -8682,10 +8813,11 @@ ${JSON.stringify(finalPayload)}`;
         st.outputRows[originalIndex]=row;
         if(st.ebook && Array.isArray(st.ebook.sourceRows) && Array.isArray(st.ebook.sourceRows[originalIndex])){
             const src=st.ebook.sourceRows[originalIndex].slice();
-            while(src.length<=Math.max(st.ebook.mainCol,st.ebook.subCol,st.ebook.engCol)) src.push('');
-            src[st.ebook.mainCol]=main;
-            if(Number(st.ebook.subCol)>=0) src[st.ebook.subCol]=sub;
-            src[st.ebook.engCol]=eng;
+            const [mainCol, subCol, engCol] = Array.isArray(row[5]) ? row[5] :
+                [st.ebook.mainCol ?? p.mainKorCol-1, st.ebook.subCol ?? p.subKorCol-1, st.ebook.engCol ?? p.engCol-1];
+            src[mainCol]=main;
+            if(subCol>=0) src[subCol]=sub;
+            src[engCol]=eng;
             st.ebook.sourceRows[originalIndex]=src;
         }
         // 편집으로 주문장이 바뀐 경우 기존 완료 상태는 유지하지만, 아직 완료되지 않은 문장은 그대로 유지합니다.
@@ -8738,15 +8870,12 @@ ${JSON.stringify(finalPayload)}`;
         if(!valid.length){ mtEbookSelectedIndexes.clear(); mtOpenEbookViewer(slot); return; }
         if(!confirm(`선택한 ${valid.length}개 문장을 삭제하시겠습니까?`)) return;
 
+        if (type === 'ebook') mtUpdateEbookAfterDeletion(slot, st, valid);
         valid.forEach(displayIndex=>{
             st.outputRows.splice(displayIndex,1);
             if(type==='ebook' && st.ebook && Array.isArray(st.ebook.sourceRows) && displayIndex < st.ebook.sourceRows.length) st.ebook.sourceRows.splice(displayIndex,1);
         });
 
-        if(type==='ebook' && Array.isArray(st.ebookReadIndexes)) {
-            const deletedAsc=valid.slice().sort((a,b)=>a-b);
-            st.ebookReadIndexes=st.ebookReadIndexes.map(Number).filter(Number.isInteger).filter(i=>!deletedAsc.includes(i)).map(i=>i-deletedAsc.filter(d=>d<i).length);
-        }
         st.lastSession=null; st.lastError='';
         mtSaveTypedState(slot,st);
         mtEbookSelectedIndexes.clear();
@@ -8793,6 +8922,8 @@ ${JSON.stringify(finalPayload)}`;
         const type=mtGetSlotType(slotIndex);
         const isEbook=type==='ebook';
         const st=mtGetTypedState(slotIndex), words=isEbook?mtGetEbookWords(slotIndex):mtGetGeneratorWords(slotIndex);
+        if (mtEbookActiveSlot !== Number(slotIndex)) mtEbookSelectedIndexes.clear();
+        mtRenderEbookListColumnOption(st, isEbook);
         if(!st.fileName || !words.length){
             mtEbookSelectedIndexes.clear();
             const toolbar=document.getElementById('mtEbookListToolbar'); if(toolbar) toolbar.style.display='none';
@@ -8825,7 +8956,7 @@ ${JSON.stringify(finalPayload)}`;
             ? `총 ${words.length}문장 · 한 페이지 ${MT_EBOOK_PAGE_SIZE}문장 · 언마스킹 완료 문장만 영어로 표시합니다.`
             : `총 ${words.length}문장 · 한 페이지 ${MT_EBOOK_PAGE_SIZE}문장 · 언마스킹 완료 문장은 옅은 회색으로 표시됩니다.`;
         const englishToggleBtn=document.getElementById('mtEbookEnglishToggleBtn');
-        if(englishToggleBtn) englishToggleBtn.textContent=mtEbookDisplayMode === 'eng' ? '주문장 보기' : '영어변환';
+        if(englishToggleBtn) englishToggleBtn.textContent=mtEbookDisplayMode === 'eng' ? '목록 문장 보기' : '영어변환';
         const list=document.getElementById('mtEbookList'); if(!list)return; list.innerHTML='';
         if(!preserveSelection){
             const validSet=new Set(words.map((_,i)=>i));
@@ -8840,9 +8971,8 @@ ${JSON.stringify(finalPayload)}`;
             item.className='mt-ebook-item'+(isRead?' read':'');
             item.dataset.index=absoluteIndex;
             const showingEnglish = mtEbookDisplayMode === 'eng' && isRead;
-            const displayText = showingEnglish ? w.eng : w.kor;
-            const subPrompt = isEbook && !showingEnglish && w.exercise && w.subKor
-                ? '<br><span class="mt-paren-text">' + mtEscapeHTML(w.subKor) + '</span>' : '';
+            const displayText = showingEnglish ? w.eng : (isEbook ? w.listText : w.kor);
+            const displayNumber = isEbook ? w.displaySerial : String(absoluteIndex+1);
             item.innerHTML=`<div class="mt-ebook-item-inner"><input type="checkbox" class="mt-ebook-item-select" aria-label="문장 ${absoluteIndex+1}번 선택" ${mtEbookSelectedIndexes.has(absoluteIndex)?'checked':''}><div class="mt-ebook-item-main-wrap"><button type="button" class="mt-ebook-item-delete-btn" title="항목 삭제" aria-label="항목 삭제">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v5"></path><path d="M14 11v5"></path>
@@ -8851,7 +8981,7 @@ ${JSON.stringify(finalPayload)}`;
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z"></path>
                 </svg>
-            </button><span class="mt-ebook-item-num">${absoluteIndex+1}</span><span class="mt-ebook-item-main">${mtEscapeHTML(displayText)}${subPrompt}</span></div></div>`;
+            </button><span class="mt-ebook-item-num">${mtEscapeHTML(displayNumber)}</span><span class="mt-ebook-item-main">${mtEscapeHTML(displayText)}</span></div></div>`;
             const check=item.querySelector('.mt-ebook-item-select');
             // 체크박스 클릭은 선택 상태만 변경하고 카드 열기 이벤트가 부모 행으로 전파되지 않도록 합니다.
             check.addEventListener('click',(e)=>{ e.stopPropagation(); }); check.addEventListener('change',(e)=>{ e.stopPropagation(); if(check.checked) mtEbookSelectedIndexes.add(absoluteIndex); else mtEbookSelectedIndexes.delete(absoluteIndex); mtEbookUpdateSelectionUi(Number(slotIndex), pageWords, start); });
@@ -10508,7 +10638,7 @@ ${JSON.stringify(finalPayload)}`;
 
         document.getElementById('mtStarBtn').innerText = currentWord.starred ? '★' : '☆';
 
-        let realSerialNumber = currentWord.serial || (currentWord.originalIndex + 1);
+        let realSerialNumber = currentWord.displaySerial || currentWord.serial || (currentWord.originalIndex + 1);
         const ebookPosition = mtEbookTypingActive && Number.isInteger(Number(currentWord.originalIndex))
             ? Number(currentWord.originalIndex) + 1
             : index + 1;
@@ -10708,7 +10838,7 @@ ${JSON.stringify(finalPayload)}`;
         (st.ebookReadIndexes||[]).map(Number).filter(Number.isInteger).forEach(i=>{if(st.outputRows[i])keys.add(mtEbookCompletionRowKey(st.outputRows[i],i,st.pattern));});
         st.ebookReadKeys=Array.from(keys);
         st.ebookReadIndexes=st.outputRows.map((row,i)=>keys.has(mtEbookCompletionRowKey(row,i,st.pattern))?i:-1).filter(i=>i>=0);
-        if(Number.isInteger(Number(record.lastIndex)))st.lastEbookStudyIndex=Number(record.lastIndex);
+        if(record.lastIndex != null && Number.isInteger(Number(record.lastIndex)))st.lastEbookStudyIndex=Number(record.lastIndex);
         return st;
     }
     // 언마스킹 완료는 화면 이동·새로고침보다 먼저 동기적으로 localStorage에 확정한다.
@@ -10779,7 +10909,7 @@ ${JSON.stringify(finalPayload)}`;
         const slot = Number(mtEbookActiveSlot);
         const current = mtCurrentStudyWords?.[mtCurrentIndex];
 
-        if (current) {
+        if (current && mtIsCurrentMaskFullyUnmasked()) {
             mtCommitEbookCompletion(slot,current);
         }
         mtRecordEbookCompletedCardIfReady();
@@ -11562,42 +11692,31 @@ ${JSON.stringify(finalPayload)}`;
         btn.innerText = `★ 모아보기 [${starCount}]`;
     }
 
-    function createBoardObject(name, rawData) {
-        const exercise = mtIsExerciseTable(rawData);
-        const {main, sub, answer} = MT_EXERCISE_COLUMNS;
-        const validData = rawData.filter(row => exercise
-            ? !mtIsExerciseHeader(row) && mtCellText(row[main]) && mtCellText(row[answer])
-            : row.some(cell => mtCellText(cell)));
-        if (validData.length === 0) return null;
-
-        let krCol = 0; let maxKr = -1;
-        let enCol = 1; let maxEn = -1;
-        let sample = validData.slice(0, 15);
-        for(let c=0; c<sample[0].length; c++) {
-            let krScore = 0, enScore = 0;
-            sample.forEach(r => {
-                let t = String(r[c]||'').replace(/[\s\d\p{P}\p{S}]/gu, '');
-                if((/[\uAC00-\uD7AF]/g).test(t)) krScore++;
-                if((/[a-zA-Z]/g).test(t)) enScore++;
-            });
-            if(krScore > maxKr) { maxKr = krScore; krCol = c; }
-            if(enScore > maxEn) { maxEn = enScore; enCol = c; }
-        }
-        if (krCol === enCol) { enCol = krCol === 0 ? 1 : 0; }
-        if (exercise) { krCol = main; enCol = answer; }
-
-        const items = validData.map((row, index) => ({
-            cells: row, views: 0, author: exercise ? '익명' : extractBoardRandomAuthor(String(row[enCol] || row[krCol] || '')),
-            starred: false, serial: index + 1, lastViewedAt: 0 
+    function createBoardObject(name, rows, main, sub, eng) {
+        const {cards, sourceRows, exercise} = mtImportCardRows(rows, main, sub, eng);
+        if (!cards.length) return null;
+        const items = sourceRows.map((cells, index) => ({
+            cells, views:0, author:exercise ? '익명' : extractBoardRandomAuthor(mtCellText(cells[eng])),
+            starred:cards[index].starred, serial:index+1, lastViewedAt:0
         }));
-
-        return { id: 'board_' + Date.now() + '_' + Math.floor(Math.random()*1000), name: name, items: items, krColIdx: krCol, enColIdx: enCol, subColIdx:exercise ? sub : null };
+        return {id:'board_' + Date.now() + '_' + Math.floor(Math.random()*1000), name, items,
+            krColIdx:main, enColIdx:eng, subColIdx:sub>=0 ? sub : null, exercise};
     }
 
-    async function addBoardAndSave(boardObj) {
-        if(!boardObj) return;
-        boardDataList.push(boardObj);
-        await saveToDatabase(); renderBoardList();
+    async function addBoardAndSave(board) {
+        boardDataList.push(board);
+        try { await saveToDatabase(); }
+        catch (error) {
+            boardDataList = boardDataList.filter(item => item.id !== board.id);
+            throw error;
+        }
+        renderBoardList();
+    }
+
+    function mtRegisterBoardTable(rows, fileName, input = null) {
+        if (!rows.length) throw new Error('등록할 행이 없습니다.');
+        mtNormalColumnTemp = {type:'board', rows, fileName, input, raw:input?.value};
+        mtOpenNormalColumnSelectModal(rows);
     }
 
     async function deleteBoard(id) {
@@ -11613,9 +11732,7 @@ ${JSON.stringify(finalPayload)}`;
         try {
             const encoding = document.getElementById('boardEncodingSelect').value;
             const rows = await mtReadImportTable(file, {encoding});
-            const board = createBoardObject(file.name, rows);
-            if (!board) throw new Error('등록할 행이 없습니다.');
-            await addBoardAndSave(board);
+            mtRegisterBoardTable(rows, file.name);
         } catch (err) {
             alert('게시판 파일 등록 중 오류가 발생했습니다.\n' + (err.message || err));
         }
@@ -11630,10 +11747,7 @@ ${JSON.stringify(finalPayload)}`;
             const firstCell = mtCellText(rows[0]?.[0]);
             const name = !firstCell || mtIsExerciseHeader(rows[0]) ? '붙여넣은 문서' :
                 (firstCell.length > 15 ? firstCell.slice(0, 15) + '...' : firstCell);
-            const board = createBoardObject(name, rows);
-            if (!board) throw new Error('등록할 행이 없습니다.');
-            await addBoardAndSave(board);
-            if (input.value === raw) input.value = '';
+            mtRegisterBoardTable(rows, name, input);
         } catch (err) {
             alert('게시판 텍스트 등록 중 오류가 발생했습니다.\n' + (err.message || err));
         }
@@ -11836,9 +11950,10 @@ ${JSON.stringify(finalPayload)}`;
             const tdTitle = document.createElement('td');
             tdTitle.className = 'board-subject-col';
             tdTitle.textContent = title || '(제목 없음)';
-            const isExercise = Number.isInteger(board.subColIdx);
-            if (isExercise) {
-                const sub = mtBracketExercisePrompt(item.cells[board.subColIdx]);
+            const isExercise = board.exercise ?? Number.isInteger(board.subColIdx);
+            if (Number.isInteger(board.subColIdx)) {
+                const value = item.cells[board.subColIdx];
+                const sub = isExercise ? mtBracketExercisePrompt(value) : mtCellText(value);
                 if (sub) {
                     const subLine = document.createElement('span');
                     subLine.className = 'board-exercise-sub';
@@ -12160,7 +12275,7 @@ ${JSON.stringify(finalPayload)}`;
   (function syncAppVersionFromFileName(){
     // 파일을 다른 이름으로 저장하거나 브라우저가 경로를 변환해도, 기본 표시가
     // 사라지지 않게 한다. 정상 파일명에서는 아래 값이 자동으로 새 번호로 대체된다.
-    const fallbackVersion='v125';
+    const fallbackVersion='v126';
     let fileName='';
     try{fileName=decodeURIComponent(String(location.pathname||'').split('/').pop()||'');}
     catch(_){fileName=String(location.pathname||'').split('/').pop()||'';}
