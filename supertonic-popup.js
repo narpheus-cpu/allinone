@@ -75,12 +75,13 @@ async function synth(text,token){
  }
  await connect();if(token!==generation)throw new DOMException('중지','AbortError');return new Promise((resolve,reject)=>{const id=++seq,timer=setTimeout(()=>{pending.delete(id);resetBridge();reject(Error('음성 합성 시간 초과 · 다시 눌러 주세요.'));},180000);pending.set(id,{resolve,reject,timer});frame.contentWindow.postMessage({type:'reader-tts',action:'synthesize',id,generation:token,engine:preferences.engine,text,lang:lang(text),voice:preferences.voice},origin);});}
 function stop(){generation++;run=null;activeFetch?.abort();try{source?.stop();audio?.resume();}catch(_){}frame?.contentWindow?.postMessage({type:'reader-tts',action:'cancel',generation},origin);for(const r of pending.values()){clearTimeout(r.timer);r.reject(new DOMException('중지','AbortError'));}pending.clear();document.querySelectorAll('.mt-speech-reading').forEach(e=>e.classList.remove('mt-speech-reading'));say('낭독 중지');}
-async function start(slot,index,field='kor',firstText=null){stop();lastField=field;const token=generation;const word=getWords(slot)[index];if(!word)return;const text=firstText??textFor(word,field);audio ||= new AudioContext();await audio.resume();if(token!==generation)return;run={slot,paused:false,field,index};try{
+function englishSentences(text){return typeof Intl.Segmenter==='function'?[...new Intl.Segmenter('en',{granularity:'sentence'}).segment(text)].map(s=>s.segment.trim()).filter(Boolean):(text.match(/[^.!?]+(?:[.!?]+|$)/g)||[text]).map(s=>s.trim()).filter(Boolean);}
+async function start(slot,index,field='kor',firstText=null,allEnglish=false){stop();lastField=field;const token=generation;const word=getWords(slot)[index];if(!word)return;const text=firstText??textFor(word,field);const utterances=allEnglish?englishSentences(text).flatMap(parts):parts(text);audio ||= new AudioContext();await audio.resume();if(token!==generation)return;run={slot,paused:false,field,index};try{
  if(Number(mtActiveSlotIndex)!==Number(slot)&&mtActiveSlotIndex!==slot){stop();return;}
  mtSaveLastReadPosition(slot,Number.isInteger(word.originalIndex)?word.originalIndex:index);mtSaveSessionState();await mtPersistTypedSlotStates();if(token!==generation)return;
  document.querySelectorAll('.mt-speech-reading').forEach(e=>e.classList.remove('mt-speech-reading'));
  const highlight=document.getElementById(field==='eng'?'mtMaskContainer':'mtKorText');highlight.classList.add('mt-speech-reading');
- say('선택한 문장 낭독 중');for(const part of parts(text)){if(token!==generation)return;const result=await synth(part,token);if(token!==generation)return;const samples=new Float32Array(result.samples),buffer=audio.createBuffer(1,samples.length,result.sampleRate);buffer.copyToChannel(samples,0);await new Promise(resolve=>{source=audio.createBufferSource();source.buffer=buffer;source.connect(audio.destination);source.onended=resolve;source.start();});}
+ say(allEnglish?'현재 카드의 영어문장 전체 낭독 중':'선택한 문장 낭독 중');for(const part of utterances){if(token!==generation)return;const result=await synth(part,token);if(token!==generation)return;const samples=new Float32Array(result.samples),buffer=audio.createBuffer(1,samples.length,result.sampleRate);buffer.copyToChannel(samples,0);await new Promise(resolve=>{source=audio.createBufferSource();source.buffer=buffer;source.connect(audio.destination);source.onended=resolve;source.start();});}
  if(token===generation){run=null;say('낭독 완료');document.querySelectorAll('.mt-speech-reading').forEach(e=>e.classList.remove('mt-speech-reading'));}
  }catch(error){if(token===generation)say('낭독 실패 · '+error.message);}}
 const style=document.createElement('style');style.textContent='.mt-speech-reading{background:#fef3c7!important;outline:2px solid #fbbf24}.mt-speech-listen{margin:0 7px;padding:3px 7px}#mtSpeechOptionsDialog,#mtSpeechExportDialog{max-width:90vw;border:1px solid #cbd5e1;border-radius:12px;padding:22px}.mt-speech-options select{max-width:65%;padding:5px}';document.head.append(style);
@@ -97,14 +98,14 @@ function decoratePopup(){
 }
 const englishControls=document.createElement('div');englishControls.id='mtPopupEnglishListen';englishControls.style.cssText='width:fit-content;text-align:center;margin:4px auto 0;position:relative;z-index:2';listenButton(englishControls,'eng',null,'영어문장 듣기');document.getElementById('mtMaskContainer').after(englishControls);
 document.addEventListener('keydown',event=>{
- if(event.key!=='Home'||event.ctrlKey||event.altKey||event.metaKey||event.shiftKey||event.isComposing)return;
+ if(event.key!=='ArrowDown'||event.ctrlKey||event.altKey||event.metaKey||event.shiftKey||event.isComposing)return;
  const popup=document.getElementById('mt-flashcard');
  if(!popup.getClientRects().length||getComputedStyle(popup).visibility==='hidden'||document.querySelector('dialog[open]'))return;
  const listen=englishControls.querySelector('button');if(!listen)return;
- event.preventDefault();event.stopImmediatePropagation();if(!event.repeat)listen.click();
+ event.preventDefault();event.stopImmediatePropagation();if(!event.repeat)start(mtActiveSlotIndex,popupIndex(),'eng',null,true).catch(error=>say(error.message));
 },true);
-englishControls.title='Home: 영어문장 듣기';englishControls.setAttribute('aria-keyshortcuts','Home');
-const shortcutHelp=document.createElement('span');shortcutHelp.textContent='Home: 영어문장 듣기';shortcutHelp.style.cssText='font-size:11px;color:#64748b;align-self:center';popupControls.append(shortcutHelp);
+englishControls.title='↓: 현재 카드의 영어문장 전체 순서대로 듣기';englishControls.setAttribute('aria-keyshortcuts','ArrowDown');
+const shortcutHelp=document.createElement('span');shortcutHelp.textContent='↓: 현재 영어문장 모두 순서대로 듣기';shortcutHelp.style.cssText='font-size:11px;color:#64748b;align-self:center';popupControls.append(shortcutHelp);
 const originalLoad=window.mtLoadWord;window.mtLoadWord=function(){if(run)stop();const result=originalLoad.apply(this,arguments);decoratePopup();return result;};
 const main=window.mtGoMainMenu;window.mtGoMainMenu=function(){stop();return main.apply(this,arguments);};
 const close=window.mtCloseEbookTyping;window.mtCloseEbookTyping=function(){stop();return close.apply(this,arguments);};

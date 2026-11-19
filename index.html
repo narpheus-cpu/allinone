@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v131</title>
+    <title>올인원 영작-단어장 시스템 · v132</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -3884,7 +3884,7 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
 
             <div style="margin-top: 25px; padding-top: 15px; border-top: 1px dashed var(--border-color); font-size: 12px; color: #6b7280; text-align: center; line-height: 1.6;">
                 * 대소문자 구분 없음. 가려진 네모를 클릭하면 힌트를 볼 수 있습니다.<br>
-                <span id="mtViewerShortcutHelp">* [Home] 현재 영어문장 낭독.<br>
+                <span id="mtViewerShortcutHelp">* [↓] 현재 카드의 영어문장 전체를 순서대로 낭독.<br>
                 * 영어 입력창 단축키: [PageUp] 이전 카드 · [PageDown] 다음 카드 · [Enter] 정답 입력/전체 가림 해제 후 다음 카드.<br>
                 * [Tab] 다음 힌트(커서가 입력 끝에 있을 때) · [Esc] 뷰어 닫기(입력창이 비었을 때).</span>
             </div>
@@ -12277,7 +12277,7 @@ ${JSON.stringify(finalPayload)}`;
   (function syncAppVersionFromFileName(){
     // 파일을 다른 이름으로 저장하거나 브라우저가 경로를 변환해도, 기본 표시가
     // 사라지지 않게 한다. 정상 파일명에서는 아래 값이 자동으로 새 번호로 대체된다.
-    const fallbackVersion='v131';
+    const fallbackVersion='v132';
     let fileName='';
     try{fileName=decodeURIComponent(String(location.pathname||'').split('/').pop()||'');}
     catch(_){fileName=String(location.pathname||'').split('/').pop()||'';}
@@ -13001,6 +13001,6 @@ ${JSON.stringify(finalPayload)}`;
     syncOpenState();
 })();
 </script>
-<script src="./supertonic-popup.js?v=130"></script>
+<script src="./supertonic-popup.js?v=132"></script>
 </body>
 </html>
