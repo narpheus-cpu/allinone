@@ -96,6 +96,15 @@ function decoratePopup(){
  englishControls.replaceChildren();const english=textFor(mtCurrentStudyWords[mtCurrentIndex],'eng');const englishSegments=segmenter?[...segmenter.segment(english)].map(s=>s.segment).filter(s=>s.trim()):[english];englishSegments.forEach((text,index)=>{const b=listenButton(englishControls,'eng',text,englishSegments.length>1?`영어문장 ${index+1} 듣기`:'영어문장 듣기');if(englishSegments.length>1)b.textContent=`🔊 ${index+1}`;});
 }
 const englishControls=document.createElement('div');englishControls.id='mtPopupEnglishListen';englishControls.style.cssText='width:fit-content;text-align:center;margin:4px auto 0;position:relative;z-index:2';listenButton(englishControls,'eng',null,'영어문장 듣기');document.getElementById('mtMaskContainer').after(englishControls);
+document.addEventListener('keydown',event=>{
+ if(event.key!=='Home'||event.ctrlKey||event.altKey||event.metaKey||event.shiftKey||event.isComposing)return;
+ const popup=document.getElementById('mt-flashcard');
+ if(!popup.getClientRects().length||getComputedStyle(popup).visibility==='hidden'||document.querySelector('dialog[open]'))return;
+ const listen=englishControls.querySelector('button');if(!listen)return;
+ event.preventDefault();event.stopImmediatePropagation();if(!event.repeat)listen.click();
+},true);
+englishControls.title='Home: 영어문장 듣기';englishControls.setAttribute('aria-keyshortcuts','Home');
+const shortcutHelp=document.createElement('span');shortcutHelp.textContent='Home: 영어문장 듣기';shortcutHelp.style.cssText='font-size:11px;color:#64748b;align-self:center';popupControls.append(shortcutHelp);
 const originalLoad=window.mtLoadWord;window.mtLoadWord=function(){if(run)stop();const result=originalLoad.apply(this,arguments);decoratePopup();return result;};
 const main=window.mtGoMainMenu;window.mtGoMainMenu=function(){stop();return main.apply(this,arguments);};
 const close=window.mtCloseEbookTyping;window.mtCloseEbookTyping=function(){stop();return close.apply(this,arguments);};
