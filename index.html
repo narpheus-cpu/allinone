@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v133</title>
+    <title>올인원 영작-단어장 시스템 · v134</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -737,7 +737,7 @@
         .mt-progress-text { color: #666; font-size: 14px; font-weight: bold; }
 
         #mtKorText { font-size: var(--mt-kor-size); font-weight: bold; color: #333; margin-top: var(--mt-kor-margin-top); margin-bottom: var(--mt-kor-margin-bottom); line-height: var(--mt-kor-line-height); text-align: center; }
-        .mt-paren-text { font-size: var(--mt-paren-size); color: #555; line-height: var(--mt-paren-line-height); }
+        .mt-paren-text { display:block; margin-top:var(--mt-kor-sub-gap,0px); font-size: var(--mt-paren-size); color: #555; line-height: var(--mt-paren-line-height); }
 
         .mt-mask-container { 
             display: flex; 
@@ -3832,6 +3832,12 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
                     <button onclick="mtAdjustLayout('korLineHeight', 0.1)">+</button>
                 </div>
                 <div class="mt-font-ctrl-item">
+                    <label for="mtKorSubGapInput">주문장·보조문장 간격</label>
+                    <button type="button" aria-label="문장 사이 간격 줄이기" onclick="mtAdjustLayout('korSubGap', -1)">-</button>
+                    <input type="number" id="mtKorSubGapInput" min="-20" max="80" step="1" value="0" oninput="mtSetKorSubGap(this.value)" style="width:48px;" title="음수는 간격 축소, 양수는 간격 확대"><span>px</span>
+                    <button type="button" aria-label="문장 사이 간격 늘리기" onclick="mtAdjustLayout('korSubGap', 1)">+</button>
+                </div>
+                <div class="mt-font-ctrl-item">
                     <span>보조문장 줄간격</span>
                     <button onclick="mtAdjustLayout('parenLineHeight', -0.1)">-</button>
                     <input type="text" id="mtParenLineHeightInput" readonly style="width:42px;">
@@ -6593,6 +6599,7 @@ Rules:
         spaceWidth: 0.8,
         korLineHeight: 1.4,
         parenLineHeight: 1.4,
+        korSubGap: 0,
         maskLineHeight: 1.4,
         inputLineHeight: 1.4,
         maskHeight: 1.2,
@@ -6630,6 +6637,7 @@ Rules:
     let mtEngBoxGap = mtGetStoredNumber('mtEngBoxGap', MT_FONT_DEFAULTS.boxGap, 0, 30);
     let mtSpaceWidth = mtGetStoredNumber('mtSpaceWidth', MT_FONT_DEFAULTS.spaceWidth, 0.1, 4.0);
     let mtKorLineHeight = mtGetStoredNumber('mtKorLineHeight', MT_FONT_DEFAULTS.korLineHeight, 1.0, 3.0);
+    let mtKorSubGap = mtGetStoredNumber('mtKorSubGap', MT_FONT_DEFAULTS.korSubGap, -20, 80);
     let mtParenLineHeight = mtGetStoredNumber('mtParenLineHeight', MT_FONT_DEFAULTS.parenLineHeight, 1.0, 3.0);
     let mtMaskLineHeight = mtGetStoredNumber('mtMaskLineHeight', MT_FONT_DEFAULTS.maskLineHeight, 1.0, 3.0);
     let mtInputLineHeight = mtGetStoredNumber('mtInputLineHeight', MT_FONT_DEFAULTS.inputLineHeight, 1.0, 3.0);
@@ -6655,6 +6663,7 @@ Rules:
             boxGap: Number.isFinite(Number(settings.boxGap)) ? Math.max(0, Math.min(30, Number(settings.boxGap))) : MT_FONT_DEFAULTS.boxGap,
             spaceWidth: Number.isFinite(Number(settings.spaceWidth)) ? Math.max(0.1, Math.min(4.0, Number(settings.spaceWidth))) : MT_FONT_DEFAULTS.spaceWidth,
             korLineHeight: Number.isFinite(Number(settings.korLineHeight)) ? Math.max(1.0, Math.min(3.0, Number(settings.korLineHeight))) : MT_FONT_DEFAULTS.korLineHeight,
+            korSubGap: Number.isFinite(Number(settings.korSubGap)) ? Math.round(Math.max(-20, Math.min(80, Number(settings.korSubGap)))) : MT_FONT_DEFAULTS.korSubGap,
             parenLineHeight: Number.isFinite(Number(settings.parenLineHeight)) ? Math.max(1.0, Math.min(3.0, Number(settings.parenLineHeight))) : MT_FONT_DEFAULTS.parenLineHeight,
             maskLineHeight: Number.isFinite(Number(settings.maskLineHeight)) ? Math.max(1.0, Math.min(3.0, Number(settings.maskLineHeight))) : MT_FONT_DEFAULTS.maskLineHeight,
             inputLineHeight: Number.isFinite(Number(settings.inputLineHeight)) ? Math.max(1.0, Math.min(3.0, Number(settings.inputLineHeight))) : MT_FONT_DEFAULTS.inputLineHeight,
@@ -6683,6 +6692,7 @@ Rules:
         mtSpaceWidth = normalized.spaceWidth;
         mtKorLineHeight = normalized.korLineHeight;
         mtParenLineHeight = normalized.parenLineHeight;
+        mtKorSubGap = normalized.korSubGap;
         mtMaskLineHeight = normalized.maskLineHeight;
         mtInputLineHeight = normalized.inputLineHeight;
         mtMaskHeight = normalized.maskHeight;
@@ -6706,6 +6716,7 @@ Rules:
         localStorage.setItem('mtSpaceWidth', String(mtSpaceWidth));
         localStorage.setItem('mtKorLineHeight', String(mtKorLineHeight));
         localStorage.setItem('mtParenLineHeight', String(mtParenLineHeight));
+        localStorage.setItem('mtKorSubGap', String(mtKorSubGap));
         localStorage.setItem('mtMaskLineHeight', String(mtMaskLineHeight));
         localStorage.setItem('mtInputLineHeight', String(mtInputLineHeight));
         localStorage.setItem('mtMaskHeight', String(mtMaskHeight));
@@ -6734,6 +6745,7 @@ Rules:
             spaceWidth: mtSpaceWidth,
             korLineHeight: mtKorLineHeight,
             parenLineHeight: mtParenLineHeight,
+            korSubGap: mtKorSubGap,
             maskLineHeight: mtMaskLineHeight,
             inputLineHeight: mtInputLineHeight,
             maskHeight: mtMaskHeight,
@@ -6761,6 +6773,8 @@ Rules:
         root.style.setProperty('--mt-space-width', mtSpaceWidth + 'em');
         root.style.setProperty('--mt-kor-line-height', mtKorLineHeight);
         root.style.setProperty('--mt-paren-line-height', mtParenLineHeight);
+        root.style.setProperty('--mt-kor-sub-gap', mtKorSubGap + 'px');
+        const gapInput=document.getElementById('mtKorSubGapInput');if(gapInput)gapInput.value=mtKorSubGap;
         root.style.setProperty('--mt-mask-line-height', mtMaskLineHeight);
         root.style.setProperty('--mt-input-line-height', mtInputLineHeight);
         root.style.setProperty('--mt-mask-height', mtMaskHeight + 'em');
@@ -6883,7 +6897,15 @@ Rules:
         window.addEventListener('blur', () => stop({type:'blur'}));
     }
 
+    function mtSetKorSubGap(value) {
+        if(String(value).trim()==='' || !Number.isFinite(Number(value)))return;
+        mtKorSubGap=Math.round(Math.max(-20,Math.min(80,Number(value))));
+        localStorage.setItem('mtKorSubGap',String(mtKorSubGap));
+        mtApplyFontSettings();
+    }
+
     function mtAdjustLayout(type, delta) {
+        if(type === 'korSubGap'){mtSetKorSubGap(mtKorSubGap+delta);return;}
         if(type === 'boxWidth') {
             mtEngBoxWidth = Math.max(0.2, Math.min(4.0, mtEngBoxWidth + delta));
             localStorage.setItem('mtEngBoxWidth', mtEngBoxWidth.toFixed(2));
@@ -10627,9 +10649,9 @@ ${JSON.stringify(finalPayload)}`;
 
         let formattedKor = mtEscapeHTML(mainKor);
         if (subKor) {
-            formattedKor += `<br><span class="mt-paren-text">${mtEscapeHTML(subKor)}</span>`;
+            formattedKor += `<span class="mt-paren-text">${mtEscapeHTML(subKor)}</span>`;
         } else if (!currentWord.exercise) {
-            formattedKor = formattedKor.replace(/\s*(\([^)]+\))/g, '<br><span class="mt-paren-text">$1</span>');
+            formattedKor = formattedKor.replace(/\s*(\([^)]+\))/g, '<span class="mt-paren-text">$1</span>');
         }
 
         document.getElementById('mtKorText').innerHTML = formattedKor;
@@ -12277,7 +12299,7 @@ ${JSON.stringify(finalPayload)}`;
   (function syncAppVersionFromFileName(){
     // 파일을 다른 이름으로 저장하거나 브라우저가 경로를 변환해도, 기본 표시가
     // 사라지지 않게 한다. 정상 파일명에서는 아래 값이 자동으로 새 번호로 대체된다.
-    const fallbackVersion='v133';
+    const fallbackVersion='v134';
     let fileName='';
     try{fileName=decodeURIComponent(String(location.pathname||'').split('/').pop()||'');}
     catch(_){fileName=String(location.pathname||'').split('/').pop()||'';}
