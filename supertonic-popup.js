@@ -3,7 +3,7 @@
 const origin='http://127.0.0.1:19426';
 const KEY='mt_supertonic_preferences_v1';
 const defaults={engine:'native',voice:'F1',language:'auto',mp3Model:'supertonic3',mp3Voice:'F1',mp3Bitrate:'128',mp3Split:false};
-let preferences={...defaults},dirty=new Set(),ready=false,frame,connection,seq=0,generation=0,run=null,audio,source;
+let preferences={...defaults},dirty=new Set(),ready=false,frame,connection,seq=0,generation=0,run=null,audio,source,activeFetch;
 const pending=new Map();
 const status=document.createElement('div');status.id='mtSpeechStatus';status.setAttribute('role','status');status.style.cssText='font-size:12px;color:#475569;padding:6px';
 const say=message=>{status.textContent=message;document.querySelectorAll('.mt-speech-status').forEach(e=>e.textContent=message);};
@@ -50,10 +50,31 @@ function textFor(word,field=lastField){return String(field==='eng'?word.eng:fiel
 function popupIndex(){return mtEbookTypingActive?(mtEbookCurrentListIndex??0):mtCurrentIndex;}
 function lang(text){if(preferences.language!=='auto')return preferences.language;return /[가-힣ᄀ-ᇿ]/u.test(text)?'ko':/[ぁ-ヿ]/u.test(text)?'ja':/[\u3400-\u9fff]/u.test(text)?'ko':'en';}
 function parts(text){const result=[];let chars=Array.from(text.trim());while(chars.length){let cut=Math.min(115,chars.length);if(chars.length>cut){const p=chars.slice(0,cut).join(''),i=Math.max(p.lastIndexOf(' '),p.lastIndexOf('。'),p.lastIndexOf('.'));if(i>55)cut=Array.from(p.slice(0,i+1)).length;}const part=chars.splice(0,cut).join('');if(/[\p{L}\p{N}]/u.test(part))result.push(part);}return result;}
-function connect(){if(connection)return connection;connection=new Promise((resolve,reject)=>{frame=document.createElement('iframe');frame.hidden=true;frame.src=origin+'/supertonic3/bridge.html';const timer=setTimeout(()=>{frame.remove();connection=null;reject(Error('로컬 음성 도우미 연결 실패'));},15000);const onReady=e=>{if(e.source===frame.contentWindow&&e.data?.action==='ready'){clearTimeout(timer);removeEventListener('message',onReady);resolve();}};addEventListener('message',onReady);frame.onload=()=>frame.contentWindow.postMessage({type:'reader-tts',action:'connect'},origin);document.body.append(frame);});return connection;}
-addEventListener('message',e=>{if(e.source!==frame?.contentWindow||e.origin!==origin||e.data?.type!=='reader-tts')return;const d=e.data,request=pending.get(d.id);if(d.action==='progress'){say(`모델 여는 중 ${d.loaded}/${d.total}`);return;}if(!request)return;clearTimeout(request.timer);pending.delete(d.id);d.action==='audio'?request.resolve(d):request.reject(Error(d.message||'합성 실패'));});
-async function synth(text,token){await connect();return new Promise((resolve,reject)=>{const id=++seq,timer=setTimeout(()=>{pending.delete(id);reject(Error('음성 합성 시간 초과'));},180000);pending.set(id,{resolve,reject,timer});frame.contentWindow.postMessage({type:'reader-tts',action:'synthesize',id,generation:token,engine:preferences.engine,text,lang:lang(text),voice:preferences.voice},origin);});}
-function stop(){generation++;run=null;try{source?.stop();audio?.resume();}catch(_){}frame?.contentWindow?.postMessage({type:'reader-tts',action:'cancel',generation},origin);for(const r of pending.values()){clearTimeout(r.timer);r.reject(new DOMException('중지','AbortError'));}pending.clear();document.querySelectorAll('.mt-speech-reading').forEach(e=>e.classList.remove('mt-speech-reading'));say('낭독 중지');}
+async function connectionError(){
+ let denied=false;try{denied=(await navigator.permissions.query({name:'local-network-access'})).state==='denied';}catch(_){}
+ return Error(denied?'브라우저가 PC 연결을 차단했습니다. 주소창의 사이트 설정에서 로컬 네트워크 접근을 허용한 뒤 다시 눌러 주세요.':'PC 음성 도우미가 응답하지 않습니다. 자동 복구를 기다린 뒤 같은 듣기 버튼을 다시 눌러 주세요.');
+}
+function resetBridge(){frame?.remove();frame=null;connection=null;}
+function connect(){if(connection)return connection;const currentFrame=document.createElement('iframe');frame=currentFrame;currentFrame.hidden=true;connection=new Promise((resolve,reject)=>{
+ let settled=false;const finish=(error)=>{if(settled)return;settled=true;clearTimeout(timer);removeEventListener('message',onReady);currentFrame.onerror=null;if(error){resetBridge();reject(error);}else resolve();};
+ const onReady=e=>{if(e.source===currentFrame.contentWindow&&e.origin===origin&&e.data?.type==='reader-tts'&&e.data.action==='ready')finish();};
+ const timer=setTimeout(async()=>finish(await connectionError()),15000);addEventListener('message',onReady);
+ currentFrame.onerror=async()=>finish(await connectionError());currentFrame.onload=()=>currentFrame.contentWindow.postMessage({type:'reader-tts',action:'connect'},origin);
+ currentFrame.src=origin+'/supertonic3/bridge.html?viewer=129';document.body.append(currentFrame);
+ });return connection;}
+addEventListener('message',e=>{if(e.source!==frame?.contentWindow||e.origin!==origin||e.data?.type!=='reader-tts')return;const d=e.data;
+ if(d.action==='unavailable'){for(const r of pending.values()){clearTimeout(r.timer);r.reject(Error(d.message||'브라우저 합성 엔진 연결 실패'));}pending.clear();resetBridge();return;}
+ const request=pending.get(d.id);if(d.action==='progress'){say(`모델 여는 중 ${d.loaded}/${d.total}`);return;}if(!request)return;clearTimeout(request.timer);pending.delete(d.id);d.action==='audio'?request.resolve(d):request.reject(Error(d.message||'합성 실패'));});
+async function synth(text,token){
+ if(preferences.engine==='native'){
+  const controller=new AbortController();activeFetch=controller;
+  try{let response;try{response=await fetch(origin+'/supertonic3/synthesize',{method:'POST',headers:{'Content-Type':'application/json'},signal:AbortSignal.any([controller.signal,AbortSignal.timeout(180000)]),body:JSON.stringify({engine:'native',text,lang:lang(text),voice:preferences.voice})});}catch(error){if(controller.signal.aborted)throw error;throw await connectionError();}
+   if(!response.ok){const error=await response.json().catch(()=>({}));throw Error(error.error||'로컬 음성 합성 실패');}
+   const samples=await response.arrayBuffer(),sampleRate=Number(response.headers.get('X-Sample-Rate'));if(!samples.byteLength||samples.byteLength%4||!sampleRate)throw Error('로컬 음성 응답 형식 오류');return {samples,sampleRate};
+  }finally{if(activeFetch===controller)activeFetch=null;}
+ }
+ await connect();if(token!==generation)throw new DOMException('중지','AbortError');return new Promise((resolve,reject)=>{const id=++seq,timer=setTimeout(()=>{pending.delete(id);resetBridge();reject(Error('음성 합성 시간 초과 · 다시 눌러 주세요.'));},180000);pending.set(id,{resolve,reject,timer});frame.contentWindow.postMessage({type:'reader-tts',action:'synthesize',id,generation:token,engine:preferences.engine,text,lang:lang(text),voice:preferences.voice},origin);});}
+function stop(){generation++;run=null;activeFetch?.abort();try{source?.stop();audio?.resume();}catch(_){}frame?.contentWindow?.postMessage({type:'reader-tts',action:'cancel',generation},origin);for(const r of pending.values()){clearTimeout(r.timer);r.reject(new DOMException('중지','AbortError'));}pending.clear();document.querySelectorAll('.mt-speech-reading').forEach(e=>e.classList.remove('mt-speech-reading'));say('낭독 중지');}
 async function start(slot,index,field='kor',firstText=null){stop();lastField=field;const token=generation;const word=getWords(slot)[index];if(!word)return;const text=firstText??textFor(word,field);audio ||= new AudioContext();await audio.resume();if(token!==generation)return;run={slot,paused:false,field,index};try{
  if(Number(mtActiveSlotIndex)!==Number(slot)&&mtActiveSlotIndex!==slot){stop();return;}
  mtSaveLastReadPosition(slot,Number.isInteger(word.originalIndex)?word.originalIndex:index);mtSaveSessionState();await mtPersistTypedSlotStates();if(token!==generation)return;
