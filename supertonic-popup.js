@@ -85,7 +85,17 @@ async function start(slot,index,field='kor',firstText=null,allEnglish=false){sto
  if(token===generation){run=null;say('낭독 완료');document.querySelectorAll('.mt-speech-reading').forEach(e=>e.classList.remove('mt-speech-reading'));}
  }catch(error){if(token===generation)say('낭독 실패 · '+error.message);}}
 const style=document.createElement('style');style.textContent='.mt-speech-reading{background:#fef3c7!important;outline:2px solid #fbbf24}.mt-speech-listen{margin:0 7px;padding:3px 7px}#mtSpeechOptionsDialog,#mtSpeechExportDialog{max-width:90vw;border:1px solid #cbd5e1;border-radius:12px;padding:22px}.mt-speech-options select{max-width:65%;padding:5px}';document.head.append(style);
-function listenButton(parent,field,text,label){const b=button('🔊',()=>start(mtActiveSlotIndex,popupIndex(),field,text),parent);b.title=label;b.setAttribute('aria-label',label);b.classList.add('mt-popup-sentence-listen');b.dataset.field=field;return b;}
+function listenButton(parent,field,text,label){const b=button('🔊',()=>start(mtActiveSlotIndex,popupIndex(),field,text),parent);b.title=label;b.setAttribute('aria-label',label);b.classList.add('mt-popup-sentence-listen');b.dataset.field=field;parent.prepend(b);return b;}
+const iconStyle=document.createElement('style');iconStyle.textContent='#mt-flashcard button.mt-popup-sentence-listen{box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;width:18px;min-width:18px;height:15px;min-height:15px;padding:0;margin:0 4px 0 0;font-size:6px;line-height:1;border-radius:3px;vertical-align:middle;flex:0 0 auto}';document.head.append(iconStyle);
+function placeEnglishListeners(){
+ const mask=document.getElementById('mtMaskContainer');mask.querySelectorAll('.mt-popup-sentence-listen[data-field="eng"]').forEach(b=>b.remove());
+ const word=mtCurrentStudyWords[mtCurrentIndex];if(!word)return;const english=textFor(word,'eng');
+ const segments=typeof Intl.Segmenter==='function'?[...new Intl.Segmenter('en',{granularity:'sentence'}).segment(english)]:[{segment:english,index:0}];
+ const tokens=[...english.matchAll(mtMaskMode==='chunk'&&!word.exercise?/\S+/g:/[^ ]+/g)];const wrappers=[...mask.children].filter(e=>e.classList.contains('mt-word-wrapper'));
+ // Insert into each sentence's first word so the icon stays with its masked text.
+ const insertions=[];segments.forEach((s,index)=>{if(!s.segment.trim())return;const offset=s.index+s.segment.length-s.segment.trimStart().length;const tokenIndex=tokens.findIndex(t=>t.index+t[0].length>offset);const target=wrappers[tokenIndex];if(target)insertions.push({target,text:s.segment,index});});
+ for(const item of insertions.reverse())listenButton(item.target,'eng',item.text,segments.length>1?`영어문장 ${item.index+1} 듣기`:'영어문장 듣기');
+}
 function decoratePopup(){
  const root=document.getElementById('mtKorText');if(!mtCurrentStudyWords[mtCurrentIndex])return;
  const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);const nodes=[];let node;
@@ -94,17 +104,17 @@ function decoratePopup(){
  for(const node of nodes){const field=node.parentElement.closest('.mt-paren-text')?'subKor':'kor',fragment=document.createDocumentFragment();const segments=segmenter?[...segmenter.segment(node.textContent)].map(x=>x.segment):[node.textContent];
  for(const text of segments){const span=document.createElement('span');span.className='mt-popup-speech-sentence';span.append(text);if(/[\p{L}\p{N}]/u.test(text))listenButton(span,field,text,field==='subKor'?'보조문장 듣기':'문장 듣기');fragment.append(span);}node.replaceWith(fragment);}
  const settingsButton=document.getElementById('mtEbookPopupSettingsBtn');settingsButton.style.display='inline-flex';settingsButton.textContent='⚙ 팝업 설정';
- englishControls.replaceChildren();const english=textFor(mtCurrentStudyWords[mtCurrentIndex],'eng');const englishSegments=segmenter?[...segmenter.segment(english)].map(s=>s.segment).filter(s=>s.trim()):[english];englishSegments.forEach((text,index)=>{const b=listenButton(englishControls,'eng',text,englishSegments.length>1?`영어문장 ${index+1} 듣기`:'영어문장 듣기');if(englishSegments.length>1)b.textContent=`🔊 ${index+1}`;});
+ placeEnglishListeners();
 }
-const englishControls=document.createElement('div');englishControls.id='mtPopupEnglishListen';englishControls.style.cssText='width:fit-content;text-align:center;margin:4px auto 0;position:relative;z-index:2';listenButton(englishControls,'eng',null,'영어문장 듣기');document.getElementById('mtMaskContainer').after(englishControls);
+const originalMaskRender=window.mtRenderMask;window.mtRenderMask=function(){const result=originalMaskRender.apply(this,arguments);placeEnglishListeners();return result;};
 document.addEventListener('keydown',event=>{
  if(event.key!=='ArrowDown'||event.ctrlKey||event.altKey||event.metaKey||event.shiftKey||event.isComposing)return;
  const popup=document.getElementById('mt-flashcard');
  if(!popup.getClientRects().length||getComputedStyle(popup).visibility==='hidden'||document.querySelector('dialog[open]'))return;
- const listen=englishControls.querySelector('button');if(!listen)return;
+ const listen=popup.querySelector('.mt-popup-sentence-listen[data-field="eng"]');if(!listen)return;
  event.preventDefault();event.stopImmediatePropagation();if(!event.repeat)start(mtActiveSlotIndex,popupIndex(),'eng',null,true).catch(error=>say(error.message));
 },true);
-englishControls.title='↓: 현재 카드의 영어문장 전체 순서대로 듣기';englishControls.setAttribute('aria-keyshortcuts','ArrowDown');
+document.getElementById('mtMaskContainer').setAttribute('aria-keyshortcuts','ArrowDown');
 const shortcutHelp=document.createElement('span');shortcutHelp.textContent='↓: 현재 영어문장 모두 순서대로 듣기';shortcutHelp.style.cssText='font-size:11px;color:#64748b;align-self:center';popupControls.append(shortcutHelp);
 const originalLoad=window.mtLoadWord;window.mtLoadWord=function(){if(run)stop();const result=originalLoad.apply(this,arguments);decoratePopup();return result;};
 const main=window.mtGoMainMenu;window.mtGoMainMenu=function(){stop();return main.apply(this,arguments);};
