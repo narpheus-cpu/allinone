@@ -115,6 +115,7 @@ function decoratePopup(){
 const originalMaskRender=window.mtRenderMask;window.mtRenderMask=function(){const result=originalMaskRender.apply(this,arguments);placeEnglishListeners();return result;};
 document.addEventListener('keydown',event=>{
  if(event.key!=='ArrowDown'||event.ctrlKey||event.altKey||event.metaKey||event.shiftKey||event.isComposing)return;
+ if(event.target instanceof Element&&event.target.closest('#mtEbookPopupSettings'))return;
  const popup=document.getElementById('mt-flashcard');
  if(!popup.getClientRects().length||getComputedStyle(popup).visibility==='hidden'||document.querySelector('dialog[open]'))return;
  const listen=popup.querySelector('.mt-popup-sentence-listen[data-field="eng"]');if(!listen)return;
