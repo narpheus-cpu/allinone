@@ -25,4 +25,5 @@ playButton.onclick=()=>{if(run)stop();else start().catch(e=>{status.textContent=
 pauseButton.onclick=async()=>{if(!run)return;const active=run;run.paused=!run.paused;try{if(run.paused)player?.pause();else if(url)await player.play();}catch(e){if(run===active)stop('페이지 TTS 재생 실패 · '+e.message);return;}if(run!==active)return;status.textContent=run.paused?'페이지 TTS 일시정지':'페이지 TTS 재생 중';controls();};
 document.addEventListener('mt-ebook-page-changing',()=>stop());document.addEventListener('mt-ebook-table-rendered',controls);document.addEventListener('mt-ebook-tts-state',()=>{if(window.mtEbookTtsSettings?.isExporting()&&run)stop();controls();});document.addEventListener('mt-ebook-tts-settings',e=>{if(run&&player&&e.detail.key==='ebook'+run.kind+'Speed'){player.preservesPitch=true;player.playbackRate=e.detail.value;}});
 window.mtStopEbookPageSpeech=()=>stop();controls();
+document.querySelectorAll('.tab-btn,#appHomeTitle').forEach(button=>button.addEventListener('click',()=>stop()));
 })();
