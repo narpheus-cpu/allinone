@@ -82,7 +82,7 @@ async function playSpeech(result,token){const player=ensureAudio(),url=URL.creat
  finally{if(playbackURL===url){player.pause();player.removeAttribute('src');player.load();playbackURL=null;}URL.revokeObjectURL(url);}}
 function stop(){generation++;run=null;activeFetch?.abort();audio?.pause();finishPlayback?.();frame?.contentWindow?.postMessage({type:'reader-tts',action:'cancel',generation},origin);for(const r of pending.values()){clearTimeout(r.timer);r.reject(new DOMException('중지','AbortError'));}pending.clear();document.querySelectorAll('.mt-speech-reading').forEach(e=>e.classList.remove('mt-speech-reading'));say('낭독 중지');}
 function englishSentences(text){return typeof Intl.Segmenter==='function'?[...new Intl.Segmenter('en',{granularity:'sentence'}).segment(text)].map(s=>s.segment.trim()).filter(Boolean):(text.match(/[^.!?]+(?:[.!?]+|$)/g)||[text]).map(s=>s.trim()).filter(Boolean);}
-async function start(slot,index,field='kor',firstText=null,allEnglish=false){stop();lastField=field;const token=generation;const word=getWords(slot)[index];if(!word)return;const text=firstText??textFor(word,field);const utterances=allEnglish?englishSentences(text).flatMap(parts):parts(text);ensureAudio();if(token!==generation)return;run={slot,paused:false,field,index};try{
+async function start(slot,index,field='kor',firstText=null,allEnglish=false){window.mtStopEbookPageSpeech?.();stop();lastField=field;const token=generation;const word=getWords(slot)[index];if(!word)return;const text=firstText??textFor(word,field);const utterances=allEnglish?englishSentences(text).flatMap(parts):parts(text);ensureAudio();if(token!==generation)return;run={slot,paused:false,field,index};try{
  if(Number(mtActiveSlotIndex)!==Number(slot)&&mtActiveSlotIndex!==slot){stop();return;}
  mtSaveLastReadPosition(slot,Number.isInteger(word.originalIndex)?word.originalIndex:index);mtSaveSessionState();await mtPersistTypedSlotStates();if(token!==generation)return;
  document.querySelectorAll('.mt-speech-reading').forEach(e=>e.classList.remove('mt-speech-reading'));
@@ -129,5 +129,5 @@ const close=window.mtCloseEbookTyping;window.mtCloseEbookTyping=function(){stop(
 const closeViewer=window.mtCloseEbookViewer;window.mtCloseEbookViewer=function(){stop();return closeViewer.apply(this,arguments);};
 addEventListener('storage',e=>{if(e.key===KEY&&e.newValue){Object.assign(preferences,JSON.parse(e.newValue));sync();}});
 document.querySelectorAll('.tab-btn').forEach(b=>b.addEventListener('click',stop));
-sync();decoratePopup();restore();
+window.mtStopPopupSpeech=stop;window.mtSpeechPCMToWave=pcmWave;sync();decoratePopup();restore();
 })();
