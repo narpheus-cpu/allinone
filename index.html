@@ -4095,6 +4095,8 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
     let mtNormalWriteChain = Promise.resolve();
     let mtRestoreInProgress = false;
     let mtAppReady = false;
+    let mtStartupFinished = false, mtStartupError = null;
+    let mtRestorePickerOpen = false;
 
     function mtCloneData(value) {
         return typeof structuredClone === 'function' ? structuredClone(value) : JSON.parse(JSON.stringify(value));
@@ -4132,6 +4134,7 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
         return job;
     }
     function mtWriteAppRecord(storeName, key, value, area) {
+        if(mtStartupError || mtRestoreInProgress) return mtObserveStorageJob(Promise.reject(new Error('데이터 보호: 초기화 오류 또는 복원 중에는 저장하지 않습니다.')),area);
         let snapshot;
         try { snapshot = mtCloneData(value); }
         catch (error) { return mtObserveStorageJob(Promise.reject(error), area); }
@@ -4153,7 +4156,7 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
 
 
     async function mtRetryAllStorage() {
-        if (mtRestoreInProgress) return;
+        if (mtRestoreInProgress || !mtAppReady) return;
         await Promise.allSettled([saveSlotsToDatabase(), saveWordsToDatabase(), saveToDatabase(),
             mtObserveStorageJob(mtPersistNormalSlotCache(), '일반 슬롯'),
             mtObserveStorageJob(mtPersistTypedSlotStates(), '유형 슬롯')]);
@@ -4305,7 +4308,30 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
             dialog.append(title,detail,note,cancel,accept); document.body.appendChild(dialog); dialog.showModal(); cancel.focus();
         });
     }
-    async function mtCommitBackupRestore(data, previousBackup) {
+    function mtIsFullEmergencyBackup(data) {
+        const b=data?.mtBackupData;
+        return data?.schemaVersion===2 && ['slotsData','words','boardDataList'].every(k=>Array.isArray(data[k])) &&
+            data.mtFontSettings && Number.isFinite(Number(data.novelFontSize)) && Number.isFinite(Number(data.vocaFontSize)) &&
+            b && ['slot_types','typed_slots','generator_settings','typing_unmask_stats','preferences','ebook_pages','star_session'].every(k=>Object.prototype.hasOwnProperty.call(b,k));
+    }
+    // Copy the original store records before any restore writes, in the SAME read/write transaction.
+    function mtCaptureRawRestoreSource(tx,storeNames) {
+        return new Promise((resolve,reject)=>{
+            const stores={};let remaining=storeNames.length;
+            for(const name of storeNames){
+                const store=tx.objectStore(name), records=[];
+                stores[name]=records;
+                const request=store.openCursor();
+                request.onerror=()=>reject(request.error||new Error('기존 데이터 원본 읽기 실패'));
+                request.onsuccess=()=>{
+                    const cursor=request.result;
+                    if(cursor){records.push({key:cursor.key,value:cursor.value});cursor.continue();}
+                    else if(--remaining===0)resolve({format:'allinone-raw-recovery-v1',createdAt:new Date().toISOString(),stores});
+                };
+            }
+        });
+    }
+    async function mtCommitBackupRestore(data, previousBackup, emergency=false) {
         const normal = Object.create(null), states = {}, types = {...data.mtBackupData.slot_types}, now = Date.now();
         for (let i = 1; i <= 11; i++) {
             if (types[i] === 'normal') normal[i] = JSON.parse(data.mtBackupData[i]);
@@ -4323,6 +4349,7 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
             const tx = db.transaction([STORE_NAME,SLOT_STORE_NAME,VOCA_STORE_NAME,MT_NORMAL_SLOT_STORE_NAME,MT_TYPED_SLOT_STORE_NAME],'readwrite');
             const done = waitForTransaction(tx);
             try {
+                if(emergency)previousBackup=await mtCaptureRawRestoreSource(tx,[STORE_NAME,SLOT_STORE_NAME,VOCA_STORE_NAME,MT_NORMAL_SLOT_STORE_NAME,MT_TYPED_SLOT_STORE_NAME]);
                 tx.objectStore(STORE_NAME).put(data.boardDataList,'communityBoardsData');
                 tx.objectStore(SLOT_STORE_NAME).put(data.slotsData,SLOT_DATA_KEY);
                 tx.objectStore(VOCA_STORE_NAME).put(data.words,VOCA_DATA_KEY);
@@ -4373,14 +4400,14 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
         set(MT_STATS_STORAGE_KEY,JSON.stringify(mtStatsStateMemory));
         if(!mirrorFailed)set('mt_full_restore_applied_v122',snapshot.fullRestoreAt);
     }
-    async function mtRestorePreparedBackup(data, previousBackup) {
+    async function mtRestorePreparedBackup(data, previousBackup, emergency=false) {
         if(mtRestoreInProgress)throw new Error('다른 복원이 진행 중입니다.');
         mtRestoreInProgress=true;
         try {
             await mtStopAllGeneratorJobs();
             clearTimeout(slotSaveTimer);clearTimeout(mtNormalSlotSaveTimer);clearTimeout(mtTypedSlotStateSaveTimer);
             await Promise.allSettled([mtAppWriteChain,mtNormalWriteChain,mtTypedSlotStateWriteChain]);
-            return await mtCommitBackupRestore(data,previousBackup);
+            return await mtCommitBackupRestore(data,previousBackup,emergency);
         } finally {mtRestoreInProgress=false;}
     }
     async function mtDownloadPreviousRestoreBackup() {
@@ -4389,7 +4416,7 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
             db=await initDB();const request=db.transaction(MT_TYPED_SLOT_STORE_NAME,'readonly').objectStore(MT_TYPED_SLOT_STORE_NAME).get('preRestoreBackupV122');
             const data=await new Promise((resolve,reject)=>{request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
             if(!data)throw new Error('아직 복원 직전 백업이 없습니다.');
-            mtDownloadJson(data,'language_before_restore_v122.json');
+            mtDownloadJson(data,data.format==='allinone-raw-recovery-v1'?'allinone_raw_before_emergency_restore.json':'language_before_restore_v122.json');
         } catch(error){alert(error.message);}finally{if(db)db.close();}
     }
 
@@ -4728,24 +4755,31 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
     async function loadFromLocalPC() {
         let busy;
         try {
-            if(!mtAppReady)throw new Error('초기 데이터 로딩이 끝난 뒤 다시 시도해 주세요.');
+            if(mtRestorePickerOpen || mtRestoreInProgress)return;
+            if(!mtStartupFinished)throw new Error('데이터를 읽는 중입니다. 다른 올인원 창을 닫은 뒤 새로고침해 주세요.');
+            mtRestorePickerOpen=true;
             const input=document.createElement('input');input.type='file';input.accept='.json,application/json';
             const file=await new Promise(resolve=>{input.onchange=()=>resolve(input.files?.[0]||null);input.addEventListener('cancel',()=>resolve(null),{once:true});input.click();});
             if(!file)return;
-            const previous=await mtBuildCompleteBackupData();
-            const prepared=mtPrepareBackupRestore(JSON.parse(await file.text()),previous);
+            const incoming=JSON.parse(await file.text());
+            const emergency=!mtAppReady;
+            // Never merge a partial backup into uninitialized in-memory defaults.
+            if(emergency && !mtIsFullEmergencyBackup(incoming))throw new Error('초기화 오류 상태에서는 완전한 v2 전체 백업만 복원할 수 있습니다. 초기화 오류: '+(mtStartupError?.message||'알 수 없음'));
+            const previous=emergency?incoming:await mtBuildCompleteBackupData();
+            const prepared=mtPrepareBackupRestore(incoming,previous);
+            if(emergency&&!confirm('초기화 오류 때문에 비상 전체 복원을 사용합니다. 기존 IndexedDB 원본은 복원과 같은 트랜잭션 안에 별도 보관합니다. 다른 올인원 창을 모두 닫았나요?'))return;
             if(!await mtShowBackupPreview(prepared,file.name))return;
             busy=document.createElement('dialog');busy.textContent='백업을 복원하고 있습니다. 잠시 기다려 주세요.';
             busy.addEventListener('cancel',event=>event.preventDefault());document.body.appendChild(busy);busy.showModal();
             // Take the rollback copy at confirmation time, including the latest AI results.
-            const latest=await mtBuildCompleteBackupData();
-            await mtRestorePreparedBackup(prepared,latest);
+            const latest=emergency?null:await mtBuildCompleteBackupData();
+            await mtRestorePreparedBackup(prepared,latest,emergency);
             alert('전체 복원을 완료했습니다. 화면을 새로 불러옵니다. 슬롯별 API 키는 다시 입력해 주세요.');
             location.reload();
         } catch(error) {
             if(error?.name!=='AbortError')alert(`백업을 복원하지 못했습니다. 기존 데이터를 유지합니다.\n${error?.message||error}`);
-            mtRestoreGeneratorTimers();
-        } finally {if(busy){busy.close();busy.remove();}}
+            if(mtAppReady)mtRestoreGeneratorTimers();
+        } finally {mtRestorePickerOpen=false;if(busy){busy.close();busy.remove();}}
     }
 
     let mtSaveReminderTimerId = null;
@@ -7132,6 +7166,7 @@ Rules:
     }
 
     function mtPersistNormalSlotCache() {
+        if(mtStartupError || mtRestoreInProgress || !mtNormalSlotCacheReady) return Promise.reject(new Error('일반 슬롯을 읽지 못했거나 복원 중이므로 저장하지 않습니다.'));
         const pending = new Set(mtNormalSlotPendingWrites);
         if (!pending.size) for (let i = 1; i <= 11; i++) pending.add(String(i));
         const snapshots = new Map();
@@ -8365,6 +8400,7 @@ ${JSON.stringify(finalPayload)}`;
     // 삭제 직후 재등록처럼 저장 요청이 겹쳐도, 이전 스냅샷이 최신 데이터를 덮어쓰지 않도록 직렬화합니다.
     let mtTypedSlotStateWriteChain = Promise.resolve();
     function mtQueueTypedSlotStatePersistence(){
+        if(mtStartupError || mtRestoreInProgress || !mtTypedSlotStateHydrated) return;
         clearTimeout(mtTypedSlotStateSaveTimer);
         mtTypedSlotStateSaveTimer=setTimeout(()=>{ mtObserveStorageJob(mtPersistTypedSlotStates(),'유형 슬롯'); },80);
     }
@@ -8390,6 +8426,7 @@ ${JSON.stringify(finalPayload)}`;
         });
     }
     function mtPersistTypedSlotStates(){
+        if(mtStartupError || mtRestoreInProgress || !mtTypedSlotStateHydrated) return Promise.reject(new Error('유형 슬롯을 읽지 못했거나 복원 중이므로 저장하지 않습니다.'));
         clearTimeout(mtTypedSlotStateSaveTimer);mtTypedSlotStateSaveTimer=null;
         const write=async()=>{
             const types={};for(let i=1;i<=11;i++){const type=mtGetSlotType(i);if(type)types[i]=type;}
@@ -11403,9 +11440,10 @@ ${JSON.stringify(finalPayload)}`;
                 if(!db.objectStoreNames.contains(MT_NORMAL_SLOT_STORE_NAME)) db.createObjectStore(MT_NORMAL_SLOT_STORE_NAME);
                 if(!db.objectStoreNames.contains(MT_TYPED_SLOT_STORE_NAME)) db.createObjectStore(MT_TYPED_SLOT_STORE_NAME);
             };
-            request.onsuccess=()=>{const db=request.result;db.onversionchange=()=>db.close();resolve(db);};
+            let blocked=false;
+            request.onsuccess=()=>{const db=request.result;db.onversionchange=()=>db.close();if(blocked){db.close();return;}resolve(db);};
             request.onerror=()=>reject(request.error||new Error('IndexedDB 열기 실패'));
-            request.onblocked=()=>console.warn('IndexedDB 업그레이드가 다른 탭/창에 의해 대기 중입니다.');
+            request.onblocked=()=>{blocked=true;reject(new Error('다른 올인원 탭 또는 앱이 데이터베이스를 사용 중입니다. 모두 닫고 다시 열어 주세요.'));};
         });
     }
 
@@ -11443,7 +11481,7 @@ ${JSON.stringify(finalPayload)}`;
             const db = await initDB();
             const tx = db.transaction(STORE_NAME, "readonly");
             const request = tx.objectStore(STORE_NAME).get("communityBoardsData");
-            await new Promise((resolve) => {
+            await new Promise((resolve,reject) => {
                 request.onsuccess = () => {
                     if (Array.isArray(request.result)) {
                         boardDataList = request.result.filter(b => b && typeof b === 'object').map(b => migrateBoardData(b));
@@ -11452,11 +11490,12 @@ ${JSON.stringify(finalPayload)}`;
                     }
                     resolve();
                 };
-                request.onerror = () => resolve();
+                request.onerror = () => {db.close();reject(request.error||new Error('게시판 읽기 실패'));};
             });
             db.close();
         } catch (e) {
             console.error("게시판 데이터베이스 불러오기 오류:", e);
+            throw e;
         }
     }
 
@@ -11478,13 +11517,13 @@ ${JSON.stringify(finalPayload)}`;
             const vocaRequest = tx.objectStore(VOCA_STORE_NAME).get(VOCA_DATA_KEY);
 
             const [storedSlots, storedWords] = await Promise.all([
-                new Promise((resolve) => {
+                new Promise((resolve,reject) => {
                     slotRequest.onsuccess = () => resolve(slotRequest.result);
-                    slotRequest.onerror = () => resolve(undefined);
+                    slotRequest.onerror = () => reject(slotRequest.error||new Error('영작 슬롯 읽기 실패'));
                 }),
-                new Promise((resolve) => {
+                new Promise((resolve,reject) => {
                     vocaRequest.onsuccess = () => resolve(vocaRequest.result);
-                    vocaRequest.onerror = () => resolve(undefined);
+                    vocaRequest.onerror = () => reject(vocaRequest.error||new Error('단어장 읽기 실패'));
                 })
             ]);
 
@@ -11544,6 +11583,7 @@ ${JSON.stringify(finalPayload)}`;
             } catch (_) {}
             ensureSlotsShape();
             if (!Array.isArray(words)) words = [];
+            throw e;
         } finally {
             if (db) db.close();
         }
@@ -12084,48 +12124,42 @@ ${JSON.stringify(finalPayload)}`;
     
 
     (async function initApp() {
+        const ui=(label,fn)=>{try{fn();}catch(error){console.error('[초기화 UI] '+label,error);}};
         try {
-            mtRenderDailyStats();
-            // 공통 / 영작 시스템 초기화
-            loadCustomFontFromStorage();
-            applyFontSettings();
-            renderNovelSlotRows();
-            initBoardListEventDelegation();
-            initBoardBodyEventDelegation();
-
-            // 기존 localStorage 데이터가 있으면 여기서 IndexedDB로 1회 이전합니다.
+            ui('통계',mtRenderDailyStats);
+            ui('사용자 글꼴',loadCustomFontFromStorage);
+            ui('글꼴 설정',applyFontSettings);
+            ui('영작 슬롯 목록',renderNovelSlotRows);
+            ui('게시판 목록 이벤트',initBoardListEventDelegation);
+            ui('게시판 본문 이벤트',initBoardBodyEventDelegation);
             await loadSlotsAndWordsFromDatabase();
-            renderAllSlotsUI();
-            switchSlot(activeSlotIndex, false);
-            renderWords();
-
-            // 게시판 시스템 초기화
-            loadBoardSettingsFromLocalStorage();
             await loadFromDatabase();
-            renderBoardList();
-
-            // 언마스킹 영작 초기화 (슬롯 불러오기 연동)
-            mtApplyFontSettings();
             await mtInitNormalSlotCache();
+            if(!mtNormalSlotCacheReady)throw new Error('일반 슬롯 데이터베이스를 읽지 못했습니다.');
             await mtInitTypedSlotStateCache();
-            // 성공 카드 통계는 localStorage보다 안전한 IndexedDB 복원본을 우선 적용합니다.
-            if (typeof mtInitStatsStateCache === 'function') mtInitStatsStateCache();
-            mtRenderDailyStats();
-            // 긴 생성 프롬프트·설정은 유형 슬롯 IndexedDB 스냅샷에서 복원한 뒤 타이머를 시작합니다.
-            if (typeof mtInitGeneratorSettingsCache === 'function') mtInitGeneratorSettingsCache();
-            if (typeof mtRestoreGeneratorTimers === 'function') mtRestoreGeneratorTimers();
-            if (typeof mtInitSlots === 'function') mtInitSlots();
-            // 기존 localStorage 슬롯도 첫 실행 즉시 영구 사본을 만들어 다음 새로고침부터 보호합니다.
-            mtQueueTypedSlotStatePersistence();
+            if(!mtTypedSlotStateHydrated)throw new Error('유형 슬롯 데이터베이스를 읽지 못했습니다.');
+            if(typeof mtInitStatsStateCache==='function')mtInitStatsStateCache();
+            if(typeof mtInitGeneratorSettingsCache==='function')mtInitGeneratorSettingsCache();
             mtAppReady=true;
-        } catch (error) {
-            // 초기화 중 한 모듈이 실패해도 다른 기능까지 중단하지 않습니다.
-            console.error('앱 초기화 중 일부 기능 오류:', error);
-            try { ensureSlotsShape(); } catch (_) {}
-            try { if (typeof renderAllSlotsUI === 'function') renderAllSlotsUI(); } catch (_) {}
-            try { if (typeof renderWords === 'function') renderWords(); } catch (_) {}
-            try { if (typeof renderBoardList === 'function') renderBoardList(); } catch (_) {}
-        }
+            ui('영작 슬롯',renderAllSlotsUI);
+            ui('활성 슬롯',()=>switchSlot(activeSlotIndex,false));
+            ui('단어장',renderWords);
+            ui('게시판 설정',loadBoardSettingsFromLocalStorage);
+            ui('게시판 목록',renderBoardList);
+            ui('학습 글꼴',mtApplyFontSettings);
+            ui('통계',mtRenderDailyStats);
+            ui('언마스킹 슬롯',()=>{if(typeof mtInitSlots==='function')mtInitSlots();});
+            ui('생성 타이머',()=>{if(typeof mtRestoreGeneratorTimers==='function')mtRestoreGeneratorTimers();});
+            mtQueueTypedSlotStatePersistence();
+        } catch(error) {
+            mtStartupError=error;
+            console.error('앱 데이터 초기화 실패:',error);
+            const notice=document.createElement('div');
+            notice.setAttribute('role','alert');
+            notice.style.cssText='padding:12px;margin:8px 0;border:1px solid #dc2626;background:#fff7ed;color:#991b1b;white-space:pre-wrap';
+            notice.textContent='데이터 초기화 오류: '+(error?.message||error)+'\n기존 데이터를 보호하기 위해 저장을 중지했습니다. 다른 올인원 창을 닫고 새로고침하거나 PC 백업 열기로 전체 v2 백업을 복원하세요.';
+            document.querySelector('.container')?.prepend(notice);
+        } finally {mtStartupFinished=true;}
     })();
 
     try { mtInitSectorMarginHandles(); } catch (_) {}
