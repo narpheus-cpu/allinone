@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>올인원 영작-단어장 시스템 · v144</title>
+    <title>올인원 영작-단어장 시스템 · v145</title>
     <!-- 파비콘 설정 코드 -->
     <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="25" fill="%238B0000"/><text x="50" y="72" font-size="65" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" fill="%23FFFFFF">A</text></svg>'>
     <!-- 엑셀 파싱 라이브러리 -->
@@ -3046,6 +3046,7 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
   padding:0 !important;
 }
 </style>
+<script src="./app-install.js?v=145"></script>
 <link rel="manifest" href="./manifest.webmanifest">
 <meta name="theme-color" content="#111827">
 </head>
@@ -12301,7 +12302,7 @@ ${JSON.stringify(finalPayload)}`;
   (function syncAppVersionFromFileName(){
     // 파일을 다른 이름으로 저장하거나 브라우저가 경로를 변환해도, 기본 표시가
     // 사라지지 않게 한다. 정상 파일명에서는 아래 값이 자동으로 새 번호로 대체된다.
-    const fallbackVersion='v144';
+    const fallbackVersion='v145';
     let fileName='';
     try{fileName=decodeURIComponent(String(location.pathname||'').split('/').pop()||'');}
     catch(_){fileName=String(location.pathname||'').split('/').pop()||'';}
@@ -13029,6 +13030,6 @@ ${JSON.stringify(finalPayload)}`;
 <script src="./ebook-list.js?v=139"></script>
 <script src="./ebook-tts-export.js?v=144"></script>
 <script src="./ebook-page-speech.js?v=141"></script>
-<script src="./app-install.js?v=144"></script>
+
 </body>
 </html>
