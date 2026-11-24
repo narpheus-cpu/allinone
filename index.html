@@ -4710,6 +4710,9 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
             const version=Math.min(3,Math.max(1,Number(mtAutoBackupNextVersion)||1));
             const fileName=`my_foreign_lang_data_backup(v${version}).json`;
             const dataToSave=await mtBuildCompleteBackupData();
+            // Never rotate away a rescue backup merely because a profile currently looks empty.
+            const hasData=dataToSave.words.length||dataToSave.boardDataList.length||dataToSave.slotsData.some(slot=>Array.isArray(slot.data)&&slot.data.length)||Object.keys(dataToSave.mtBackupData.slot_types).length;
+            if(!hasData){console.warn('[자동 백업] 빈 데이터로 기존 백업을 덮어쓰지 않습니다.');return false;}
             const fileHandle=await mtAutoBackupDirectoryHandle.getFileHandle(fileName,{create:true});
             const writable=await fileHandle.createWritable();
             await writable.write(JSON.stringify(dataToSave,null,2));
@@ -4753,9 +4756,9 @@ body:has(#boardTab.active) #mtEbookModalBackdrop { display:none !important; }
     }
 
     async function loadFromLocalPC() {
+        if(mtRestorePickerOpen || mtRestoreInProgress)return;
         let busy;
         try {
-            if(mtRestorePickerOpen || mtRestoreInProgress)return;
             if(!mtStartupFinished)throw new Error('데이터를 읽는 중입니다. 다른 올인원 창을 닫은 뒤 새로고침해 주세요.');
             mtRestorePickerOpen=true;
             const input=document.createElement('input');input.type='file';input.accept='.json,application/json';
@@ -12152,7 +12155,7 @@ ${JSON.stringify(finalPayload)}`;
             ui('생성 타이머',()=>{if(typeof mtRestoreGeneratorTimers==='function')mtRestoreGeneratorTimers();});
             mtQueueTypedSlotStatePersistence();
         } catch(error) {
-            mtStartupError=error;
+            mtStartupError=error;mtAppReady=false;
             console.error('앱 데이터 초기화 실패:',error);
             const notice=document.createElement('div');
             notice.setAttribute('role','alert');
