@@ -1,7 +1,7 @@
 'use strict';
-const CACHE='allinone-app-v147-recovery',base=new URL('./',self.location.href);
+const CACHE='allinone-app-completion-backup-v146',base=new URL('./',self.location.href);
 const xlsx='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
-const core=['./','./app-install.js?v=145','./supertonic-popup.js?v=139','./ebook-list.js?v=139','./ebook-tts-export.js?v=144','./ebook-page-speech.js?v=141','./manifest.webmanifest','./app-icon-192.png','./app-icon-512.png'].map(path=>new URL(path,base).href);
+const core=['./','./ebook-selection.js?v=146','./pc-backup.js?v=146','./app-install.js?v=145','./supertonic-popup.js?v=139','./ebook-list.js?v=139','./ebook-tts-export.js?v=144','./ebook-page-speech.js?v=141','./manifest.webmanifest','./app-icon-192.png','./app-icon-512.png'].map(path=>new URL(path,base).href);
 const allowed=new Set(core.map(url=>new URL(url).pathname));allowed.add(new URL('index.html',base).pathname);
 self.addEventListener('install',event=>event.waitUntil((async()=>{const cache=await caches.open(CACHE);await cache.addAll(core.map(url=>new Request(url,{cache:'reload'})));try{await cache.add(xlsx);}catch(_){}await self.skipWaiting();})()));
 self.addEventListener('activate',event=>event.waitUntil((async()=>{for(const key of await caches.keys())if(key.startsWith('allinone-app-')&&key!==CACHE)await caches.delete(key);await self.clients.claim();})()));
