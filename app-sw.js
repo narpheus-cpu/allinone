@@ -1,5 +1,5 @@
 'use strict';
-const CACHE='allinone-app-v146-pwa',base=new URL('./',self.location.href);
+const CACHE='allinone-app-v147-recovery',base=new URL('./',self.location.href);
 const xlsx='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
 const core=['./','./app-install.js?v=145','./supertonic-popup.js?v=139','./ebook-list.js?v=139','./ebook-tts-export.js?v=144','./ebook-page-speech.js?v=141','./manifest.webmanifest','./app-icon-192.png','./app-icon-512.png'].map(path=>new URL(path,base).href);
 const allowed=new Set(core.map(url=>new URL(url).pathname));allowed.add(new URL('index.html',base).pathname);
